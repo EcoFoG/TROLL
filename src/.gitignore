@@ -1,0 +1,9 @@
+*.o
+*.out
+*.so
+*.dll
+*.txt
+./OUTPUT
+*.sublime-project
+*.sublime-workspace
+*.xlsx

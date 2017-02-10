@@ -1,0 +1,11 @@
+Package: TROLL
+Type: Package
+Title: Personal package to use TROLL model
+Version: 0.1.9001
+Author: Sylvain SCHMITT
+Maintainer: Sylvain SCHMITT <sylvain.schmitt@agroparistech.fr>
+Description: Function and code to manage and use forest model indivdual-based spatially-explicit TROLL.
+License: GPL 3
+LazyData: TRUE
+LinkingTo: Rcpp
+Imports: Rcpp
