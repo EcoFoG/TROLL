@@ -6,6 +6,7 @@ NULL
 #'This is an S4 class to represent TROLL outputs.
 #'
 #'@slot name char. model name
+#'@slot path char. path to the model
 #'@slot abundances list. abundances data frames
 #'@slot agb df. agb data frame
 #'@slot ba list. ba data frames
@@ -28,6 +29,7 @@ NULL
 setClass('TROLLoutput',
          representation(
            name = 'character',
+           path = 'character',
            abundances = 'list',
            agb = 'data.frame',
            ba = 'list',
@@ -50,6 +52,7 @@ setClass('TROLLoutput',
          ),
          prototype(
            name = character(),
+           path = character(),
            abundances = list(),
            agb = data.frame(),
            ba = list(),
@@ -72,6 +75,7 @@ setClass('TROLLoutput',
 
 TROLLoutput <- function(
   name = character(),
+  path = character(),
   abundances = list(),
   agb = data.frame(),
   ba = list(),
@@ -92,6 +96,7 @@ TROLLoutput <- function(
 ){
   return(new('TROLLoutput',
              name = name,
+             path = path,
              abundances = abundances,
              agb = agb,
              ba = ba,

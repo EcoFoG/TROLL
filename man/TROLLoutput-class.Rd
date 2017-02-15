@@ -12,6 +12,8 @@ This is an S4 class to represent TROLL outputs.
 \describe{
 \item{\code{name}}{char. model name}
 
+\item{\code{path}}{char. path to the model}
+
 \item{\code{abundances}}{list. abundances data frames}
 
 \item{\code{agb}}{df. agb data frame}

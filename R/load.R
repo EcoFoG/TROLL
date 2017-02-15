@@ -28,6 +28,7 @@ load <- function(name, path = getwd()){
   # Opening files
   x <- TROLLoutput(
     name = name,
+    path = path,
     abundances = list(
       abund = read.table(file.path(path, paste0(name, '_0_abund.txt')), row.names = 1),
       abu10 = read.table(file.path(path, paste0(name, '_0_abu10.txt')), row.names = 1),
@@ -106,16 +107,18 @@ load <- function(name, path = getwd()){
                     skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 8),
         maxIrradiance = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
                              skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 9),
+        irradiance = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
+                             skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 10),
         e_s = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                   skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 10),
-        e_a = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
                    skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 11),
-        VPS = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
+        e_a = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
                    skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 12),
+        VPD = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
+                   skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 13),
         dailymeanVPD = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                            skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 13),
+                            skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 14),
         dailymaxVPD = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                           skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 14)
+                           skip = 35 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 15)
       )
     ),
     paramspace = list(
