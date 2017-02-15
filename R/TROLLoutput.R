@@ -1,3 +1,6 @@
+#' @importFrom sp SpatialPixelsDataFrame
+NULL
+
 #'An S4 class to represent TROLL outputs
 #'
 #'This is an S4 class to represent TROLL outputs.
@@ -8,6 +11,7 @@
 #'@slot ba list. ba data frames
 #'@slot dbh df. dbh data frame
 #'@slot death list. death data frames
+#'@slot final_pattern df. final pattern data frame
 #'@slot gpp df. gpp data frame
 #'@slot info list. model info
 #'@slot litterfall df. litterfall data frame
@@ -18,7 +22,7 @@
 #'@slot R list. respiration data frames
 #'@slot site list. site data frames
 #'@slot sp_par df. species par data frame
-#'@slot vertd int. vertd through iterations
+#'@slot vertd df. vertd data.frame
 #'
 #'@export
 setClass('TROLLoutput',
@@ -30,7 +34,7 @@ setClass('TROLLoutput',
            # cica = 'data.frame', To massive
            dbh = 'data.frame',
            death = 'list',
-           # final_pattern, To massive
+           final_pattern = 'SpatialPixelsDataFrame',
            gpp = 'data.frame',
            info = 'list',
            # leafdens = 'list', To massive
@@ -42,7 +46,7 @@ setClass('TROLLoutput',
            R = 'list',
            site = 'list',
            sp_par = 'data.frame',
-           vertd = 'numeric'
+           vertd = 'data.frame'
          ),
          prototype(
            name = character(),
@@ -51,6 +55,7 @@ setClass('TROLLoutput',
            ba = list(),
            dbh = data.frame(),
            death = list(),
+           final_pattern = new('SpatialPixelsDataFrame'),
            gpp = data.frame(),
            info = list(),
            litterfall = data.frame(),
@@ -61,66 +66,29 @@ setClass('TROLLoutput',
            R = list(),
            site = list(),
            sp_par = data.frame(),
-           vertd =  numeric()
+           vertd =  data.frame()
          )
 )
 
 TROLLoutput <- function(
   name = character(),
-  abundances = list(
-    adund = data.frame(),
-    abu10 = data.frame(),
-    abu30 = data.frame()
-  ),
+  abundances = list(),
   agb = data.frame(),
-  ba = list(
-    ba = data.frame(),
-    ba10 = data.frame()
-  ),
+  ba = list(),
   dbh = data.frame(),
-  death = list(
-    death = data.frame(),
-    death1 = data.frame(),
-    death2 = data.frame(),
-    death3 = data.frame(),
-    deathrate = data.frame()
-  ),
+  death = list(),
+  final_pattern = new('SpatialPixelsDataFrame'),
   gpp = data.frame(),
-  info = list(
-    step = NA,
-    SitesNb = c(NA,NA),
-    IterationsNb = NA,
-    timestep = NA,
-    SpeciesNb = NA,
-    ComputationTime = NA
-  ),
+  info = list(),
   litterfall = data.frame(),
   npp = data.frame(),
   par = list(),
-  paramspace = list(
-    proc	= integer(),
-    phi = numeric(),
-    k = numeric(),
-    fallocwood	= numeric(),
-    falloccanopy	= numeric(),
-    m	= numeric(),
-    m1	= numeric()
-  ),
+  paramspace = list(),
   ppfd0 = data.frame(),
-  R = list(
-    Rday = data.frame(),
-    Rnight = data.frame()
-  ),
-  site = list(
-    site1 = data.frame(),
-    site2 = data.frame(),
-    site3 = data.frame(),
-    site4 = data.frame(),
-    site5 = data.frame(),
-    site6 = data.frame()
-  ),
+  R = list(),
+  site = list(),
   sp_par = data.frame(),
-  vertd = numeric()
+  vertd = data.frame()
 ){
   return(new('TROLLoutput',
              name = name,
@@ -129,6 +97,7 @@ TROLLoutput <- function(
              ba = ba,
              dbh = dbh,
              death = death,
+             final_pattern = final_pattern,
              gpp = gpp,
              info = info,
              litterfall = litterfall,

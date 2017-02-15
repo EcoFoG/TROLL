@@ -8,7 +8,7 @@
 \S4method{print}{TROLLoutput}(x, ...)
 }
 \arguments{
-\item{TROLLoutput}{}
+\item{x}{TROLLoutput}
 }
 \value{
 Print in console

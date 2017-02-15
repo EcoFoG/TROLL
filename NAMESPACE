@@ -2,5 +2,9 @@
 
 export(load)
 exportClasses(TROLLoutput)
+exportMethods(plot)
 exportMethods(print)
 import(methods)
+importFrom(sp,"coordinates<-")
+importFrom(sp,"gridded<-")
+importFrom(sp,SpatialPixelsDataFrame)

@@ -22,6 +22,8 @@ This is an S4 class to represent TROLL outputs.
 
 \item{\code{death}}{list. death data frames}
 
+\item{\code{final_pattern}}{df. final pattern data frame}
+
 \item{\code{gpp}}{df. gpp data frame}
 
 \item{\code{info}}{list. model info}
@@ -42,6 +44,6 @@ This is an S4 class to represent TROLL outputs.
 
 \item{\code{sp_par}}{df. species par data frame}
 
-\item{\code{vertd}}{int. vertd through iterations}
+\item{\code{vertd}}{df. vertd data.frame}
 }}
 

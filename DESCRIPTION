@@ -1,7 +1,7 @@
 Package: TROLL
 Type: Package
 Title: Personal package to use TROLL model
-Version: 0.1.9002
+Version: 0.1.9003
 Author: Sylvain SCHMITT
 Maintainer: Sylvain SCHMITT <sylvain.schmitt@agroparistech.fr>
 Description: Function and code to manage and use forest model indivdual-based
@@ -16,4 +16,5 @@ RoxygenNote: 5.0.1
 Collate:
     'TROLLoutput.R'
     'load.R'
+    'plot.TOLLoutput.R'
     'print.TROLLoutput.R'
