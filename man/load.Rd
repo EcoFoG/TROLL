@@ -23,4 +23,3 @@ path = './src/OUTPUT/test2/'
 load(name, path)
 
 }
-

@@ -42,4 +42,3 @@ Available plots
 \examples{
 
 }
-

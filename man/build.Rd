@@ -15,4 +15,3 @@ Function to build TROLL code
 \examples{
 
 }
-

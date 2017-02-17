@@ -4,7 +4,8 @@
 \alias{run}
 \title{Run TROLL}
 \usage{
-run(name, input = "./src/input.txt", path = "./src/OUTPUT")
+run(name, input = "./src/input.txt", path = "./src/OUTPUT",
+  overwrite = FALSE)
 }
 \arguments{
 \item{name}{char. name of the model}
@@ -12,6 +13,8 @@ run(name, input = "./src/input.txt", path = "./src/OUTPUT")
 \item{input}{char. input file path}
 
 \item{path}{char. apth to save the ouptuts}
+
+\item{overwrite}{logical. allow to overwrite existing outputs files}
 }
 \value{
 model output files in the path folder
@@ -22,4 +25,3 @@ Function to run TROLL code
 \examples{
 
 }
-

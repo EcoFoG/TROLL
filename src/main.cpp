@@ -22,6 +22,7 @@
  ###    version 2.11 --- IM - jan 2016 (timestep better used and two input files - one for species, one for climate and environment parameters)
  ###    version 2.12 --- JC - jan 2016 porting to GitHub for social coding, check of the MPI routines and update, new header for code, trivia: reindentation (orphan lines removed)
  ###    version 2.2 --- IM - may 2016 core changes in: daily coupling with environment; respiration; treefall module
+ ###    version dev --- SS - febr 2017 disturbance module implementation
  ###
  ####################################################################*/
 
@@ -48,6 +49,7 @@
 #undef SEEDTRADEOFF     /* if defined: the number of seeds produced by each tree is determined by the tree NPP allocated to reproduction and the species seed mass, otherwise the number of seeds is fixed; besides, seedling recruitment in one site is not made by randomly and 'equiprobably' picking one species among the seeds present at that site but the probability of recruitment among the present seeds is proportional to the number of seeds (in s_Seed[site]) time the seed mass of each species */
 #undef NDD              /*if defined, negative density dependant processes affect both the probablilty of seedling recruitment and the local tree death rate. The term of density-dependance is computed as the sum of conspecific tree basal area divided by their distance to the focal tree within a neighbourhood (circle of radius 15m) */
 
+#define DISTURBANCE      /* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
 
 /* Libraries */
 # include <cstdio>
@@ -128,6 +130,10 @@ Cair;               /* atmosphericCO2 concentration, if we aim at making CO2 var
 float daily_light[24];    /* normalized (ie between 0 and 1) daily light variation (used if DAILYLIGHT defined) */
 float daily_vpd[24];      /* normalized (ie between 0 and 1) daily vpd variation (used if DAILYLIGHT defined) */
 float daily_T[24];        /* normalized (ie between 0 and 1) daily T variation (used if DAILYLIGHTdefined) */
+
+/* new disturbance module */
+int disturb_iter;       /* iteration step where the disturbation occure */
+float disturb_intensity;      /* intensity of disturbance in percent of BA */
 
 
 /*********************************************/
@@ -253,6 +259,7 @@ Initialise(void),
 AllocMem(void),
 BirthInit(void),
 Evolution(void),
+Disturbance(void), /* new disturbance module */ 
 UpdateField(void),
 #ifdef BASICTREEFALL /* new v.2.2 */
 UpdateTreefall(void),
@@ -1666,6 +1673,8 @@ void Initialise() {
         if(nbout) freqout = nbiter/nbout;
         In >> numesp; In.getline(buffer,128,'\n');
         In >> p; In.getline(buffer,128,'\n');
+        In >> disturb_iter; In.getline(buffer,128,'\n');
+        In >> disturb_intensity; In.getline(buffer,128,'\n');
         for (int i=0; i<=23; i++) In >> daily_light[i];
         In.getline(buffer,128,'\n');
         for (int i=0; i<=23; i++) In >> daily_vpd[i];
@@ -2186,6 +2195,9 @@ void BirthInit() {
 
 void Evolution() {
     
+#ifdef DISTURBANCE
+    Disturbance();                      /* Create a disturbance for a given iteration */
+#endif
     UpdateField();                      /* Update light fields and seed banks */
     UpdateTree();                       /* Update trees */
 #ifdef BASICTREEFALL
@@ -2193,6 +2205,32 @@ void Evolution() {
 #endif
     Average();                          /* Compute averages for outputs */
     OutputField();                      /* Output the statistics */
+}
+
+
+/*##################################
+ ####    Compute a disturbance   ###
+ ##################################*/
+
+void Disturbance() {
+
+    int site;
+    float dbh=0.0, disturb_dbh=0.0;
+
+    for(site=1;site<=sites;site++)
+        dbh += T[site].t_dbh;
+
+    if(iter == disturb_iter) {
+        cout << "Disturbance of " << disturb_intensity * 100 << "% of BA." << endl;
+
+        while (disturb_dbh/dbh < disturb_intensity) {
+            int site=floor(genrand2()*sites);
+            disturb_dbh += T[site].t_dbh;
+            T[site].t_hurt += 10*T[site].t_Tree_Height;
+            // cout << "Site " << site << " loose is tree of dbh " << T[site].t_dbh << " disturbed ba is now " << disturb_ba << endl;
+        }
+    }
+
 }
 
 

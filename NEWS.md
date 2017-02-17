@@ -1,3 +1,17 @@
+# TO DO
+
+* automatic integration of Paracou and Guyafor data into virtual forest for simulations
+* sylviculture module in main.cpp
+* improve plot methods
+* integrate plot comparisons between models
+* document plot function
+* function to transform existing surveys in model outputs for comparisons
+* automatic integration of Paracou and Guyafor data into model outputs
+
+# TROLL 0.1.9006
+
+* DISTURBANCE module in main.cpp
+
 # TROLL 0.1.9005
 
 * virtualize.R

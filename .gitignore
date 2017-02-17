@@ -3,4 +3,4 @@
 .RData
 .Ruserdata
 .Rbuildignore
-inst/exdtata/species.txt
+inst/extdata/species.txt

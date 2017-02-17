@@ -1,3 +1,7 @@
+#' @importFrom maptools elide
+#' @importFrom sp coordinates<-
+NULL
+
 #' Virtualize
 #'
 #' Virtualize a forest survey in forest text file to initialize TROLL model
@@ -101,35 +105,41 @@ virtualize <- function(
   if(spcorrect){
     n <- length(spmis$ref$gen)
     cat(n, 'species mismatch to correct :\n')
-    iref <- c()
-    jdata <- c()
-    for(i in 1:n){
-      genmatch <- match(spmis$ref$gen[i], spmis$data$gen)
-      if(is.na(genmatch)){
-        cat(i, '/', n, ': No suggestion for', spmis$ref$sp[i], '\n')
-      } else {
-        for(j in genmatch){
-          answer <- readline(prompt = paste(i, '/', n, ': Is', spmis$data$sp[j], 'corresponding to', spmis$ref$sp[i], '(y/n) : '))
-          switch (answer,
-                  y = {
-                    data$sp[data$sp == spmis$data$sp[j]] <- spmis$ref$sp[i]
-                    spdata[spdata == spmis$data$sp[j]] <- spmis$ref$sp[i]
-                    spmatch <- c(spmatch, spmis$ref$sp[i])
-                    iref <- c(iref, i)
-                    jdata <- c(jdata, j)
-                  }
-          )
+    answer <- readline(prompt = 'Do you want to coorect theim (y/n) : ')
+    if(answer == 'y'){
+      jdata <- c()
+      for(i in 1:n){
+        genmatch <- match(spmis$ref$gen[i], spmis$data$gen)
+        if(is.na(genmatch)){
+          cat(i, '/', n, ': No suggestion for', spmis$ref$sp[i], '\n')
+        } else {
+          for(j in genmatch){
+            answer <- readline(prompt = paste(i, '/', n, ': Is', spmis$data$sp[j], 'corresponding to', spmis$ref$sp[i], '(y/n) : '))
+            switch (answer,
+                    y = {
+                      data$sp[data$sp == spmis$data$sp[j]] <- spmis$ref$sp[i]
+                      spdata[spdata == spmis$data$sp[j]] <- spmis$ref$sp[i]
+                      spmatch <- c(spmatch, spmis$ref$sp[i])
+                      iref <- c(iref, i)
+                      jdata <- c(jdata, j)
+                    }
+            )
+          }
         }
       }
+      if(length(iref) > 0){
+        spmis$ref <- spmis$ref[-iref,]
+        spmis$data <- spmis$data[-jdata,]
+      }
     }
-    spmis$ref <- spmis$ref[-iref,]
-    spmis$data <- spmis$data[-jdata,]
+    iref <- c()
   }
 
   # For now removing missing data
   spmis <- sort(spmis$data$sp)
-  spmisrep <- round(sum(data$dbh[match(spmis, data$sp)], na.rm = TRUE) / sum(data$dbh) * 100)
-  spmis <- c(paste('Missing species represents', spmisrep, '% of basal area.'), spmis)
+  spmisBA <- round(sum(data$dbh[match(spmis, data$sp)], na.rm = TRUE) / sum(data$dbh) * 100)
+  spmisInd <- round(length(match(spmis, data$sp)) / length(data$sp) * 100)
+  spmis <- c(paste(length(spmis), 'missing species representing', spmisInd, '% of individuals and', spmisBA, '% of basal area.'), spmis)
   warning(spmis[1], ' They will be removed from the data.')
   if(missing[1])
     write.table(spmis, missing[2], col.names = FALSE, row.names = FALSE, quote = FALSE)
@@ -138,8 +148,8 @@ virtualize <- function(
   # Creating the grid
   datasp <- data
   coordinates(datasp) <- c('x', 'y') # spatializing data
-  pxmin <- data[which(data$x == xmin), c('x', 'y')] # getting main points for rotation
-  pymin <- data[which(data$y == ymin), c('x', 'y')]
+  pxmin <- data[which(data$x == min(data$x)), c('x', 'y')] # getting main points for rotation
+  pymin <- data[which(data$y == min(data$y)), c('x', 'y')]
   pobj <- cbind(pxmin['x'], pymin['y'])
   x <- as.numeric(pymin - pxmin) # getting vectors
   y <- as.numeric(pobj - pxmin)
@@ -152,10 +162,9 @@ virtualize <- function(
   data$x <- round((data$x - min(data$x)) * NH)
   data$y <- round((data$y - min(data$y)) * NV)
   data <- data[order(data$dbh, decreasing = TRUE),]
-  duplicate <- row.names(data)[duplicated(data[1:2])]
-  if(length(duplicate) > 0){
-    warning(length(duplicate), ' trees occupe the same case in the grid. The biggest dbh will be kept.')
-    data <- data[-duplicate,]
+  if(length(duplicated(data[1:2])) > 0){
+    warning(length(duplicated(data[1:2])), ' trees occupe the same case in the grid. The biggest dbh will be kept.')
+    data <- data[-duplicated(data[1:2]),]
   }
   # plot(y ~ x, data, col = as.factor(sp), pch = 16, cex = dbh / 50) # To see the result
 

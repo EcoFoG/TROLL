@@ -19,4 +19,3 @@ Function to print TROLL outputs.
 \examples{
 
 }
-

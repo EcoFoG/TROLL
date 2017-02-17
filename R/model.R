@@ -21,6 +21,8 @@ NULL
 #' @param nbout int. number of outputs
 #' @param numesp int. number of species
 #' @param p num. light incidence parameter (diff through turbid medium)
+#' @param disturb_iter num. iteration step where the disturbation occure
+#' @param disturb_intensity num. intensity of disturbance in percent of BA
 #' @param daylight num. normalized daily light course (from 7am to 7 pm, with a half-hour time step)
 #' @param dayT num. normalized daily VPD course (from 7am to 7 pm, with a half-hour time step)
 #' @param dayVPD num. normalized daily T course (from 7am to 7 pm, with a half-hour time step)
@@ -66,18 +68,20 @@ model <- function(
   name,
   build = TRUE,
   input = './src/input.txt',
-  overwrite = FALSE,
+  overwrite = TRUE,
   path = './src/OUTPUT',
   # general parameters
   nbcol = 400,
   nbrows = 400,
-  nbiter = 5000,
+  nbiter = 12,
   iter = 12,
   NV = 1,
   NH = 1,
   nbout = 4,
   numesp = 163,
   p = 0.05,
+  disturb_iter = 4,
+  disturb_intensity = 0.4,
   daylight = c(0.030,	0.108, 0.208,	0.304,	0.473,	0.617,	0.723,	0.823,	0.925,
                0.965,	0.995,	0.988,	1.000,	0.942,	0.854,	0.766,	0.646,	0.493,
                0.360,	0.277,	0.183,	0.102,	0.058,	0.022),
@@ -145,7 +149,9 @@ model <- function(
 ){
   init(input = input, overwrite = overwrite, nbcol = nbcol, nbrows = nbrows,
     nbiter = nbiter, iter = iter, NV = NV, NH = NH, nbout = nbout,
-    numesp = numesp, p = p, daylight = daylight, dayT = dayT, dayVPD = dayVPD,
+    numesp = numesp, p = p, disturb_iter = disturb_iter,
+    disturb_intensity = disturb_intensity,
+    daylight = daylight, dayT = dayT, dayVPD = dayVPD,
     klight = klight, phi = phi, vC = vC, DBH0 = DBH0, H0 = H0, ra0 = ra0,
     ra1 = ra1, de0 = de0, de1 = de1, dens = dens, fbranchstem = fbranchstem,
     fcanopy = fcanopy, seedrain = seedrain, nbseeds = nbseeds,
