@@ -4,10 +4,18 @@
 \alias{build}
 \title{Build TROLL}
 \usage{
-build()
+build(src = getOption("TROLL.src"), app = getOption("TROLL.app"),
+  path = getOption("TROLL.path"), verbose = TRUE)
+}
+\arguments{
+\item{src}{char. path to src file}
+
+\item{app}{char. path to troll app (e.g. TROLL.out)}
+
+\item{path}{char. working directory}
 }
 \value{
-build the TROLL.out file in ./src
+build the TROLL app
 }
 \description{
 Function to build TROLL code

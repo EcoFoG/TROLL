@@ -4,9 +4,11 @@
 \alias{model}
 \title{Model}
 \usage{
-model(name, build = TRUE, input = "./src/input.txt", overwrite = TRUE,
-  path = "./src/OUTPUT", nbcol = 400, nbrows = 400, nbiter = 12,
-  iter = 12, NV = 1, NH = 1, nbout = 4, numesp = 163, p = 0.05,
+model(name, path = getOption("TROLL.path"), src = getOption("TROLL.src"),
+  app = getOption("TROLL.app"), input = getOption("TROLL.init"),
+  output = getOption("TROLL.output"), build = TRUE, overwrite = TRUE,
+  verbose = TRUE, nbcol = 400, nbrows = 400, nbiter = 12, iter = 12,
+  NV = 1, NH = 1, nbout = 4, numesp = 163, p = 0.05,
   disturb_iter = 4, disturb_intensity = 0.4, daylight = c(0.03, 0.108,
   0.208, 0.304, 0.473, 0.617, 0.723, 0.823, 0.925, 0.965, 0.995, 0.988, 1,
   0.942, 0.854, 0.766, 0.646, 0.493, 0.36, 0.277, 0.183, 0.102, 0.058, 0.022),
@@ -18,14 +20,13 @@ model(name, build = TRUE, input = "./src/input.txt", overwrite = TRUE,
   vC = 0.1, DBH0 = 0.01, H0 = 1, ra0 = 0.5, ra1 = 10, de0 = 0.3,
   de1 = 0.12, dens = 0.8, fbranchstem = 0.35, fcanopy = 0.3,
   seedrain = 200, nbseeds = 10, mindeathrate = 0.035, m1 = 0.035,
-  CO2 = 360, species = read.table(system.file("extdata", "species.txt",
-  package = "TROLL"), header = TRUE, dec = ".", sep = ""),
-  Tyear = c(24.64982014, 24.60624211, 24.49933474, 24.96279395, 24.88365139,
-  24.87594184, 24.98313802, 25.68910135, 26.58033805, 26.98619405, 25.87259696,
-  25.16530008), maxT = c(29.08402, 28.86072, 28.51707, 29.56514, 29.0068,
-  29.83177, 30.19183, 31.34605, 32.93941, 33.14729, 31.72165, 30.32959),
-  nightmeanT = c(23.22247, 23.15235, 23.21073, 23.35492, 23.58619, 23.29334,
-  23.3578, 23.6699, 24.09092, 24.55815, 23.71159, 23.34976),
+  CO2 = 360, species = read.table(getOption("TROLL.species"), header = TRUE,
+  dec = ".", sep = ""), Tyear = c(24.64982014, 24.60624211, 24.49933474,
+  24.96279395, 24.88365139, 24.87594184, 24.98313802, 25.68910135, 26.58033805,
+  26.98619405, 25.87259696, 25.16530008), maxT = c(29.08402, 28.86072,
+  28.51707, 29.56514, 29.0068, 29.83177, 30.19183, 31.34605, 32.93941, 33.14729,
+  31.72165, 30.32959), nightmeanT = c(23.22247, 23.15235, 23.21073, 23.35492,
+  23.58619, 23.29334, 23.3578, 23.6699, 24.09092, 24.55815, 23.71159, 23.34976),
   rainfall = c(296.726, 253.528, 454.302, 320.562, 425.2, 277.966, 163.426,
   102.012, 43.834, 26.466, 76, 157.1), wind = c(0.901671724, 0.864544643,
   0.836516801, 0.851327994, 0.787419637, 0.774398649, 0.831167015, 0.91152957,
@@ -50,13 +51,21 @@ model(name, build = TRUE, input = "./src/input.txt", overwrite = TRUE,
 \arguments{
 \item{name}{char. name of the model}
 
-\item{build}{logical. do you want to (re)-build the model}
+\item{path}{char. working directory}
 
-\item{input}{char. input file path}
+\item{src}{char. path to src file}
+
+\item{app}{char. path to troll app (e.g. TROLL.out)}
+
+\item{input}{char. input file to create}
+
+\item{output}{char. name of the folder to save outputs}
+
+\item{build}{logical. do you want to (re)-build the model}
 
 \item{overwrite}{logical. allow to overwrite existing input and outputs files}
 
-\item{path}{char. path to save the ouptuts}
+\item{verbose}{logical. allow output in console}
 
 \item{nbcol}{int. number of columns}
 

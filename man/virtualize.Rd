@@ -4,10 +4,11 @@
 \alias{virtualize}
 \title{Virtualize}
 \usage{
-virtualize(forest = "./src/forest.txt", overwrite = FALSE,
+virtualize(forest = getOption("TROLL.forest"),
+  path = getOption("TROLL.path"), overwrite = FALSE,
   species = read.table(system.file("extdata", "species.txt", package =
   "TROLL"), header = TRUE, dec = ".", sep = "", row.names = 1),
-  missing = c(TRUE, "./src/missing.txt"), spcorrect = TRUE,
+  missing = getOption("TROLL.missing"), spcorrect = TRUE,
   data = read.csv("~/Documents/BIOGET/Projet/Data/paracou data - corrected DBH/paracou_p1_15.csv"),
   plotcol = "n_parcelle", xcol = "Xutm", ycol = "Yutm",
   censuscol = "campagne", spcol = c("Genre", "espece"), dbhcol = "dbh_c",

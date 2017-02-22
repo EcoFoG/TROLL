@@ -2214,11 +2214,15 @@ void Evolution() {
 
 void Disturbance() {
 
+	// Two issues:
+	// 1 - Can the function go two times on the same site and count two time the same dbh ?
+	// 2 - If the last tree selected dbh explode the disturbance intensity (need to add real disturbance intensity output ?)
+
     int site;
     float dbh=0.0, disturb_dbh=0.0;
 
     for(site=1;site<=sites;site++)
-        dbh += T[site].t_dbh;
+        dbh += T[site].t_dbh;  
 
     if(iter == disturb_iter) {
         cout << "Disturbance of " << disturb_intensity * 100 << "% of BA." << endl;
@@ -2227,7 +2231,7 @@ void Disturbance() {
             int site=floor(genrand2()*sites);
             disturb_dbh += T[site].t_dbh;
             T[site].t_hurt += 10*T[site].t_Tree_Height;
-            // cout << "Site " << site << " loose is tree of dbh " << T[site].t_dbh << " disturbed ba is now " << disturb_ba << endl;
+            // cout << "Site " << site << " loose is tree of dbh " << T[site].t_dbh << " disturbed dbh is now " << disturb_dbh << endl;
         }
     }
 

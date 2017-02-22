@@ -3,9 +3,12 @@
 #' Function to run TROLL code
 #'
 #' @param name char. name of the model
-#' @param input char. input file path
-#' @param path char. apth to save the ouptuts
+#' @param path char. working directory
+#' @param app char. path to troll app (e.g. TROLL.out)
+#' @param input char. input file
+#' @param output char. name of the folder to save outputs
 #' @param overwrite logical. allow to overwrite existing outputs files
+#' @param verbose logical. allow output in console
 #'
 #' @return model output files in the path folder
 #'
@@ -14,23 +17,31 @@
 #' @examples
 #'
 run <- function(name,
-                input = './src/input.txt',
-                path = './src/OUTPUT',
-                overwrite = FALSE){
+                path = getOption("TROLL.path"),
+                app = getOption("TROLL.app"),
+                input = getOption("TROLL.init"),
+                output = getOption("TROLL.output"),
+                overwrite = TRUE,
+                verbose = TRUE){
 
-  if(name %in% list.dirs(path, full.names = FALSE)[-1]){
+  if(name %in% list.dirs(file.path(path, output), full.names = FALSE)[-1]){
     if(!overwrite)
       stop('Outputs already exist, use overwrite = T.')
-    path <- file.path(path, name)
-    unlink(path, recursive = TRUE)
+    path_o <- file.path(path, output, name)
+    unlink(path_o, recursive = TRUE)
   } else {
-    path <- file.path(path, name)
+    path_o <- file.path(path, output, name)
   }
-  dir.create(path)
+  dir.create(path_o)
 
-  input <- substring(input, 3)
-  input <- paste0("'", input, "'")
-  path <- paste0(path, '/', name)
-  command <- paste0('./src/TROLL.out -i', input, ' -o', path)
+  app_c <- paste0('./', app)
+  input_c <- paste0("'", input, "'")
+  output_c <- file.path(paste0('./', output), name, name)
+  command <- paste0('cd ', path, ' ; ',
+                    app_c,
+                    ' -i', input_c, 
+                    ' -o', output_c)
+  if(verbose)
+    cat(command, '\n')
   system(command)
 }

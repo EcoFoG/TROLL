@@ -13,9 +13,6 @@ NULL
 #' @export
 #'
 #' @examples
-#' name = 'test2'
-#' path = './src/OUTPUT/test2/'
-#' load(name, path)
 #'
 load <- function(name, path = getwd()){
 

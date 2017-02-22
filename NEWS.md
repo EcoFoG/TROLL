@@ -7,6 +7,12 @@
 * document plot function
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
+* document TROLL pkg options
+* fix `init.R` and `load.R` in new workflow
+
+# TROLL 0.1.9007
+
+* New workflow woth working directory and TROLL pkg options
 
 # TROLL 0.1.9006
 

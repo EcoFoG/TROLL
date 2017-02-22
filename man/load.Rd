@@ -18,8 +18,5 @@ an S4 \linkS4class{TROLLoutput} class object
 Function to load TROLL output
 }
 \examples{
-name = 'test2'
-path = './src/OUTPUT/test2/'
-load(name, path)
 
 }

@@ -1,5 +1,6 @@
 #' @importFrom maptools elide
-#' @importFrom sp coordinates<-
+#' @importFrom sp coordinates<- 
+#' @importFrom sp coordinates
 NULL
 
 #' Virtualize
@@ -33,12 +34,13 @@ NULL
 #'
 virtualize <- function(
   # file
-  forest = './src/forest.txt',
+  forest = getOption("TROLL.forest"),
+  path = getOption("TROLL.path"),
   overwrite = FALSE,
   # species data
   species = read.table(system.file("extdata", "species.txt",  package = 'TROLL'),
                        header=TRUE, dec=".", sep="", row.names = 1),
-  missing = c(TRUE, './src/missing.txt'),
+  missing = getOption("TROLL.missing"),
   spcorrect = TRUE,
   # data
   data = read.csv("~/Documents/BIOGET/Projet/Data/paracou data - corrected DBH/paracou_p1_15.csv"),
@@ -141,8 +143,8 @@ virtualize <- function(
   spmisInd <- round(length(match(spmis, data$sp)) / length(data$sp) * 100)
   spmis <- c(paste(length(spmis), 'missing species representing', spmisInd, '% of individuals and', spmisBA, '% of basal area.'), spmis)
   warning(spmis[1], ' They will be removed from the data.')
-  if(missing[1])
-    write.table(spmis, missing[2], col.names = FALSE, row.names = FALSE, quote = FALSE)
+  if(!is.null(missing))
+    write.table(spmis, file.path(path, missing), col.names = FALSE, row.names = FALSE, quote = FALSE)
   data <- data[-match(spmis[-1], data$sp),]
 
   # Creating the grid
@@ -170,12 +172,8 @@ virtualize <- function(
 
   # Writting table
   data <- data[order(data$x, data$y),]
-  path <- unlist(strsplit(forest, '/'))
-  name <- tail(path, 1)
-  path <- path[-length(path)]
-  path <- do.call(file.path, as.list(path))
   if(!overwrite)
-    if(name %in% list.files(path))
+    if(forest %in% list.files(path))
       stop('The file already exist, use overwrite = T.')
-  write.table(data, file = forest, row.names = FALSE, quote = FALSE, sep = '\t')
+  write.table(data, file = file.path(path, forest), row.names = FALSE, quote = FALSE, sep = '\t')
 }

@@ -4,17 +4,24 @@
 \alias{run}
 \title{Run TROLL}
 \usage{
-run(name, input = "./src/input.txt", path = "./src/OUTPUT",
-  overwrite = FALSE)
+run(name, path = getOption("TROLL.path"), app = getOption("TROLL.app"),
+  input = getOption("TROLL.init"), output = getOption("TROLL.output"),
+  overwrite = TRUE, verbose = TRUE)
 }
 \arguments{
 \item{name}{char. name of the model}
 
-\item{input}{char. input file path}
+\item{path}{char. working directory}
 
-\item{path}{char. apth to save the ouptuts}
+\item{app}{char. path to troll app (e.g. TROLL.out)}
+
+\item{input}{char. input file}
+
+\item{output}{char. name of the folder to save outputs}
 
 \item{overwrite}{logical. allow to overwrite existing outputs files}
+
+\item{verbose}{logical. allow output in console}
 }
 \value{
 model output files in the path folder

@@ -8,10 +8,14 @@ NULL
 #' Create and open a TROLL model
 #'
 #' @param name char. name of the model
+#' @param path char. working directory
+#' @param src char. path to src file
+#' @param app char. path to troll app (e.g. TROLL.out)
+#' @param input char. input file to create
+#' @param output char. name of the folder to save outputs
 #' @param build logical. do you want to (re)-build the model
-#' @param input char. input file path
-#' @param path char. path to save the ouptuts
 #' @param overwrite logical. allow to overwrite existing input and outputs files
+#' @param verbose logical. allow output in console
 #' @param nbcol int. number of columns
 #' @param nbrows int. number of rows
 #' @param nbiter int. total number of time step
@@ -66,10 +70,14 @@ NULL
 model <- function(
   # function options
   name,
+  path = getOption("TROLL.path"),
+  src = getOption("TROLL.src"),
+  app = getOption("TROLL.app"),
+  input = getOption("TROLL.init"),
+  output = getOption("TROLL.output"),
   build = TRUE,
-  input = './src/input.txt',
   overwrite = TRUE,
-  path = './src/OUTPUT',
+  verbose = TRUE,
   # general parameters
   nbcol = 400,
   nbrows = 400,
@@ -110,7 +118,7 @@ model <- function(
   m1 = 0.035,
   CO2 = 360,
   # species data
-  species = read.table(system.file("extdata", "species.txt",  package = 'TROLL'),
+  species = read.table(getOption("TROLL.species"),
                        header=TRUE, dec=".", sep=""),
   # climate data
   Tyear = c(24.64982014,	24.60624211,	24.49933474,	24.96279395,	24.88365139,
@@ -145,25 +153,64 @@ model <- function(
                    1.1442166,	0.8511218),
   dailymaxVPD = c(1.183852,	1.178975,	1.074576,	1.305361,	1.034367,	1.280059,
                   1.439207,	1.787562,	2.418552,	2.471909,	2.020966,	1.567758)
-
 ){
-  init(input = input, overwrite = overwrite, nbcol = nbcol, nbrows = nbrows,
-    nbiter = nbiter, iter = iter, NV = NV, NH = NH, nbout = nbout,
-    numesp = numesp, p = p, disturb_iter = disturb_iter,
+  init(path = path, 
+       input = input, 
+       overwrite = overwrite, 
+       nbcol = nbcol, 
+       nbrows = nbrows,
+    nbiter = nbiter, 
+    iter = iter, 
+    NV = NV, 
+    NH = NH, 
+    nbout = nbout,
+    numesp = numesp, 
+    p = p, 
+    disturb_iter = disturb_iter,
     disturb_intensity = disturb_intensity,
-    daylight = daylight, dayT = dayT, dayVPD = dayVPD,
-    klight = klight, phi = phi, vC = vC, DBH0 = DBH0, H0 = H0, ra0 = ra0,
-    ra1 = ra1, de0 = de0, de1 = de1, dens = dens, fbranchstem = fbranchstem,
-    fcanopy = fcanopy, seedrain = seedrain, nbseeds = nbseeds,
-    mindeathrate = mindeathrate, m1 = m1, CO2 = CO2, species = species,
-    Tyear = Tyear, maxT = maxT, nightmeanT = nightmeanT,
-    rainfall = rainfall, wind = wind, maxIrradiance = maxIrradiance,
-    irradiance = irradiance, e_s = e_s, e_a = e_a, VPD = VPD,
-    dailymeanVPD = dailymeanVPD, dailymaxVPD = dailymaxVPD)
+    daylight = daylight, 
+    dayT = dayT, 
+    dayVPD = dayVPD,
+    klight = klight, 
+    phi = phi, 
+    vC = vC, 
+    DBH0 = DBH0, 
+    H0 = H0, 
+    ra0 = ra0,
+    ra1 = ra1, 
+    de0 = de0, 
+    de1 = de1, 
+    dens = dens, 
+    fbranchstem = fbranchstem,
+    fcanopy = fcanopy, 
+    seedrain = seedrain, 
+    nbseeds = nbseeds,
+    mindeathrate = mindeathrate, 
+    m1 = m1, 
+    CO2 = CO2, 
+    species = species,
+    Tyear = Tyear, 
+    maxT = maxT, 
+    nightmeanT = nightmeanT,
+    rainfall = rainfall, 
+    wind = wind, 
+    maxIrradiance = maxIrradiance,
+    irradiance = irradiance, 
+    e_s = e_s, 
+    e_a = e_a, 
+    VPD = VPD,
+    dailymeanVPD = dailymeanVPD, 
+    dailymaxVPD = dailymaxVPD)
   if(build)
     build()
-  run(name = name, input = input, path = path, overwrite = overwrite)
-  path <- file.path(path, name)
+  run(name = name,
+      path = path,
+      app = app,
+      input = input,
+      output = output,
+      overwrite = overwrite,
+      verbose = verbose)
+  path <- file.path(path, output, name)
   model <- load(name = name, path = path)
 
   return(model)

@@ -2,7 +2,8 @@
 #'
 #' Create the parameter file for the TROLL program
 #'
-#' @param file int. path to the file to create
+#' @param path char. working directory
+#' @param input char. input file to create
 #' @param overwrite logical. allow to overwrite existing input file
 #' @param nbcol int. number of columns
 #' @param nbrows int. number of rows
@@ -57,12 +58,13 @@
 #'
 init <- function(
   # file
-  input = './src/input.txt',
+  path = getOption("TROLL.path"),
+  input = getOption("TROLL.init"),
   overwrite = TRUE,
   # general parameters
   nbcol = 400,
   nbrows = 400,
-  nbiter = 5000,
+  nbiter = 12,
   iter = 12,
   NV = 1,
   NH = 1,
@@ -99,7 +101,7 @@ init <- function(
   m1 = 0.035,
   CO2 = 360,
   # species data
-  species = read.table(system.file("extdata", "species.txt",  package = 'TROLL'),
+  species = read.table(getOption("TROLL.species"),
                        header=TRUE, dec=".", sep=""),
   # climate data
   Tyear = c(24.64982014,	24.60624211,	24.49933474,	24.96279395,	24.88365139,
@@ -136,14 +138,10 @@ init <- function(
                   1.439207,	1.787562,	2.418552,	2.471909,	2.020966,	1.567758)
 ){
   # Creating and opening file
-  path <- unlist(strsplit(input, '/'))
-  name <- tail(path, 1)
-  path <- path[-length(path)]
-  path <- do.call(file.path, as.list(path))
   if(!overwrite)
-    if(name %in% list.files(path))
+    if(input %in% list.files(path))
       stop('The file already exist, use overwrite = T.')
-  fileConn <- file(input)
+  fileConn <- file(file.path(path, input))
 
   # Writing file
   writeLines(c(
