@@ -187,7 +187,7 @@ init <- function(
 
   names(species)[1] <- '****'
   suppressWarnings(
-  write.table(species, input, sep = "\t", append = TRUE,
+  write.table(species, file.path(path, input), sep = "\t", append = TRUE,
               row.names = FALSE, quote = FALSE)
   )
 
@@ -205,5 +205,5 @@ init <- function(
     do.call(paste, as.list(c(VPD, '/* VPD in kPa */', sep = '\t'))), '\n',
     do.call(paste, as.list(c(dailymeanVPD, '/* Daily mean VPD in kPa */', sep = '\t'))), '\n',
     do.call(paste, as.list(c(dailymaxVPD, '/* daily max VPD in kPa */', sep = '\t')))
-  ), file = input, append = TRUE)
+  ), file = file.path(path, input), append = TRUE)
 }

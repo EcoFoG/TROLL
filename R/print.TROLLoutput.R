@@ -11,6 +11,8 @@ NULL
 #'
 #' @examples
 #'
+#' @name print.TROLLoutput
+#' 
 setMethod('print', 'TROLLoutput', function(x, ...) {
 
   cat('Object of class :', class(x)[1],'\n\n')

@@ -2,13 +2,17 @@
 
 * automatic integration of Paracou and Guyafor data into virtual forest for simulations
 * sylviculture module in main.cpp
-* improve plot methods
+* improve plot methods (to precise)
 * integrate plot comparisons between models
-* document plot function
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
-* document TROLL pkg options
-* fix `init.R` and `load.R` in new workflow
+
+# TROLL 0.1.9008
+
+* fix init.R
+* doc TROLL pkg options
+* doc plut function
+* default plot
 
 # TROLL 0.1.9007
 
