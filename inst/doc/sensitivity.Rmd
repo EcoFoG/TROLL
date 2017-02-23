@@ -1,0 +1,86 @@
+---
+title: "Trait sensitivity analysis"
+author: "Sylvain Schmitt"
+date: '`r Sys.Date()`'
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r config, message=FALSE, warning=FALSE, include=FALSE}
+library(knitr)
+library(parallel)
+cores <- detectCores() - 1
+library(TROLL)
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
+    cache = T, cache.lazy = F)
+```
+
+Built with `TROLL` package version `r packageVersion('TROLL')` available at https://gitlab.com/sylvain.schmitt/TROLL.
+
+# Material and methods
+
+## Functionnal traits
+
+TROLL model currently encompass following traits:
+
+```{r traits}
+species  <- read.table(getOption("TROLL.species"), header=TRUE, dec=".", sep="", row.names = 1)
+species <- species[c('Nmass', 'LMA', 'wsg', 'dmax', 'hmax', 'ah', 'Pmass', 'g1')]
+means <- apply(species, 2, mean)
+vars <- apply(species, 2, var)
+species[c('mean', 'var'),] <- rbind(means, vars)
+species <- species[c('mean', 'var'),]
+kable(t(species))
+```
+
+Table 1: Functional traits of TROLL model species *Traits with their abbreviation, standard unit, mean and variance.*
+
+## Sensitivity analysis
+
+```{r parameters}
+time <- 1 # years
+```
+
+To assess the sensitivity of TROLL model to species functionnal traits, we performed a sensitivity analysis by fixing species trait values to their mean. Each trait was tested independently. Simulations were conducted on ... We assumed maturity of the forest after `r time` years of regeneration [@Li]. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity).
+
+# Results
+
+```{r simulations}
+options(TROLL.output = "sensitivity")
+sim <- list()
+# Generating
+# build(verbose = F)
+# for(trait in c(names(species), 'control')){
+#   if(trait == 'control'){
+#       init(nbiter = time * 12, disturb_iter = time * 12 + 1) # No disturbance
+#   } else {
+#     sp_data <-  read.table(getOption("TROLL.species"), header = TRUE, dec = ".", sep = "")
+#     sp_data[trait] <- species['mean', trait]
+#     init(nbiter = time * 12, disturb_iter = time * 12 + 1, species = sp_data) # No disturbance
+#   }
+#   run(name = trait, verbose = F)
+# }
+# Opening
+for(trait in c(names(species), 'control')){
+  sim[[trait]] <- load(name = trait, path = file.path(getOption("TROLL.path"), getOption("TROLL.output"), trait))
+}
+```
+
+```{r graph}
+n10 <- compareplot(sim, 'abu10', legend = F)
+n30 <- compareplot(sim, 'abu30')
+agb <- compareplot(sim, 'agb', legend = F)
+gpp <- compareplot(sim, 'gpp', legend = F)
+cowplot::plot_grid(n10, n30, agb, gpp, labels=c("N10", "N30", "AGB", "GPP"), ncol = 2, nrow = 2)
+```
+
+Figure 1: Sensitivity analysis. *Evolution in time of number of stems above 10 cm dbh (N10) and 30 cm dbh (N30), aboveground biomass (AGB) and leaf groth primary production (GPP) in control TROLL model or by fixing species functionnal traits to their mean.*
+
+# Discussion
+
+# References
