@@ -180,8 +180,6 @@ setMethod('plot', 'TROLLoutput', function(x, y = NULL, ...) {
           'age' = {
             plot(x@final_pattern['age'],
                  col=rev(heat.colors(10)),
-                 xlim=c(0,x_max),
-                 ylim=c(0,y_max),
                  main="TROLL age distribution",
                  xlab="x (m)",
                  ylab="y (m)"

@@ -15,6 +15,7 @@ library(knitr)
 library(parallel)
 cores <- detectCores() - 1
 library(TROLL)
+library(plotly)
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
     cache = T, cache.lazy = F)
@@ -67,7 +68,7 @@ options(TROLL.output = "sensitivity")
 
 ```{r opening}
 # traits <- c(names(species), 'control')
-# traits <- traits[-which(traits == 'ah')]
+# traits <- traits
 # cl <- makeCluster(getOption("cl.cores", cores))
 # path <- file.path(getOption("TROLL.path"), getOption("TROLL.output"))
 # clusterExport(cl, list("traits", "path"))
@@ -96,13 +97,13 @@ Figure 1: Sensitivity analysis. *Evolution in time of number of stems above 10 c
 # Supplementray materials
 
 ```{r graph sup}
-compareplot(sim, 'abu10')
+ggplotly(compareplot(sim, 'abu10'))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'abu30')
+ggplotly(compareplot(sim, 'abu30'))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'agb')
+ggplotly(compareplot(sim, 'agb'))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'gpp')
+ggplotly(compareplot(sim, 'gpp'))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
 ```
 

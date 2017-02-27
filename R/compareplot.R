@@ -1,4 +1,4 @@
-#' @importFrom ggplot2 ggplot aes geom_point xlab ylab scale_colour_hue theme_bw theme scale_x_continuous
+#' @importFrom ggplot2 ggplot aes geom_point xlab ylab scale_colour_hue theme_bw theme scale_x_continuous geom_line
 NULL
 
 #' Compare plot
@@ -33,9 +33,10 @@ compareplot <- function(sim, output = 'agb', legend = TRUE){
                 'gpp' = "Total GPPLeaf (in MgC/ha)"
                 )
   g <- ggplot(table, aes(x = time, y = output, colour = trait)) +
-    geom_point(size=2, fill = "white") +
+    geom_point(size=0.5) +
+    geom_line() +
     xlab('Times (years)') +
-    scale_x_continuous(breaks = seq(0, max(time), length.out = sim[[1]]@par$general$nbiter/sim[[1]]@par$general$iter+1)) +
+    scale_x_continuous(breaks = seq(0, max(time), length.out = (sim[[1]]@par$general$nbiter/sim[[1]]@par$general$iter)/50+1)) +
     ylab(lab) +
     theme_bw()
   if(legend)

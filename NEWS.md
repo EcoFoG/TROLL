@@ -7,6 +7,13 @@
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
 
+# TROLL 0.1.9010
+
+* DISTURBANCE module with `Tree[site].t_death()` in `main.cpp`
+* Other DISTURBANCE module fix in `main.cpp`
+* sensitive analysis end
+* interactive sensitive analysis doc `sensitivitly.Rmd` with `plotly`package
+
 # TROLL 0.1.9009
 
 * trait sensitivity analysis > sensitivity.Rmd
