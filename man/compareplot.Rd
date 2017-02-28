@@ -4,7 +4,7 @@
 \alias{compareplot}
 \title{Compare plot}
 \usage{
-compareplot(sim, output = "agb", legend = TRUE)
+compareplot(sim, output = "agb", legend = TRUE, reduce = 12)
 }
 \arguments{
 \item{sim}{list of TROLL.output. TROLL model outputs to compare}
@@ -12,6 +12,8 @@ compareplot(sim, output = "agb", legend = TRUE)
 \item{output}{char. Output to compare (abu10, abu30, agb and gpp available)}
 
 \item{legend}{logical. add legend}
+
+\item{reduce}{int. factor to reduce number of outputs points (default 12 months reduced to one year)}
 }
 \value{
 ggplot2 object

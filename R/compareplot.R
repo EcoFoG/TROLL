@@ -8,6 +8,7 @@ NULL
 #' @param sim list of TROLL.output. TROLL model outputs to compare
 #' @param output char. Output to compare (abu10, abu30, agb and gpp available)
 #' @param legend logical. add legend
+#' @param reduce int. factor to reduce number of outputs points (default 12 months reduced to one year)
 #'
 #' @return ggplot2 object
 #' 
@@ -15,7 +16,10 @@ NULL
 #'
 #' @examples
 #' 
-compareplot <- function(sim, output = 'agb', legend = TRUE){
+compareplot <- function(sim, 
+                        output = 'agb', 
+                        legend = TRUE,
+                        reduce = 12){
   time <- seq(1,sim[[1]]@par$general$nbiter,1)/sim[[1]]@par$general$iter
   if(grepl('abu', output)){
     table <- data.frame(time = rep(time, length(names(sim))),
@@ -25,6 +29,10 @@ compareplot <- function(sim, output = 'agb', legend = TRUE){
     table <- data.frame(time = rep(time, length(names(sim))),
                         output = unlist(lapply(sim, function(x) slot(x, output)$Total)),
                         trait = rep(names(sim), each = length(time)))
+  }
+  if(reduce > 1){
+    time <- (time*12)[1:(length(time)/12)]
+    table <- table[table$time %in% time,]
   }
   lab <- switch(output,
                 'agb' = 'Aboveground biomass (tonnes/ha)',

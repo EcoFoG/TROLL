@@ -3,9 +3,9 @@ title: "Trait sensitivity analysis"
 author: "Sylvain Schmitt"
 date: '`r Sys.Date()`'
 output:
-  html_document: default
-  pdf_document: default
   word_document: default
+  pdf_document: default
+  html_document: default
 csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
 bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
@@ -81,10 +81,11 @@ rm(list = ls()[-which(ls() == 'sim')]) ; gc()
 ```
 
 ```{r graph}
-n10 <- compareplot(sim, 'abu10', legend = F)
-n30 <- compareplot(sim, 'abu30')
-agb <- compareplot(sim, 'agb', legend = F)
-gpp <- compareplot(sim, 'gpp', legend = F)
+r <- 12
+n10 <- compareplot(sim, 'abu10', legend = F, reduce = r)
+n30 <- compareplot(sim, 'abu30', reduce = r)
+agb <- compareplot(sim, 'agb', legend = F, reduce = r)
+gpp <- compareplot(sim, 'gpp', legend = F, reduce = r)
 cowplot::plot_grid(n10, n30, agb, gpp, labels=c("N10", "N30", "AGB", "GPP"), ncol = 2, nrow = 2)
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
 ```
@@ -96,13 +97,13 @@ Figure 1: Sensitivity analysis. *Evolution in time of number of stems above 10 c
 # Supplementray materials
 
 ```{r graph sup}
-compareplot(sim, 'abu10')
+compareplot(sim, 'abu10', reduce = 12)
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'abu30')
+compareplot(sim, 'abu30', reduce = 12)
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'agb')
+compareplot(sim, 'agb', reduce = 12)
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'gpp')
+compareplot(sim, 'gpp', reduce = 12)
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
 ```
 

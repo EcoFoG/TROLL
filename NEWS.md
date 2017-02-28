@@ -7,6 +7,10 @@
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
 
+# TROLL 0.1.9011
+
+* Reduce factor parameter in `compareplot.R` for sensitive analysis
+
 # TROLL 0.1.9010
 
 * DISTURBANCE module with `Tree[site].t_death()` in `main.cpp`

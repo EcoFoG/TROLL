@@ -78,14 +78,15 @@ options(TROLL.output = "sensitivity")
 # stopCluster(cl)
 # names(sim) <- traits
 base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
-rm(list = ls()[-which(ls() == 'sim')]) ; gc()
+rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
 ```
 
 ```{r graph}
-n10 <- compareplot(sim, 'abu10', legend = F)
-n30 <- compareplot(sim, 'abu30')
-agb <- compareplot(sim, 'agb', legend = F)
-gpp <- compareplot(sim, 'gpp', legend = F)
+r <- 24
+n10 <- compareplot(sim, 'abu10', legend = F, reduce = r)
+n30 <- compareplot(sim, 'abu30', reduce = r)
+agb <- compareplot(sim, 'agb', legend = F, reduce = r)
+gpp <- compareplot(sim, 'gpp', legend = F, reduce = r)
 cowplot::plot_grid(n10, n30, agb, gpp, labels=c("N10", "N30", "AGB", "GPP"), ncol = 2, nrow = 2)
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
 ```
@@ -97,13 +98,13 @@ Figure 1: Sensitivity analysis. *Evolution in time of number of stems above 10 c
 # Supplementray materials
 
 ```{r graph sup}
-ggplotly(compareplot(sim, 'abu10'))
+ggplotly(compareplot(sim, 'abu10', reduce = 24))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-ggplotly(compareplot(sim, 'abu30'))
+ggplotly(compareplot(sim, 'abu30', reduce = 24))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-ggplotly(compareplot(sim, 'agb'))
+ggplotly(compareplot(sim, 'agb', reduce = 24))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-ggplotly(compareplot(sim, 'gpp'))
+ggplotly(compareplot(sim, 'gpp', reduce = 24))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
 ```
 
