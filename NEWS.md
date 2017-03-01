@@ -7,6 +7,10 @@
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
 
+# TROLL 0.1.9012
+
+* TROLL code `main.cpp` v2.3.0 integration
+
 # TROLL 0.1.9011
 
 * Reduce factor parameter in `compareplot.R` for sensitive analysis

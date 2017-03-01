@@ -5,7 +5,7 @@
 \title{Build TROLL}
 \usage{
 build(src = getOption("TROLL.src"), app = getOption("TROLL.app"),
-  path = getOption("TROLL.path"), verbose = TRUE)
+  path = getOption("TROLL.path"), optimisation = NULL, verbose = TRUE)
 }
 \arguments{
 \item{src}{char. path to src file}
@@ -13,6 +13,10 @@ build(src = getOption("TROLL.src"), app = getOption("TROLL.app"),
 \item{app}{char. path to troll app (e.g. TROLL.out)}
 
 \item{path}{char. working directory}
+
+\item{optimisation}{char. optimisation level to build cpp with g++ (default NULL)}
+
+\item{verbose}{logical. activate outputs in console}
 }
 \value{
 build the TROLL app

@@ -21,7 +21,7 @@ NULL
 #'@slot paramspace list. model space parameters
 #'@slot ppfd0 df. ground level ppfd data frames
 #'@slot R list. respiration data frames
-#'@slot site list. site data frames
+# @slot site list. site data frames
 #'@slot sp_par df. species par data frame
 #'@slot vertd df. vertd data.frame
 #'
@@ -46,7 +46,7 @@ setClass('TROLLoutput',
            paramspace = 'list',
            ppfd0 = 'data.frame',
            R = 'list',
-           site = 'list',
+           # site = 'list',
            sp_par = 'data.frame',
            vertd = 'data.frame'
          ),
@@ -67,7 +67,7 @@ setClass('TROLLoutput',
            paramspace = list(),
            ppfd0 = data.frame(),
            R = list(),
-           site = list(),
+           # site = list(),
            sp_par = data.frame(),
            vertd =  data.frame()
          )
@@ -90,7 +90,7 @@ TROLLoutput <- function(
   paramspace = list(),
   ppfd0 = data.frame(),
   R = list(),
-  site = list(),
+  # site = list(),
   sp_par = data.frame(),
   vertd = data.frame()
 ){
@@ -111,7 +111,7 @@ TROLLoutput <- function(
              paramspace = paramspace,
              ppfd0 = ppfd0,
              R = R,
-             site = site,
+             # site = site,
              sp_par = sp_par,
              vertd = vertd
   )

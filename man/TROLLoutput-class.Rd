@@ -42,8 +42,6 @@ This is an S4 class to represent TROLL outputs.
 
 \item{\code{R}}{list. respiration data frames}
 
-\item{\code{site}}{list. site data frames}
-
 \item{\code{sp_par}}{df. species par data frame}
 
 \item{\code{vertd}}{df. vertd data.frame}

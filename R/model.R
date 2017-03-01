@@ -10,9 +10,9 @@ NULL
 #' @param name char. name of the model
 #' @param path char. working directory
 #' @param src char. path to src file
+#' @param optimisation char. optimisation level to build cpp with g++ (default NULL)
 #' @param app char. path to troll app (e.g. TROLL.out)
 #' @param input char. input file to create
-#' @param output char. name of the folder to save outputs
 #' @param build logical. do you want to (re)-build the model
 #' @param overwrite logical. allow to overwrite existing input and outputs files
 #' @param verbose logical. allow output in console
@@ -69,9 +69,10 @@ NULL
 #'
 model <- function(
   # function options
-  name,
+  name = getOption("TROLL.name"),
   path = getOption("TROLL.path"),
   src = getOption("TROLL.src"),
+  optimisation = NULL,
   app = getOption("TROLL.app"),
   input = getOption("TROLL.init"),
   output = getOption("TROLL.output"),
@@ -202,15 +203,18 @@ model <- function(
     dailymeanVPD = dailymeanVPD, 
     dailymaxVPD = dailymaxVPD)
   if(build)
-    build()
+    build(src = src,
+      app = app,
+      path = path,
+      optimisation = optimisation,
+      verbose = verbose)
   run(name = name,
       path = path,
       app = app,
       input = input,
-      output = output,
       overwrite = overwrite,
       verbose = verbose)
-  path <- file.path(path, output, name)
+  path <- file.path(path, name)
   model <- load(name = name, path = path)
 
   return(model)

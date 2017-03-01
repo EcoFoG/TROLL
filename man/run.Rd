@@ -4,8 +4,8 @@
 \alias{run}
 \title{Run TROLL}
 \usage{
-run(name, path = getOption("TROLL.path"), app = getOption("TROLL.app"),
-  input = getOption("TROLL.init"), output = getOption("TROLL.output"),
+run(name = getOption("TROLL.name"), path = getOption("TROLL.path"),
+  app = getOption("TROLL.app"), input = getOption("TROLL.init"),
   overwrite = TRUE, verbose = TRUE)
 }
 \arguments{
@@ -16,8 +16,6 @@ run(name, path = getOption("TROLL.path"), app = getOption("TROLL.app"),
 \item{app}{char. path to troll app (e.g. TROLL.out)}
 
 \item{input}{char. input file}
-
-\item{output}{char. name of the folder to save outputs}
 
 \item{overwrite}{logical. allow to overwrite existing outputs files}
 

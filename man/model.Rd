@@ -4,7 +4,8 @@
 \alias{model}
 \title{Model}
 \usage{
-model(name, path = getOption("TROLL.path"), src = getOption("TROLL.src"),
+model(name = getOption("TROLL.name"), path = getOption("TROLL.path"),
+  src = getOption("TROLL.src"), optimisation = NULL,
   app = getOption("TROLL.app"), input = getOption("TROLL.init"),
   output = getOption("TROLL.output"), build = TRUE, overwrite = TRUE,
   verbose = TRUE, nbcol = 400, nbrows = 400, nbiter = 12, iter = 12,
@@ -55,11 +56,11 @@ model(name, path = getOption("TROLL.path"), src = getOption("TROLL.src"),
 
 \item{src}{char. path to src file}
 
+\item{optimisation}{char. optimisation level to build cpp with g++ (default NULL)}
+
 \item{app}{char. path to troll app (e.g. TROLL.out)}
 
 \item{input}{char. input file to create}
-
-\item{output}{char. name of the folder to save outputs}
 
 \item{build}{logical. do you want to (re)-build the model}
 

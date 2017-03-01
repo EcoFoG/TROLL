@@ -14,7 +14,8 @@ NULL
 #'
 #' @examples
 #'
-load <- function(name, path = getwd()){
+load <- function(name = getOption("TROLL.name"), 
+                 path = file.path(getOption("TROLL.path"), getOption("TROLL.name"))){
 
   # Final pattern
   final_pattern <- read.table(file.path(path, paste0(name, '_0_final_pattern.txt')))
@@ -77,47 +78,48 @@ load <- function(name, path = getwd()){
       species_par = list(
         klight = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 19, n = 1, quiet = TRUE),
         phi = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 20, n = 1, quiet = TRUE),
-        vC = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 21, n = 1, quiet = TRUE),
-        DBH0 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 22, n = 1, quiet = TRUE),
-        H0 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 23, n = 1, quiet = TRUE),
-        ra0 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 24, n = 1, quiet = TRUE),
-        ra1 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 25, n = 1, quiet = TRUE),
-        de0 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 26, n = 1, quiet = TRUE),
-        de1 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 27, n = 1, quiet = TRUE),
-        dens = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 28, n = 1, quiet = TRUE),
-        fbranchstem = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 29, n = 1, quiet = TRUE),
-        fcanopy = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 30, n = 1, quiet = TRUE),
-        seedrain = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 31, n = 1, quiet = TRUE),
-        nbseeds = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 32, n = 1, quiet = TRUE),
-        mindeathrate = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 33, n = 1, quiet = TRUE),
-        m1 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 34, n = 1, quiet = TRUE),
-        CO2 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 35, n = 1, quiet = TRUE)
+        g1 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 21, n = 1, quiet = TRUE), 
+        vC = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 22, n = 1, quiet = TRUE),
+        DBH0 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 23, n = 1, quiet = TRUE),
+        H0 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 24, n = 1, quiet = TRUE),
+        ra0 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 25, n = 1, quiet = TRUE),
+        ra1 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 26, n = 1, quiet = TRUE),
+        de0 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 27, n = 1, quiet = TRUE),
+        de1 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 28, n = 1, quiet = TRUE),
+        dens = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 29, n = 1, quiet = TRUE),
+        fbranchstem = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 30, n = 1, quiet = TRUE),
+        fcanopy = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 31, n = 1, quiet = TRUE),
+        seedrain = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 32, n = 1, quiet = TRUE),
+        nbseeds = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 33, n = 1, quiet = TRUE),
+        mindeathrate = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 34, n = 1, quiet = TRUE),
+        m1 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 35, n = 1, quiet = TRUE),
+        CO2 = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), skip = 36, n = 1, quiet = TRUE)
       ),
       climate = list(
         Tyear = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-             skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 4),
+             skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 4),
         maxT = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                    skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 5),
+                    skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 5),
         nightmeanT = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                          skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 6),
+                          skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 6),
         rainfall = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                        skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 7),
+                        skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 7),
         wind = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                    skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 8),
+                    skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 8),
         maxIrradiance = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                             skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 9),
+                             skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 9),
         irradiance = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                             skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 10),
+                             skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 10),
         e_s = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                   skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 11),
+                   skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 11),
         e_a = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                   skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 12),
+                   skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 12),
         VPD = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                   skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 13),
+                   skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 13),
         dailymeanVPD = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                            skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 14),
+                            skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 14),
         dailymaxVPD = scan(file.path(path, paste0(name, '_0_par.txt')), numeric(), n = 12, quiet = TRUE,
-                           skip = 37 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 15)
+                           skip = 38 + scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE) + 15)
       )
     ),
     paramspace = list(
@@ -134,17 +136,17 @@ load <- function(name, path = getwd()){
       Rday = read.table(file.path(path, paste0(name, '_0_Rday.txt')), row.names = 1),
       Rnight = read.table(file.path(path, paste0(name, '_0_Rnight.txt')), row.names = 1)
     ),
-    site = list(
-      site1 = read.table(file.path(path, paste0(name, '_0_site1.txt')), row.names = 1),
-      site2 = read.table(file.path(path, paste0(name, '_0_site2.txt')), row.names = 1),
-      site3 = read.table(file.path(path, paste0(name, '_0_site3.txt')), row.names = 1),
-      site4 = read.table(file.path(path, paste0(name, '_0_site4.txt')), row.names = 1),
-      site5 = read.table(file.path(path, paste0(name, '_0_site5.txt')), row.names = 1),
-      site6 = read.table(file.path(path, paste0(name, '_0_site6.txt')), row.names = 1)
-    ),
+    # site = list(
+    #   site1 = read.table(file.path(path, paste0(name, '_0_site1.txt')), row.names = 1),
+    #   site2 = read.table(file.path(path, paste0(name, '_0_site2.txt')), row.names = 1),
+    #   site3 = read.table(file.path(path, paste0(name, '_0_site3.txt')), row.names = 1),
+    #   site4 = read.table(file.path(path, paste0(name, '_0_site4.txt')), row.names = 1),
+    #   site5 = read.table(file.path(path, paste0(name, '_0_site5.txt')), row.names = 1),
+    #   site6 = read.table(file.path(path, paste0(name, '_0_site6.txt')), row.names = 1)
+    # ),
     sp_par = read.table(file.path(path, paste0(name, '_0_par.txt')),
                         header=TRUE, dec=".", sep="",
-                        skip=37, row.names=1,
+                        skip=38, row.names=1,
                         nrows=scan(file.path(path, paste0(name, '_0_par.txt')), integer(), skip = 11, n = 1, quiet = TRUE)),
     vertd = read.table(file.path(path, paste0(name, '_0_vertd.txt')))
   )

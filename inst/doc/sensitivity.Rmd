@@ -3,9 +3,9 @@ title: "Trait sensitivity analysis"
 author: "Sylvain Schmitt"
 date: '`r Sys.Date()`'
 output:
-  word_document: default
-  pdf_document: default
   html_document: default
+  pdf_document: default
+  word_document: default
 csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
 bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
@@ -46,7 +46,7 @@ Table 1: Functional traits of TROLL model species *Traits with their abbreviatio
 time <- 500 # years
 ```
 
-To assess the sensitivity of TROLL model to species functionnal traits, we performed a sensitivity analysis by fixing species trait values to their mean. Each trait was tested independently. Simulations were conducted on ... We assumed maturity of the forest after `r time` years of regeneration [@Li]. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity).
+To assess the sensitivity of TROLL model to species functionnal traits, we performed a sensitivity analysis by fixing species trait values to their mean. Each trait was tested independently. Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB of memory. We assumed maturity of the forest after `r time` years of regeneration [@Li]. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity).
 
 # Results
 
@@ -76,35 +76,76 @@ options(TROLL.output = "sensitivity")
 # })
 # stopCluster(cl)
 # names(sim) <- traits
-base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
-rm(list = ls()[-which(ls() == 'sim')]) ; gc()
 ```
 
+Figure 1 and supplementary materials summary results of the sensitivity analysis with outputs of number of stem above 10 cm dbh (N10), number of stem above 30 cm dbh (N30), aboveground biomass (AGB), and leaf growth primary production (GPP). First we see that **g1**, **Nmass**, and **Pmass** don't affect or weakly models outputs. Then we can split remaining functionnal traits effect in three groups: 
+
+- traits related to *dominance* with **ah**, **hmax** which affected all studied ecosystem outputs (N10, N30, AGB and GPP),
+- traits related to light interception with **LMA** which affected mainly AGB and GPP,
+- traits related to survival with **dmax** and **wsg** which affected mainly N30. 
+
+Supplementary materials specifically show ecosystem outputs for functionnal traits which affected theim.
+
 ```{r graph}
+base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
 r <- 12
 n10 <- compareplot(sim, 'abu10', legend = F, reduce = r)
 n30 <- compareplot(sim, 'abu30', reduce = r)
 agb <- compareplot(sim, 'agb', legend = F, reduce = r)
 gpp <- compareplot(sim, 'gpp', legend = F, reduce = r)
 cowplot::plot_grid(n10, n30, agb, gpp, labels=c("N10", "N30", "AGB", "GPP"), ncol = 2, nrow = 2)
-rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
+rm(list = ls()) ; invisible(gc())
 ```
 
-Figure 1: Sensitivity analysis. *Evolution in time of number of stems above 10 cm dbh (N10) and 30 cm dbh (N30), aboveground biomass (AGB) and leaf groth primary production (GPP) in control TROLL model or by fixing species functionnal traits to their mean.*
+Figure 1: Sensitivity analysis. *Evolution in time of number of stems above 10 cm dbh (N10) and 30 cm dbh (N30), aboveground biomass (AGB) and leaf growth primary production (GPP) in control TROLL model or by fixing species functionnal traits to their mean.*
+
+## *Dominance*
+
+```{r dominance}
+base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
+
+rm(sim)
+```
+
+## Light intercetpion
+
+```{r light}
+base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
+agbdiff <- mean(sim$control@agb$Total[(300*12):(500*12)] - sim$LMA@agb$Total[(300*12):(500*12)])
+gppdiff <- round(mean(sim$control@gpp$Total[(300*12):(500*12)] - sim$LMA@gpp$Total[(300*12):(500*12)]),1)
+rm(sim)
+```
+
+Simulation with **LMA** fixed to mean shows lower AGB and GPP than control simulation. If we consider AGB and GPP stable after 300 years as the plateau suggested it, mean difference of AGB and GPP between 300 and 500 years are $`r agbdiff`~tonnes.ha^-1$ and $`r gppdiff`~MgC.ha^-1$ respectivelly. 
+
+## Survival
+
+```{r survival}
+base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
+wsg <- round(max(sim$wsg@abundances$abu30) / max(sim$control@abundances$abu30),1)
+dmax <- round(max(sim$dmax@abundances$abu30) / max(sim$control@abundances$abu30),1)
+wsglag <- round(max(which(sim$wsg@abundances$abu30$Total == max(sim$wsg@abundances$abu30$Total)) / 12)) - round(max(which(sim$control@abundances$abu30$Total == max(sim$control@abundances$abu30$Total)) / 12))
+rm(sim)
+```
+
+Simulations with **dmax** and **wsg** fixed to mean show much higher peak of trees above 30 cm dbh compare to control simulation between 50 and 200 years. **wsg** reach `r wsg` times more trees above 30 cm dbh than control simulation and **dmax** `r dmax`. Moreover with **wsg** simulation the peak is lagged of `r wsglag` years.
 
 # Discussion
 
 # Supplementray materials
 
 ```{r graph sup}
-compareplot(sim, 'abu10', reduce = 12)
+rm(list = ls()) ; invisible(gc())
+base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
+sim <- subset(sim, !(names(sim) %in% c('g1', 'Nmass', 'Pmass')))
+(n10 <- compareplot(subset(sim, names(sim) %in% c('control', 'ah', 'hmax')), 'abu10', reduce = 12))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'abu30', reduce = 12)
+(n30 <- compareplot(subset(sim, names(sim) %in% c('control', 'ah', 'hmax', 'dmax', 'wsg')), 'abu30', reduce = 12))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'agb', reduce = 12)
+(agb <- compareplot(subset(sim, names(sim) %in% c('control', 'ah', 'hmax', 'LMA')), 'agb', reduce = 12))
 rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-compareplot(sim, 'gpp', reduce = 12)
-rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
+(gpp <- compareplot(subset(sim, names(sim) %in% c('control', 'ah', 'hmax', 'LMA')), 'gpp', reduce = 12))
+rm(list = ls()) ; invisible(gc())
 ```
 
 # References

@@ -20,7 +20,8 @@
 #' @param dayT num. normalized daily VPD course (from 7am to 7 pm, with a half-hour time step)
 #' @param dayVPD num. normalized daily T course (from 7am to 7 pm, with a half-hour time step)
 #' @param klight num. light attenuation in the canopy Beer-Lambert
-#' @param phi quantum yield (in micromol C/micromol photon)
+#' @param phi num. quantum yield (in micromol C/micromol photon)
+#' @param g1 num. parameter g1 of Medlyn et al ’s stomatal conductance model 
 #' @param vC num. variance of the flexion moment
 #' @param DBH0 num. initial dbh (m)
 #' @param H0 num. initial height (m)
@@ -85,6 +86,7 @@ init <- function(
   # species parameters
   klight = 0.9,
   phi = 0.06,
+  g1 = 3.77,
   vC = 0.1,
   DBH0 = 0.01,
   H0 = 1,
@@ -95,7 +97,7 @@ init <- function(
   dens = 0.8,
   fbranchstem = 0.35,
   fcanopy = 0.30,
-  seedrain = 200,
+  seedrain = 5000,
   nbseeds = 10,
   mindeathrate = 0.035,
   m1 = 0.035,
@@ -165,14 +167,15 @@ init <- function(
     do.call(paste, as.list(c(format(dayVPD, nsmall = 3), '  /* normalized daily T course (from 7am to 7pm, with a half-hour time-step */', sep = '\t'))),
     '###	Characters shared by species											',
     paste(klight,	'/* klight # light attenuation in the canopy Beer-Lambert */', sep = '\t'),
-    paste(phi,	'/* phi # quantum yield (in micromol C/micromol photon) */											', sep = '\t'),
-    paste(vC,	'/* vC  # variance of the flexion moment */											', sep = '\t'),
-    paste(DBH0,	'/* DBH0 # initial dbh (m) */											', sep = '\t'),
-    paste(H0,	'/* H0 # initial height (m) */											', sep = '\t'),
-    paste(ra0,	'/* ra0 # initial crown radius (in m) */											', sep = '\t'),
-    paste(ra1,	'/* ra1 # crown radius - dbh slope */											', sep = '\t'),
-    paste(de0,	'/* de0 # initial crown depth(in m) */											', sep = '\t'),
-    paste(de1,	'/* de1 # Crown_Depth/height slope (m/m) */											', sep = '\t'),
+    paste(phi,	'/* phi # quantum yield (in micromol C/micromol photon) */', sep = '\t'),
+    paste(g1,	'/* parameter g1 of Medlyn et al ’s stomatal conductance model */', sep = '\t'),
+    paste(vC,	'/* vC  # variance of the flexion moment */', sep = '\t'),
+    paste(DBH0,	'/* DBH0 # initial dbh (m) */', sep = '\t'),
+    paste(H0,	'/* H0 # initial height (m) */', sep = '\t'),
+    paste(ra0,	'/* ra0 # initial crown radius (in m) */', sep = '\t'),
+    paste(ra1,	'/* ra1 # crown radius - dbh slope */', sep = '\t'),
+    paste(de0,	'/* de0 # initial crown depth(in m) */', sep = '\t'),
+    paste(de1,	'/* de1 # Crown_Depth/height slope (m/m) */', sep = '\t'),
     paste(dens,	'/* dens # leaf density (m^2/m^2) */', sep = '\t'),
     paste(fbranchstem,	'/* fraction of biomass allocated to above ground wood (branches+stem) */', sep = '\t'),
     paste(format(fcanopy, nsmall = 2),	'/* fraction of biomass allocated to canopy (leaves + reproductive organs + twigs) */											', sep = '\t'),
