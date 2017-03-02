@@ -2057,6 +2057,13 @@ void Initialise() {
             output[34].open(nnn, ios::out);
             sprintf(nnn,"%s_%i_cica.txt",buf, easympi_rank);
             output[35].open(nnn, ios::out);
+
+            // output[36] to register killed trees during a disturbance event
+
+            if(_DISTURBANCE){
+				sprintf(nnn,"%s_%i_disturbance.txt",buf, easympi_rank);
+            	output[36].open(nnn, ios::out);
+            }
         }
         
         sprintf(nnn,"%s_%i_paramspace.txt",buf, easympi_rank);
@@ -2281,8 +2288,6 @@ void Evolution() {
 
 void Disturbance() {
 
-	// Add disturbance output file to save removed trees
-
     if(iter == disturb_iter) {
         cout << "Disturbance of " << disturb_intensity * 100 << "% of BA." << endl;
 
@@ -2297,8 +2302,9 @@ void Disturbance() {
 
         	if(T[site].t_age != 0) {
         		disturb_dbh += T[site].t_dbh;
+        		// saving killed tree in disturbance.txt file
+        		output[36] << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
             	T[site].Death();
-            	// cout << "Site " << site << " loose is tree of dbh " << T[site].t_dbh << " disturbed dbh is now " << disturb_dbh << endl;
         	} 
         }
     }

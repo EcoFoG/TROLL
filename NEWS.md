@@ -1,11 +1,16 @@
 # TO DO
 
+* automatic defintion of option in `main.cpp` (ex: `_FromData`)
 * automatic integration of Paracou and Guyafor data into virtual forest for simulations
 * sylviculture module in main.cpp
 * improve plot methods (to precise)
-* integrate plot comparisons between models
+* integrate plot comparisons between models (to improve)
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
+
+# TROLL 0.1.9013
+
+* Split btw TROLL pkg (personnal pkg for TROLL dev and doc.Rmd) and RconTroll pkg (R pkg to use TROLL)
 
 # TROLL 0.1.9012
 

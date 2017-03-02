@@ -14,13 +14,15 @@ bibliography: /home/sylvain/Documents/Bibliography/library.bib
 library(knitr)
 library(parallel)
 cores <- detectCores() - 1
+devtools::install_github('sylvainschmitt/RconTroll')
 library(TROLL)
+library(RconTroll)
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
     cache = T, cache.lazy = F)
 ```
 
-Built with `TROLL` package version `r packageVersion('TROLL')` available at https://gitlab.com/sylvain.schmitt/TROLL.
+Built with `RconTroll` package version `r packageVersion('RconTroll')` available at https://gitlab.com/sylvain.schmitt/RconTroll and `TROLL` package version `r packageVersion('TROLL')` available at https://gitlab.com/sylvain.schmitt/TROLL.
 
 # Material and methods
 
