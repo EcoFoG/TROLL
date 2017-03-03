@@ -17,6 +17,7 @@ cores <- detectCores() - 1
 devtools::install_github('sylvainschmitt/RconTroll')
 library(TROLL)
 library(RconTroll)
+library(corrplot)
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
     cache = T, cache.lazy = F)
@@ -31,13 +32,14 @@ Built with `RconTroll` package version `r packageVersion('RconTroll')` available
 TROLL model currently encompass following traits:
 
 ```{r traits}
-species  <- read.table(getOption("TROLL.species"), header=TRUE, dec=".", sep="", row.names = 1)
-species <- species[c('Nmass', 'LMA', 'wsg', 'dmax', 'hmax', 'ah', 'Pmass', 'g1')]
-means <- apply(species, 2, mean)
-vars <- apply(species, 2, var)
-species[c('mean', 'var'),] <- rbind(means, vars)
-species <- species[c('mean', 'var'),]
-kable(t(species))
+species  <- read.table(getOption("TROLL.species"), header=TRUE, dec=".", sep="")
+spsum <- data.frame(
+  row.names = names(species[-1]),
+  unit = c('$g.cm^-2$', '$g.g^-1$', '$g.g^-1$', '$g.g^-1$', '$m$', '$m$', '', '$cm^3$', '$?$'),
+  mean = apply(species[-1], 2, mean),
+  vars = apply(species[-1], 2, var)
+)
+kable(spsum)
 ```
 
 Table 1: Functional traits of TROLL model species *Traits with their abbreviation, standard unit, mean and variance.*
@@ -45,39 +47,73 @@ Table 1: Functional traits of TROLL model species *Traits with their abbreviatio
 ## Sensitivity analysis
 
 ```{r parameters}
-time <- 500 # years
+time <- 2 # years
 ```
 
-To assess the sensitivity of TROLL model to species functionnal traits, we performed a sensitivity analysis by fixing species trait values to their mean. Each trait was tested independently. Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB of memory. We assumed maturity of the forest after `r time` years of regeneration [@Li]. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity).
+To assess the sensitivity of TROLL model to species functionnal traits, we performed a sensitivity analysis by fixing species trait values to their mean. Each trait was tested independently. Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB of memory. We assumed maturity of the forest after 500 years of regeneration [@Li] and computed simulation `r time` years after a disturbance event of 40% intensity. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity). We reduce to a common mean traits with a correlation $r \geq 0.8$ (see figure 1). 
+
+```{r corr}
+corrplot.mixed(cor(species[-1]))
+```
+
+Figure 1: Correlation of functional traits within TROLL model species *Traits with their abbreviation, standard unit, mean and variance.*
 
 # Results
 
 ```{r simulations}
-options(TROLL.output = "sensitivity")
-# build(verbose = F)
-# for(trait in c(names(species), 'control')){
-#   if(trait == 'control'){
-#       init(nbiter = time * 12, disturb_iter = time * 12 + 1) # No disturbance
-#   } else {
-#     sp_data <-  read.table(getOption("TROLL.species"), header = TRUE, dec = ".", sep = "")
-#     sp_data[trait] <- species['mean', trait]
-#     init(nbiter = time * 12, disturb_iter = time * 12 + 1, species = sp_data) # No disturbance
-#   }
-#   run(name = trait, verbose = F)
-# }
+options(RconTroll.path = '~/Documents/ECOFOG/Results/sensitivity')
+# input creations
+traits <- names(species)
+traits <- traits[-which(traits %in% c('Nmass', 'Pmass', 'ah', 'hmax'))]
+invisible(sapply(traits, function(trait){
+  species_t <- species
+  species_t[,trait] <- mean(species_t[,trait])
+  init(input = paste0(trait, '.txt'), species = species_t,
+       nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
+}))
+species_t <- species
+species_t[,'ah'] <- mean(species_t[,'ah'])
+species_t[,'hmax'] <- mean(species_t[,'hmax'])
+init(input = 'ah-hmax.txt', species = species_t,
+     nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
+traits <- c(traits, 'ah-hmax')
+init(input = 'control', species = species,
+     nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
+traits <- c(traits, 'control')
+# build and folder
+build(src = file.path(getOption("RconTroll.path"), 'main.cpp'), optimisation = '-Ofast', verbose = F)
+invisible(sapply(traits, function(trait) dir.create(file.path(getOption("RconTroll.path"), trait))))
+# bash creation
+if('sensitivity.sh' %in% list.files(getOption("RconTroll.path")))
+   unlink(file.path(getOption("RconTroll.path"), 'sensitivity.sh'))
+bash <- file(file.path(getOption("RconTroll.path"), 'sensitivity.sh'), open = 'a')
+cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
+cat(' echo "TROLL parrallel modelling in shell"  \n\n', file = bash, append = TRUE)
+for(i in 1:length(traits)){
+  command <- paste0('./', getOption("RconTroll.app"), 
+                    ' -i"', traits[[i]], 
+                    '.txt" -f"forest.txt" -o./',
+                    traits[[i]], '/', traits[[i]], ' &\n')
+  cat(command, file = bash, append = TRUE)
+  if(i %/% 3 == i/3)
+  cat('wait\n', file = bash, append = TRUE)
+}
+cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
+close(bash)
 ```
 
 ```{r opening}
-# traits <- c(names(species), 'control')
-# traits <- traits[-which(traits == 'ah')]
 # cl <- makeCluster(getOption("cl.cores", cores))
-# path <- file.path(getOption("TROLL.path"), getOption("TROLL.output"))
+# path <- getOption("RconTroll.path")
 # clusterExport(cl, list("traits", "path"))
 # sim <- parLapply(cl, as.list(traits), function(trait){
-#  TROLL::load(name = trait, path = file.path(path, trait)) 
+#  TROLL::load(name = trait, path = file.path(path, trait))
 # })
 # stopCluster(cl)
 # names(sim) <- traits
+# save(sim, file = file.path(path, 'sensitivity.Rdata'))
+# rm(list = ls()) ; invisible(gc())
+# load(file.path(getOption("RconTroll.path"), 'sensitivity.Rdata'))
 ```
 
 Figure 1 and supplementary materials summary results of the sensitivity analysis with outputs of number of stem above 10 cm dbh (N10), number of stem above 30 cm dbh (N30), aboveground biomass (AGB), and leaf growth primary production (GPP). First we see that **g1**, **Nmass**, and **Pmass** don't affect or weakly models outputs. Then we can split remaining functionnal traits effect in three groups: 
@@ -89,14 +125,14 @@ Figure 1 and supplementary materials summary results of the sensitivity analysis
 Supplementary materials specifically show ecosystem outputs for functionnal traits which affected theim.
 
 ```{r graph}
-base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
-r <- 12
-n10 <- compareplot(sim, 'abu10', legend = F, reduce = r)
-n30 <- compareplot(sim, 'abu30', reduce = r)
-agb <- compareplot(sim, 'agb', legend = F, reduce = r)
-gpp <- compareplot(sim, 'gpp', legend = F, reduce = r)
-cowplot::plot_grid(n10, n30, agb, gpp, labels=c("N10", "N30", "AGB", "GPP"), ncol = 2, nrow = 2)
-rm(list = ls()) ; invisible(gc())
+# base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
+# r <- 12
+# n10 <- compareplot(sim, 'abu10', legend = F, reduce = r)
+# n30 <- compareplot(sim, 'abu30', reduce = r)
+# agb <- compareplot(sim, 'agb', legend = F, reduce = r)
+# gpp <- compareplot(sim, 'gpp', legend = F, reduce = r)
+# cowplot::plot_grid(n10, n30, agb, gpp, labels=c("N10", "N30", "AGB", "GPP"), ncol = 2, nrow = 2)
+# rm(list = ls()) ; invisible(gc())
 ```
 
 Figure 1: Sensitivity analysis. *Evolution in time of number of stems above 10 cm dbh (N10) and 30 cm dbh (N30), aboveground biomass (AGB) and leaf growth primary production (GPP) in control TROLL model or by fixing species functionnal traits to their mean.*
@@ -104,18 +140,20 @@ Figure 1: Sensitivity analysis. *Evolution in time of number of stems above 10 c
 ## *Dominance*
 
 ```{r dominance}
-base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
-
-rm(sim)
+# base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
+# 
+# rm(sim)
 ```
 
 ## Light intercetpion
 
 ```{r light}
-base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
-agbdiff <- mean(sim$control@agb$Total[(300*12):(500*12)] - sim$LMA@agb$Total[(300*12):(500*12)])
-gppdiff <- round(mean(sim$control@gpp$Total[(300*12):(500*12)] - sim$LMA@gpp$Total[(300*12):(500*12)]),1)
-rm(sim)
+# base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
+# agbdiff <- mean(sim$control@agb$Total[(300*12):(500*12)] - sim$LMA@agb$Total[(300*12):(500*12)])
+# gppdiff <- round(mean(sim$control@gpp$Total[(300*12):(500*12)] - sim$LMA@gpp$Total[(300*12):(500*12)]),1)
+agbdiff <- NA
+gppdiff <- NA
+# rm(sim)
 ```
 
 Simulation with **LMA** fixed to mean shows lower AGB and GPP than control simulation. If we consider AGB and GPP stable after 300 years as the plateau suggested it, mean difference of AGB and GPP between 300 and 500 years are $`r agbdiff`~tonnes.ha^-1$ and $`r gppdiff`~MgC.ha^-1$ respectivelly. 
@@ -123,11 +161,14 @@ Simulation with **LMA** fixed to mean shows lower AGB and GPP than control simul
 ## Survival
 
 ```{r survival}
-base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
-wsg <- round(max(sim$wsg@abundances$abu30) / max(sim$control@abundances$abu30),1)
-dmax <- round(max(sim$dmax@abundances$abu30) / max(sim$control@abundances$abu30),1)
-wsglag <- round(max(which(sim$wsg@abundances$abu30$Total == max(sim$wsg@abundances$abu30$Total)) / 12)) - round(max(which(sim$control@abundances$abu30$Total == max(sim$control@abundances$abu30$Total)) / 12))
-rm(sim)
+# base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
+# wsg <- round(max(sim$wsg@abundances$abu30) / max(sim$control@abundances$abu30),1)
+# dmax <- round(max(sim$dmax@abundances$abu30) / max(sim$control@abundances$abu30),1)
+# wsglag <- round(max(which(sim$wsg@abundances$abu30$Total == max(sim$wsg@abundances$abu30$Total)) / 12)) - round(max(which(sim$control@abundances$abu30$Total == max(sim$control@abundances$abu30$Total)) / 12))
+wsg <- NA
+dmax <- NA
+wsglag <- NA
+# rm(sim)
 ```
 
 Simulations with **dmax** and **wsg** fixed to mean show much higher peak of trees above 30 cm dbh compare to control simulation between 50 and 200 years. **wsg** reach `r wsg` times more trees above 30 cm dbh than control simulation and **dmax** `r dmax`. Moreover with **wsg** simulation the peak is lagged of `r wsglag` years.
@@ -137,17 +178,7 @@ Simulations with **dmax** and **wsg** fixed to mean show much higher peak of tre
 # Supplementray materials
 
 ```{r graph sup}
-rm(list = ls()) ; invisible(gc())
-base::load('~/Documents/ECOFOG/Results/sensitivity/sensitivity.Rdata')
-sim <- subset(sim, !(names(sim) %in% c('g1', 'Nmass', 'Pmass')))
-(n10 <- compareplot(subset(sim, names(sim) %in% c('control', 'ah', 'hmax')), 'abu10', reduce = 12))
-rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-(n30 <- compareplot(subset(sim, names(sim) %in% c('control', 'ah', 'hmax', 'dmax', 'wsg')), 'abu30', reduce = 12))
-rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-(agb <- compareplot(subset(sim, names(sim) %in% c('control', 'ah', 'hmax', 'LMA')), 'agb', reduce = 12))
-rm(list = ls()[-which(ls() == 'sim')]) ; invisible(gc())
-(gpp <- compareplot(subset(sim, names(sim) %in% c('control', 'ah', 'hmax', 'LMA')), 'gpp', reduce = 12))
-rm(list = ls()) ; invisible(gc())
+
 ```
 
 # References
