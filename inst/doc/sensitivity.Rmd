@@ -68,6 +68,49 @@ Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB
 
 # Results
 
+```{r traits simulations}
+n <- 100
+options(RconTroll.path = '~/Documents/ECOFOG/Results/control')
+# input creations
+replicates <- 1:n
+init(input = 'control.txt', species = species,
+     nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
+invisible(sapply(replicates, function(replicate) 
+  dir.create(file.path(getOption("RconTroll.path"), paste0('control', replicate)))))
+# bash creation
+if('control.sh' %in% list.files(getOption("RconTroll.path")))
+   unlink(file.path(getOption("RconTroll.path"), 'control.sh'))
+bash <- file(file.path(getOption("RconTroll.path"), 'control.sh'), open = 'a')
+cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
+cat(' echo "TROLL parrallel modelling in shell"  \n\n', file = bash, append = TRUE)
+for(i in replicates){
+  command <- paste0('./', getOption("RconTroll.app"),
+                    ' -i"control.txt" -f"forest.txt" 
+                    -o./', paste0('control', i), 
+                    '/', paste0('control', i), ' &\n')
+  cat(command, file = bash, append = TRUE)
+  if(i %/% cores == i/cores)
+  cat('wait\n', file = bash, append = TRUE)
+}
+cat('wait\n', file = bash, append = TRUE)
+cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
+close(bash)
+```
+
+```{r control opening}
+# cl <- makeCluster(getOption("cl.cores", cores))
+# path <- getOption("RconTroll.path")
+# clusterExport(cl, list("replicates", "path"))
+# sim <- parLapply(cl, as.list(replicates), function(i){
+#  TROLL::load(name = paste0('control', i), path = file.path(path, paste0('control', i)))
+# })
+# stopCluster(cl)
+# names(sim) <- paste0('control', replicates)
+# save(sim, file = file.path(path, 'control.Rdata'))
+# rm(list = ls()) ; invisible(gc())
+# load(file.path('~/Documents/ECOFOG/Results/sensitivity/', 'sensitivity.Rdata'))
+```
+
 ## Functional traits
 
 ```{r traits simulations}
@@ -87,9 +130,6 @@ Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB
 # init(input = 'ah-hmax.txt', species = species_t,
 #      nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
 # traits <- c(traits, 'ah-hmax')
-# init(input = 'control', species = species,
-#      nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
-# traits <- c(traits, 'control')
 # invisible(sapply(traits, function(trait) dir.create(file.path(getOption("RconTroll.path"), trait))))
 # # bash creation
 # if('sensitivity.sh' %in% list.files(getOption("RconTroll.path")))
@@ -98,8 +138,8 @@ Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB
 # cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
 # cat(' echo "TROLL parrallel modelling in shell"  \n\n', file = bash, append = TRUE)
 # for(i in 1:length(traits)){
-#   command <- paste0('./', getOption("RconTroll.app"), 
-#                     ' -i"', traits[[i]], 
+#   command <- paste0('./', getOption("RconTroll.app"),
+#                     ' -i"', traits[[i]],
 #                     '.txt" -f"forest.txt" -o./',
 #                     traits[[i]], '/', traits[[i]], ' &\n')
 #   cat(command, file = bash, append = TRUE)
@@ -122,39 +162,39 @@ Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB
 # names(sim) <- traits
 # save(sim, file = file.path(path, 'sensitivity.Rdata'))
 # rm(list = ls()) ; invisible(gc())
-# load(file.path(getOption("RconTroll.path"), 'sensitivity.Rdata'))
+load(file.path('~/Documents/ECOFOG/Results/sensitivity/', 'sensitivity.Rdata'))
 ```
 
 ## Seed rain
 
 ```{r seedrain simulations}
-options(RconTroll.path = '~/Documents/ECOFOG/Results/seedrain')
-# input creations
-intensities <- c(0.01, 0.1, 1, 10)
-intensities <- intensities*200
-invisible(sapply(intensities, function(i){
-  init(input = paste0(i, '.txt'), seedrain = i, species = species,
-       nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
-}))
-invisible(sapply(intensities, function(i) dir.create(file.path(getOption("RconTroll.path"), i))))
-# bash creation
-if('seedrain.sh' %in% list.files(getOption("RconTroll.path")))
-   unlink(file.path(getOption("RconTroll.path"), 'seedrain.sh'))
-bash <- file(file.path(getOption("RconTroll.path"), 'seedrain.sh'), open = 'a')
-cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
-cat(' echo "TROLL parrallel modelling in shell"  \n\n', file = bash, append = TRUE)
-for(i in 1:length(intensities)){
-  command <- paste0('./', getOption("RconTroll.app"),
-                    ' -i"', intensities[[i]],
-                    '.txt" -f"forest.txt" -o./',
-                    intensities[[i]], '/', intensities[[i]], ' &\n')
-  cat(command, file = bash, append = TRUE)
-  if(i %/% cores == i/cores)
-  cat('wait\n', file = bash, append = TRUE)
-}
-cat('wait\n', file = bash, append = TRUE)
-cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
-close(bash)
+# options(RconTroll.path = '~/Documents/ECOFOG/Results/seedrain')
+# # input creations
+# intensities <- c(0.01, 0.1, 10)
+# intensities <- intensities*200
+# invisible(sapply(intensities, function(i){
+#   init(input = paste0(i, '.txt'), seedrain = i, species = species,
+#        nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
+# }))
+# invisible(sapply(intensities, function(i) dir.create(file.path(getOption("RconTroll.path"), i))))
+# # bash creation
+# if('seedrain.sh' %in% list.files(getOption("RconTroll.path")))
+#    unlink(file.path(getOption("RconTroll.path"), 'seedrain.sh'))
+# bash <- file(file.path(getOption("RconTroll.path"), 'seedrain.sh'), open = 'a')
+# cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
+# cat(' echo "TROLL parrallel modelling in shell"  \n\n', file = bash, append = TRUE)
+# for(i in 1:length(intensities)){
+#   command <- paste0('./', getOption("RconTroll.app"),
+#                     ' -i"', intensities[[i]],
+#                     '.txt" -f"forest.txt" -o./',
+#                     intensities[[i]], '/', intensities[[i]], ' &\n')
+#   cat(command, file = bash, append = TRUE)
+#   if(i %/% cores == i/cores)
+#   cat('wait\n', file = bash, append = TRUE)
+# }
+# cat('wait\n', file = bash, append = TRUE)
+# cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
+# close(bash)
 ```
 
 ```{r seedrain opening}
@@ -162,10 +202,10 @@ close(bash)
 # path <- getOption("RconTroll.path")
 # clusterExport(cl, list("traits", "path"))
 # sim <- parLapply(cl, as.list(traits), function(trait){
-#  TROLL::load(name = trait, path = file.path(path, trait))
+#  RconTroll::load(name = trait, path = file.path(path, trait))
 # })
 # stopCluster(cl)
-# names(sim) <- traits
+# names(sim) <- intensities
 # save(sim, file = file.path(path, 'sensitivity.Rdata'))
 # rm(list = ls()) ; invisible(gc())
 # load(file.path(getOption("RconTroll.path"), 'sensitivity.Rdata'))
