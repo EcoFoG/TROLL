@@ -7,6 +7,10 @@
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
 
+# TROLL 0.1.9017
+
+* Sensitivity analysis : new RconTroll integration
+
 # TROLL 0.1.9016
 
 * Sensitivity analysis with control replicates

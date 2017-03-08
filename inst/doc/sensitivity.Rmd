@@ -36,7 +36,7 @@ To study resistance and resilience of ecosystem face to disturbance, highlightin
 TROLL model currently encompass following traits:
 
 ```{r traits}
-species  <- read.table(getOption("TROLL.species"), header=TRUE, dec=".", sep="")
+species  <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=TRUE, dec=".", sep="")
 spsum <- data.frame(
   row.names = names(species[-1]),
   unit = c('$g.cm^-2$', '$g.g^-1$', '$g.g^-1$', '$g.g^-1$', '$m$', '$m$', '', '$cm^3$', '$?$'),
@@ -61,40 +61,40 @@ Figure 1: Correlation of functional traits within TROLL model species *Traits wi
 To assess the sensitivity of TROLL model to seed rain, we performed a sensitivity analysis by fixing simulations seed rain constant to 1%, 10%, 100% and 1000% from is default value.
 
 ```{r parameters}
-time <- 2 # years
+time <- 100 # years
 ```
 
 Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB of memory. We assumed maturity of the forest after 500 years of regeneration [@Li] and computed simulation `r time` years after a disturbance event of 40% intensity. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity).
 
 # Results
 
-```{r traits simulations}
-n <- 100
-options(RconTroll.path = '~/Documents/ECOFOG/Results/control')
-# input creations
-replicates <- 1:n
-init(input = 'control.txt', species = species,
-     nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
-invisible(sapply(replicates, function(replicate) 
-  dir.create(file.path(getOption("RconTroll.path"), paste0('control', replicate)))))
+```{r control simulations}
+# n <- 100
+# options(RconTroll.path = '~/Documents/ECOFOG/Results/control')
+# # input creations
+# replicates <- 1:n
+# init(input = 'control.txt', species = species,
+#      nbiter = time*12+1, disturb_iter = 1, disturb_intensity = 0.4)
+# invisible(sapply(replicates, function(replicate) 
+#   dir.create(file.path(getOption("RconTroll.path"), paste0('control', replicate)))))
 # bash creation
-if('control.sh' %in% list.files(getOption("RconTroll.path")))
-   unlink(file.path(getOption("RconTroll.path"), 'control.sh'))
-bash <- file(file.path(getOption("RconTroll.path"), 'control.sh'), open = 'a')
-cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
-cat(' echo "TROLL parrallel modelling in shell"  \n\n', file = bash, append = TRUE)
-for(i in replicates){
-  command <- paste0('./', getOption("RconTroll.app"),
-                    ' -i"control.txt" -f"forest.txt" 
-                    -o./', paste0('control', i), 
-                    '/', paste0('control', i), ' &\n')
-  cat(command, file = bash, append = TRUE)
-  if(i %/% cores == i/cores)
-  cat('wait\n', file = bash, append = TRUE)
-}
-cat('wait\n', file = bash, append = TRUE)
-cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
-close(bash)
+# if('control.sh' %in% list.files(getOption("RconTroll.path")))
+#    unlink(file.path(getOption("RconTroll.path"), 'control.sh'))
+# bash <- file(file.path(getOption("RconTroll.path"), 'control.sh'), open = 'a')
+# cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
+# cat(' echo "TROLL parrallel modelling in shell"  \n\n', file = bash, append = TRUE)
+# for(i in replicates){
+#   command <- paste0('./', getOption("RconTroll.app"),
+#                     ' -i"control.txt" -f"forest.txt" -o./', 
+#                     paste0('control', i),
+#                     '/', paste0('control', i), ' &\n')
+#   cat(command, file = bash, append = TRUE)
+#   if(i %/% cores == i/cores)
+#   cat('wait\n', file = bash, append = TRUE)
+# }
+# cat('wait\n', file = bash, append = TRUE)
+# cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
+# close(bash)
 ```
 
 ```{r control opening}
@@ -102,13 +102,17 @@ close(bash)
 # path <- getOption("RconTroll.path")
 # clusterExport(cl, list("replicates", "path"))
 # sim <- parLapply(cl, as.list(replicates), function(i){
-#  TROLL::load(name = paste0('control', i), path = file.path(path, paste0('control', i)))
+#  RconTroll::load(name = paste0('control', i), 
+#                  path = file.path(path, paste0('control', i)))
 # })
 # stopCluster(cl)
 # names(sim) <- paste0('control', replicates)
-# save(sim, file = file.path(path, 'control.Rdata'))
+# sim <- stack(sim)
+# sim <- aggregate(sim)
+# control <- sim
+# save(control, file = file.path('~/Documents/ECOFOG/Results/control/', 'control.Rdata'))
 # rm(list = ls()) ; invisible(gc())
-# load(file.path('~/Documents/ECOFOG/Results/sensitivity/', 'sensitivity.Rdata'))
+# load(file.path('~/Documents/ECOFOG/Results/control/', 'control.Rdata'))
 ```
 
 ## Functional traits
@@ -160,9 +164,12 @@ close(bash)
 # })
 # stopCluster(cl)
 # names(sim) <- traits
-# save(sim, file = file.path(path, 'sensitivity.Rdata'))
+# sim <- stack(sim)
+# traits <- sim
+# save(traits, file = file.path('~/Documents/ECOFOG/Results/sensitivity/',
+#                               'traits.Rdata'))
 # rm(list = ls()) ; invisible(gc())
-load(file.path('~/Documents/ECOFOG/Results/sensitivity/', 'sensitivity.Rdata'))
+# load(file.path('~/Documents/ECOFOG/Results/traits/', 'traits.Rdata'))
 ```
 
 ## Seed rain
@@ -206,9 +213,12 @@ load(file.path('~/Documents/ECOFOG/Results/sensitivity/', 'sensitivity.Rdata'))
 # })
 # stopCluster(cl)
 # names(sim) <- intensities
-# save(sim, file = file.path(path, 'sensitivity.Rdata'))
+# sim <- stack(sim)
+# seedrain <- sim
+# save(seedrain, file = file.path('~/Documents/ECOFOG/Results/seedrain',
+#                                 'seedrain.Rdata'))
 # rm(list = ls()) ; invisible(gc())
-# load(file.path(getOption("RconTroll.path"), 'sensitivity.Rdata'))
+# load(file.path('~/Documents/ECOFOG/Results/seedrain', 'seedrain.Rdata'))
 ```
 
 # Discussion
