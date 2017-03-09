@@ -23,7 +23,7 @@ opts_chunk$set(
     cache = T, cache.lazy = F)
 ```
 
-Built with `RconTroll` package version `r packageVersion('RconTroll')` available at https://gitlab.com/sylvain.schmitt/RconTroll and `TROLL` package version `r packageVersion('TROLL')` available at https://gitlab.com/sylvain.schmitt/TROLL.
+Built with `RconTroll` package version `r packageVersion('RconTroll')` available at https://gitlab.com/sylvain.schmitt/RconTroll and `TROLL` package version `r packageVersion('TROLL')` available at https://gitlab.com/sylvain.schmitt/TROLL with `r R.Version()$version.string` environment.
 
 # Introduction
 
@@ -62,14 +62,16 @@ To assess the sensitivity of TROLL model to seed rain, we performed a sensitivit
 
 ```{r parameters}
 time <- 100 # years
+n <- 100 # replicates
 ```
 
-Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB of memory. We assumed maturity of the forest after 500 years of regeneration [@Li] and computed simulation `r time` years after a disturbance event of 40% intensity. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity).
+Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB of memory. We assumed maturity of the forest after 500 years of regeneration [@Li] and computed simulation `r time` years after a disturbance event of 40% intensity. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity). To assess ecosystem outputs sensitivity to studied parameters, we compared it to `r n` replicates of control simulations with all parameters set to default values. Ecosystem outputs outside of the range of the control replicates values is significantly influenced by the studied parameter.
+
+All analyses were conducted under `r R.Version()$version.string` with RconTroll package version `r packageVersion('RconTroll')`.
 
 # Results
 
 ```{r control simulations}
-# n <- 100
 # options(RconTroll.path = '~/Documents/ECOFOG/Results/control')
 # # input creations
 # replicates <- 1:n
@@ -98,21 +100,10 @@ Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB
 ```
 
 ```{r control opening}
-# cl <- makeCluster(getOption("cl.cores", cores))
-# path <- getOption("RconTroll.path")
-# clusterExport(cl, list("replicates", "path"))
-# sim <- parLapply(cl, as.list(replicates), function(i){
-#  RconTroll::load(name = paste0('control', i), 
-#                  path = file.path(path, paste0('control', i)))
-# })
-# stopCluster(cl)
-# names(sim) <- paste0('control', replicates)
-# sim <- stack(sim)
-# sim <- aggregate(sim)
-# control <- sim
-# save(control, file = file.path('~/Documents/ECOFOG/Results/control/', 'control.Rdata'))
-# rm(list = ls()) ; invisible(gc())
-# load(file.path('~/Documents/ECOFOG/Results/control/', 'control.Rdata'))
+path <- '~/Documents/ECOFOG/Results/control'
+# control <- loadStack(path = file.path(path, 'simulations'), old = T)
+# save(control, file = file.path(path, 'control.Rdata'))
+load(file.path(path, 'control.Rdata'))
 ```
 
 ## Functional traits
@@ -156,20 +147,10 @@ Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB
 ```
 
 ```{r traits opening}
-# cl <- makeCluster(getOption("cl.cores", cores))
-# path <- getOption("RconTroll.path")
-# clusterExport(cl, list("traits", "path"))
-# sim <- parLapply(cl, as.list(traits), function(trait){
-#  TROLL::load(name = trait, path = file.path(path, trait))
-# })
-# stopCluster(cl)
-# names(sim) <- traits
-# sim <- stack(sim)
-# traits <- sim
-# save(traits, file = file.path('~/Documents/ECOFOG/Results/sensitivity/',
-#                               'traits.Rdata'))
-# rm(list = ls()) ; invisible(gc())
-# load(file.path('~/Documents/ECOFOG/Results/traits/', 'traits.Rdata'))
+path <- '~/Documents/ECOFOG/Results/traits'
+# control <- loadStack(path = file.path(path, 'simulations'), old = T)
+# save(control, file = file.path(path, 'traits.Rdata'))
+load(file.path(path, 'traits.Rdata'))
 ```
 
 ## Seed rain
@@ -205,20 +186,10 @@ Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB
 ```
 
 ```{r seedrain opening}
-# cl <- makeCluster(getOption("cl.cores", cores))
-# path <- getOption("RconTroll.path")
-# clusterExport(cl, list("traits", "path"))
-# sim <- parLapply(cl, as.list(traits), function(trait){
-#  RconTroll::load(name = trait, path = file.path(path, trait))
-# })
-# stopCluster(cl)
-# names(sim) <- intensities
-# sim <- stack(sim)
-# seedrain <- sim
-# save(seedrain, file = file.path('~/Documents/ECOFOG/Results/seedrain',
-#                                 'seedrain.Rdata'))
-# rm(list = ls()) ; invisible(gc())
-# load(file.path('~/Documents/ECOFOG/Results/seedrain', 'seedrain.Rdata'))
+path <- '~/Documents/ECOFOG/Results/seedrain'
+# control <- loadStack(path = file.path(path, 'simulations'), old = T)
+# save(control, file = file.path(path, 'seedrain.Rdata'))
+load(file.path(path, 'seedrain.Rdata'))
 ```
 
 # Discussion
