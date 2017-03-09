@@ -7,6 +7,10 @@
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
 
+# TROLL 0.1.9019
+
+* Sensitivity analysis 2 done
+
 # TROLL 0.1.9018
 
 * Sensitivity analysis: loadStack integration

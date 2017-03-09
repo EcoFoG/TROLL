@@ -18,6 +18,7 @@ devtools::install_github('sylvainschmitt/RconTroll')
 library(TROLL)
 library(RconTroll)
 library(corrplot)
+library(cowplot)
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
     cache = T, cache.lazy = F)
@@ -27,7 +28,7 @@ Built with `RconTroll` package version `r packageVersion('RconTroll')` available
 
 # Introduction
 
-To study resistance and resilience of ecosystem face to disturbance, highlighting the role of biodiversity, we decided to use TROLL model simulations [@Chave1999]. In order to have get a finer study of simulations response, we need to assess first sensitivity of the TROLL model to different parameters. More particularly we need to assess the importance of functional traits to further better control functional diversities in simulations. We also need to assess sensitivity of the model to see rain constant because we assume it as being one major factor of tree recruitments after disturbance.
+To study resistance and resilience of ecosystem face to disturbance, highlighting the role of biodiversity, we decided to use TROLL model simulations [@Chave1999]. In order to get a finer study of simulations response, we need to assess first sensitivity of the TROLL model to different parameters. More particularly we need to assess the importance of functional traits to further better control functional diversities in simulations. We also need to assess sensitivity of the model to see rain constant because we assume it is one of the main factor of tree recruitments after disturbance in the model.
 
 # Material and methods
 
@@ -39,11 +40,12 @@ TROLL model currently encompass following traits:
 species  <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=TRUE, dec=".", sep="")
 spsum <- data.frame(
   row.names = names(species[-1]),
-  unit = c('$g.cm^-2$', '$g.g^-1$', '$g.g^-1$', '$g.g^-1$', '$m$', '$m$', '', '$cm^3$', '$?$'),
+  unit = c('$g.m^-2$', 'm$g.g^-1$', '$mg.g^-1$', '$g.cm^-3$', '$m$', '$m$', 
+           '$m$', '$mm^3$', '$nb.ha^-1$'),
   mean = apply(species[-1], 2, mean),
-  vars = apply(species[-1], 2, var)
+  variance = apply(species[-1], 2, var)
 )
-kable(spsum)
+kable(spsum, format.args = list(scientific = T, digits = 3))
 ```
 
 Table 1: Functional traits of TROLL model species *Traits with their abbreviation, standard unit, mean and variance.*
@@ -54,7 +56,7 @@ To assess the sensitivity of TROLL model to species functionnal traits, we perfo
 corrplot.mixed(cor(species[-1]))
 ```
 
-Figure 1: Correlation of functional traits within TROLL model species *Traits with their abbreviation, standard unit, mean and variance.*
+Figure 1: Correlation of functional traits within TROLL model species *Blue represents negative coorelations whereas red represents positive correlations. Values and colour intensity represents correlation values.*
 
 ## Seed rain
 
@@ -65,11 +67,13 @@ time <- 100 # years
 n <- 100 # replicates
 ```
 
-Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB of memory. We assumed maturity of the forest after 500 years of regeneration [@Li] and computed simulation `r time` years after a disturbance event of 40% intensity. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity). To assess ecosystem outputs sensitivity to studied parameters, we compared it to `r n` replicates of control simulations with all parameters set to default values. Ecosystem outputs outside of the range of the control replicates values is significantly influenced by the studied parameter.
+Simulations were conducted on Intel Xeon(R) with 32 CPUs of 2.00GHz and 188.9 GB of memory. We assumed maturity of the forest after 500 years of regeneration [@Li] and computed simulation `r time` years after a disturbance event of 40% intensity. Due to computer limitations we did not run replicate (besides it should be necessary to reduce simulation stochasticity). To assess ecosystem outputs sensitivity to studied parameters, we compared it to `r n` replicates of control simulations with all parameters set to default values. Ecosystem outputs outside of the range of the control replicates values are significantly influenced by the studied parameter.
 
 All analyses were conducted under `r R.Version()$version.string` with RconTroll package version `r packageVersion('RconTroll')`.
 
 # Results
+
+## Control
 
 ```{r control simulations}
 # options(RconTroll.path = '~/Documents/ECOFOG/Results/control')
@@ -99,12 +103,33 @@ All analyses were conducted under `r R.Version()$version.string` with RconTroll 
 # close(bash)
 ```
 
+Disturbed tree diameter structure corresponded to tree diameter structure before disturbance (figure 2). Consequently, we assumed that disturbance did not affect much ecosystem structure. Secondly range of values inside control replicates is low (figure 3).
+
+```{r control structure, fig.height=4}
+mature <- loadOutputOld('mature', '~/Documents/ECOFOG/Results/mature/')
+control1 <- loadOutputOld('control1', '~/Documents/ECOFOG/Results/control/simulations/control1/')
+dbh_mature <- plot(mature, what = 'dbh', ggplot2 = T)
+dbh_control <- plot(control1, what = 'distdbh', ggplot2 = T)
+plot_grid(dbh_mature, dbh_control, labels = c('A', 'B'), nrow = 1, ncol = 2)
+```
+
+Figure 2. Tree diameter structure before disturbance (**A**) and disturbed (**B**).
+
 ```{r control opening}
 path <- '~/Documents/ECOFOG/Results/control'
 # control <- loadStack(path = file.path(path, 'simulations'), old = T)
+# control <- aggregate(control)
 # save(control, file = file.path(path, 'control.Rdata'))
 load(file.path(path, 'control.Rdata'))
+n10 <- plot(control, what = 'abu10', ggplot2 = T)
+n30 <- plot(control, what = 'abu30', ggplot2 = T)
+agb <- plot(control, what = 'agb', ggplot2 = T)
+ba <- plot(control, what = 'ba', ggplot2 = T)
+plot_grid(n10, n30, agb, ba, labels = c('N10', 'N30', 'AGB', 'BA'), nrow = 2, ncol = 2)
+rm(list = ls()[-which(ls() %in% c('control1', 'control'))]) ; invisible(gc())
 ```
+
+Figure 3. Control replicates variation. _Number of trees with dbh above 10 cm (**N10**) and 30 cm (**N30**), above ground biomass (**AGB**) and basal area (**BA**)._
 
 ## Functional traits
 
@@ -146,14 +171,37 @@ load(file.path(path, 'control.Rdata'))
 # close(bash)
 ```
 
+Most of functional traits had a significant long term influence on ecosystem outputs (figure 4). Only **seedvolume** was always in the range of variation of control replicates. On the other hand, functional traits did not influenced final ecosystem structure (figure 5). More particulraly, **ah-hmax** traits fixed to mean increased number of stems above 10 and above 30 cm dbh and basal area after disturbance (but not in long term) and did not affect aboveground biomass. Similarly, **wsg** trait fixed to mean had exactly the same effect on number of stems above 10 and above 30 cm dbh and basal area after disturbance than **ah-hmax** but with a time lag ; and **wsg** also increased aboveground biomass. **dmax** trait fixed to mean slightly decreased number of stems above 10 and above 30 cm dbh over time while it increased basal area and aboveground biomass. Finally, **LMA** trait fixed to mean only decreased number of stem above 10 cm dbh after ecosystem resilience to disturbance (approximately 50 years) but did not affect other ecosystem outputs.
+
 ```{r traits opening}
 path <- '~/Documents/ECOFOG/Results/traits'
-# control <- loadStack(path = file.path(path, 'simulations'), old = T)
-# save(control, file = file.path(path, 'traits.Rdata'))
+# traits <- loadStack(path = file.path(path, 'simulations'), old = T)
+# save(traits, file = file.path(path, 'traits.Rdata'))
 load(file.path(path, 'traits.Rdata'))
+n10 <- plot(traits, control, what = 'abu10', ggplot2 = T)
+n30 <- plot(traits, control, what = 'abu30', ggplot2 = T)
+agb <- plot(traits, control, what = 'agb', ggplot2 = T)
+ba <- plot(traits, control, what = 'ba', ggplot2 = T)
+plot_grid(n10, n30, agb, ba, labels = c('N10', 'N30', 'AGB', 'BA'), nrow = 2, ncol = 2)
+rm(list = ls()[-which(ls() %in% c('control1', 'control','traits'))]) ; invisible(gc())
 ```
 
+Figure 4. Traits variation. _Number of trees with dbh above 10 cm (**N10**) and 30 cm (**N30**), above ground biomass (**AGB**) and basal area (**BA**)._
+
+```{r traits structure}
+height <- plot(traits, what = 'height', ggplot2 = T)
+heightc <- plot(control1, what = 'height', ggplot2 = T)
+dbh <- plot(traits, what = 'dbh', ggplot2 = T)
+dbhc <- plot(control1, what = 'dbh', ggplot2 = T)
+plot_grid(height, heightc, dbh, dbhc, labels = c('A', 'B', 'C', 'D'), nrow = 2, ncol = 2)
+rm(list = ls()[-which(ls() %in% c('control1', 'control'))]) ; invisible(gc())
+```
+
+Figure 5. Traits structure. _Tree final height histogram for traits (**A**) and control (**B**), and tree final diameter histogram for traits (**C**) and control (**D**)._
+
 ## Seed rain
+
+Seedrain constant affected ecosystem outputs only when set lower than default value (figure 6). Moreover, did not seem to affect aboveground biomass and final ecosystem structure (figure 7). Seedrain constant fixed to 1% or 10% of its default value seemed to have a similar effect. Lower seedrain implied faster decrease of stem above 10 cm dbh and higher number of stem above 30 cm dbh after ecosystem resilience to disturbance (approximately 50 years). Finally, lower seedrain decrease basal area over time.
 
 ```{r seedrain simulations}
 # options(RconTroll.path = '~/Documents/ECOFOG/Results/seedrain')
@@ -187,13 +235,42 @@ load(file.path(path, 'traits.Rdata'))
 
 ```{r seedrain opening}
 path <- '~/Documents/ECOFOG/Results/seedrain'
-# control <- loadStack(path = file.path(path, 'simulations'), old = T)
-# save(control, file = file.path(path, 'seedrain.Rdata'))
+# seedrain <- loadStack(path = file.path(path, 'simulations'), old = T)
+# save(seedrain, file = file.path(path, 'seedrain.Rdata'))
 load(file.path(path, 'seedrain.Rdata'))
+n10 <- plot(seedrain, control, what = 'abu10', ggplot2 = T)
+n30 <- plot(seedrain, control, what = 'abu30', ggplot2 = T)
+agb <- plot(seedrain, control, what = 'agb', ggplot2 = T)
+ba <- plot(seedrain, control, what = 'ba', ggplot2 = T)
+plot_grid(n10, n30, agb, ba, labels = c('N10', 'N30', 'AGB', 'BA'), nrow = 2, ncol = 2)
+rm(list = ls()[-which(ls() %in% c('control1', 'control','seedrain'))]) ; invisible(gc())
 ```
+
+Figure 6. Seedrain variation. _Number of trees with dbh above 10 cm (**N10**) and 30 cm (**N30**), above ground biomass (**AGB**) and basal area (**BA**)._
+
+```{r seedrain structure}
+height <- plot(seedrain, what = 'height', ggplot2 = T)
+heightc <- plot(control1, what = 'height', ggplot2 = T)
+dbh <- plot(seedrain, what = 'dbh', ggplot2 = T)
+dbhc <- plot(control1, what = 'dbh', ggplot2 = T)
+plot_grid(height, heightc, dbh, dbhc, labels = c('A', 'B', 'C', 'D'), nrow = 2, ncol = 2)
+rm(list = ls()[-which(ls() %in% c('control1', 'control'))]) ; invisible(gc())
+```
+
+Figure 7. Seedrain structure. _Tree final height histogram for traits (**A**) and control (**B**), and tree final diameter histogram for traits (**C**) and control (**D**)._
 
 # Discussion
 
-# Supplementray materials
+## Functional traits selection
+
+We can surely don't take into account **seedmass** trait in subsequent analysis. Similarly we may also ignore **LMA** trait in subsequent analysis. Consequently control of diversity for subsequent analysis should use a 4-dimensionnal space of functional diversity and composition with **ah**, **hmax**, **wsg** and **dmax**. Considering the high correlation between **ah** and **hmax** we could also keep only **ah**.
+
+## Seed rain constant influence
+
+Contrarily to expectation seedrain constant did not seem to be a major parameter of ecosystem recovery after disturbance. Still we have to look deeper on effect on diversity per se. And seedrain constant fixed to a low value seemed to unstabilized ecosystem (with number of stems above 10 cm dbh decreasing under the pre-disturbance value).
+
+## Conclusion
+
+We can now move to subsequent analysis of studying disturbance and biodiversity effect on ecosystem functioning. To do so we will control biodiversity in input with a 3-dimensionnal functional space including **ah**, **wsg** and **dmax**. And we can let seedrain constant to its default value without any risk of untaken side effect.
 
 # References
