@@ -3,9 +3,9 @@ title: "Trait sensitivity analysis"
 author: "Sylvain Schmitt"
 date: '`r Sys.Date()`'
 output:
+  word_document: default
   pdf_document: default
   html_document: default
-  word_document: default
 csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
 bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
@@ -104,7 +104,7 @@ All analyses were conducted under `r R.Version()$version.string` with RconTroll 
 # close(bash)
 ```
 
-Disturbed ecosystem structure corresponded to ecosystem structure before disturbance (figure 2). Similarly, disturbed ecosystem functional composition corresponded to ecosystem structure before disturbance (figure 3). Consequently, we assumed that disturbance did not affect much ecosystem structure and function. Secondly range of values inside control replicates is low (figure 4).
+Both disturbed ecosystem structure and functional composition corresponded to ecosystem structure and functional composition before disturbance (figure 2 & 3). Consequently, we assumed that disturbance did not affect much ecosystem structure and function. Secondly range of values inside control replicates is low (figure 4).
 
 ```{r control structure}
 mature <- loadOutputOld('mature', '~/Documents/ECOFOG/Results/mature/')
@@ -153,7 +153,7 @@ plot_grid(n10, n30, agb, ba, labels = c('N10', 'N30', 'AGB', 'BA'), nrow = 2, nc
 rm(list = ls()[-which(ls() %in% c('control1', 'control'))]) ; invisible(gc())
 ```
 
-Figure 4. Control replicates variation. _Number of trees with dbh above 10 cm (**N10**) and 30 cm (**N30**), above ground biomass (**AGB**) and basal area (**BA**)._
+Figure 4. Control replicates variation. _Maximum, mean and minimum number of trees with dbh above 10 cm (**N10**) and 30 cm (**N30**), above ground biomass (**AGB**) and basal area (**BA**) over simulation time._
 
 ## Functional traits
 
@@ -195,7 +195,9 @@ Figure 4. Control replicates variation. _Number of trees with dbh above 10 cm (*
 # close(bash)
 ```
 
-Most of functional traits had a significant long term influence on ecosystem outputs (figure 5). Only **seedvolume** was always in the range of variation of control replicates. On the other hand, functional traits did not influenced final ecosystem structure (figure 6). More particulraly, **ah-hmax** traits fixed to mean increased number of stems above 10 and above 30 cm dbh and basal area after disturbance (but not in long term) and did not affect aboveground biomass. Similarly, **wsg** trait fixed to mean had exactly the same effect on number of stems above 10 and above 30 cm dbh and basal area after disturbance than **ah-hmax** but with a time lag ; and **wsg** also increased aboveground biomass. **dmax** trait fixed to mean slightly decreased number of stems above 10 and above 30 cm dbh over time while it increased basal area and aboveground biomass. Finally, **LMA** trait fixed to mean only decreased number of stem above 10 cm dbh after ecosystem resilience to disturbance (approximately 50 years) but did not affect other ecosystem outputs.
+Most of functional traits had a significant long term influence on ecosystem outputs (figure 5). Only **seedvolume** was always in the range of variation of control replicates. On the other hand, few functional traits influenced final ecosystem structure (figure 6). Only **dmax** add higher diversity for greater orders implying better eveness in species distributions. Regarding functional composition, traits fixed to mean did not change other functional traits density distribution (figure 7).
+
+**ah-hmax** traits fixed to mean increased number of stems above 10 and above 30 cm dbh and basal area after disturbance (but not in long term) and did not affect aboveground biomass. Similarly, **wsg** trait fixed to mean had exactly the same effect on number of stems above 10 and above 30 cm dbh and basal area after disturbance than **ah-hmax** but with a time lag ; and **wsg** also increased aboveground biomass. **dmax** trait fixed to mean slightly decreased number of stems above 10 and above 30 cm dbh over time while it increased basal area, aboveground biomass, and species eveness. Finally, **LMA** trait fixed to mean only decreased number of stem above 10 cm dbh after ecosystem resilience to disturbance (approximately 50 years) but did not affect other ecosystem outputs.
 
 ```{r traits opening}
 path <- '~/Documents/ECOFOG/Results/traits'
@@ -242,7 +244,8 @@ Figure 7. Traits functional composition. _Ecosystem final functional composition
 
 ## Seed rain
 
-Seedrain constant affected ecosystem outputs only when set lower than default value (figure 8). Moreover, did not seem to affect aboveground biomass and final ecosystem structure (figure 9). Seedrain constant fixed to 1% or 10% of its default value seemed to have a similar effect. Lower seedrain implied faster decrease of stem above 10 cm dbh and higher number of stem above 30 cm dbh after ecosystem resilience to disturbance (approximately 50 years). Finally, lower seedrain decrease basal area over time.
+Seedrain constant affected ecosystem outputs only when set lower than default value (figure 8 & 9).
+Moreover, seedrain did not seem to affect aboveground biomass (figure 8) and final ecosystem height and diameter structure (figure 9). Seedrain constant fixed to 1% or 10% of its default value seemed to have a similar effect. Lower seedrain implied faster decrease of stem above 10 cm dbh and higher number of stem above 30 cm dbh after ecosystem resilience to disturbance (approximately 50 years). Lower seedrain than default decreased basal area over time. In addition, lower seedrain than default decreased equitability by increasing abundance of abundant species and decreasing abundance of less abundant species. Seedrain constant even decreased the total number of species when fixed to 1% of tis default value. Finally, seedrain constant slightly affected functional composition with higher pike on ecosystem most representatives functional trait values. In a nutshell, the lower is the seedrain constant the most the functional density distribution is aggregated around few functional trait values.
 
 ```{r seedrain simulations}
 # options(RconTroll.path = '~/Documents/ECOFOG/Results/seedrain')
@@ -319,13 +322,19 @@ Figure 10. Seedrain functional composition. _Ecosystem final functional composit
 
 # Discussion
 
+## Disturbance simulation
+
+Ecosystem structure, species organisation and functional composition stayed the same before and after disturbance. We can thus validate disturbance module in its actual state. Morevoer we can now consider that the composition we will initialise at the beginning of simulations will stay the same after disturbance. Finally control replicates has shown few stochasticity, it advocates for few or no replicates in further analysis.
+
 ## Functional traits selection
 
-We can surely don't take into account **seedmass** trait in subsequent analysis. Similarly we may also ignore **LMA** trait in subsequent analysis. Consequently control of diversity for subsequent analysis should use a 4-dimensionnal space of functional diversity and composition with **ah**, **hmax**, **wsg** and **dmax**. Considering the high correlation between **ah** and **hmax** we could also keep only **ah**.
+**ah-hmax** fixed to mean implied no high or low trees. Less high trees left space for more trees increasing number of stems in the ecosystem thus increasing basal area. **wsg** fixed to mean mainly increased wood density of light wood species. Globally higher wood density increased lifespan of individuals responsible for the time lag and the higher number of stems increasing basal area. **wsg** fiwed to mean also increased carbon capture by individuals, thus increasing aboveground biomass. **dmax** fixed to mean decreased death rates. Decreased death rate diminished number of stems, expecially big ones thus increasing global basal area and abiveground biomass. **dmax** fixed to mean by keeping more small diameter stems also increased random selection of species increasing eveness in species distribution.
+
+We can surely don't take into account **seedmass** trait in subsequent analysis. Similarly we may also ignore **LMA** trait in subsequent analysis. Considering the high correlation between **ah** and **hmax** we could also keep only **hmax** (because of its more straightforward ecological meaning). Consequently control of diversity for subsequent analysis should use a 6-dimensionnal space of functional diversity and composition with **hmax**, **wsg** and **dmax**. 
 
 ## Seed rain constant influence
 
-Contrarily to expectation seedrain constant did not seem to be a major parameter of ecosystem recovery after disturbance. Still we have to look deeper on effect on diversity per se. And seedrain constant fixed to a low value seemed to unstabilized ecosystem (with number of stems above 10 cm dbh decreasing under the pre-disturbance value).
+Seedrain constant did not directly affect ecosystem global outputs over simulation post-disturbance time but have a major effect on species and functional composition and diversity. Reducing seedrain constant resulted in an ecosystem selecting few species increasing their abundance and functional dominance of their traits. Thus reduced seedrain constant greatly diminsihed eveness untill a decrease of total number of species for its lowest value. Consequently seedrain constant fixed to a low value seemed to unstabilized ecosystem (with number of stems above 10 cm dbh decreasing under the pre-disturbance value).
 
 ## Conclusion
 

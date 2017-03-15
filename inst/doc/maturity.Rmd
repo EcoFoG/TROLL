@@ -1,0 +1,95 @@
+---
+title: "Maturity"
+author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
+date: '`r Sys.Date()`'
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r config, message=FALSE, warning=FALSE, include=FALSE}
+library(knitr)
+library(parallel)
+cores <- detectCores() - 1
+# devtools::install_github('sylvainschmitt/RconTroll')
+library(TROLL)
+library(RconTroll)
+library(cowplot)
+library(hypervolume)
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
+    cache = T, cache.lazy = F)
+```
+
+Built with `RconTroll` package version `r packageVersion('RconTroll')` available at https://gitlab.com/sylvain.schmitt/RconTroll and `TROLL` package version `r packageVersion('TROLL')` available at https://gitlab.com/sylvain.schmitt/TROLL with `r R.Version()$version.string` environment.
+
+# Design of experiment
+
+## Space of experiments
+
+```{r SOE}
+dist <- 0:3*0.25
+rich <- 3^(1:4)
+set.seed(42)
+n <- 100
+species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=TRUE, dec=".", sep="", row.names = 1)
+species <- species[c('LMA', 'wsg', 'hmax', 'dmax')]
+density <- ks::kde(scale(species), eval.points = scale(species))
+proba <- (1/density$estimate) / sum(1/density$estimate)
+data <- lapply(as.list(rich), function(r) 
+  replicate(n, species[sample(row.names(species), r, F, proba),],
+            simplify = F))
+names(data) <- rich
+dataCWM <- lapply(data, function(x) lapply(x, function(y) apply(y,2, mean)))
+dataCWM <- lapply(dataCWM, function(x) data.frame(do.call('rbind', x)))
+bd <- estimate_bandwidth(scale(species))
+dataHV <- lapply(data, function(x) lapply(x, function(y) try(get_volume(hypervolume(scale(y), bandwidth = bd, verbose = F, warnings = F)))))
+dataHV <- lapply(dataHV, unlist)
+dataHV <- data.frame(do.call('cbind', dataHV))
+names(dataHV) <- paste0('HV.', rich)
+dataCentroids <- lapply(dataCWM, function(x) apply(x, 2, mean))
+dataDist <- data.frame(mapply(function(x,y) apply(x, 1, function(z) sqrt(sum((z - y)^2))), x = dataCWM, y = dataCentroids))
+names(dataDist) <- paste0('dist.', rich)
+Sample <- cbind(dataDist, dataHV)
+Sample <- lapply(as.list(rich), function(r) Sample[grep(r, names(Sample))])
+names(Sample) <- rich
+Sample <- lapply(Sample, function(x) x[x[,1] < sd(x[,1]),])
+SampleScale <- lapply(Sample, function(x) seq(from = min(x[,2]), max(x[,2]), length.out = 10))
+Sample <- mapply(function(x,y) do.call('rbind', sapply(y, function(z) x[which.min(abs(x[,2] - z)) ,], simplify = F)), 
+                 x = Sample, y = SampleScale, SIMPLIFY = F)
+Sample <- lapply(Sample, function(x) x[!duplicated(x),])
+Sample <- lapply(Sample, row.names)
+Sample <- mapply(function(x,y) x[as.numeric(y)], x = data, y = Sample, SIMPLIFY = F)
+Sample <- lapply(Sample, function(x) lapply(x, row.names))
+names(Sample) <- rich
+```
+
+The space of experiments encompass following axes (with their abbreviations and values) :
+
+- **Disturbance:** $dist \in \left\{ `r paste(dist)` \right\}$
+- **Richness:** $rich \in \left\{ `r paste(rich)` \right\}$
+- **Community weighted mean:** $cwm$
+- **Community weighted variance:** $cwv$
+
+Weapply(space, 2, function(x) seq(from = x[1], to = x[2], length.out = n)) will reduce it to $n_{exp}$ experiments with Ehanced Stochastic Evolutionary (ESE) algorithms following @Jin2005 with the help of `DiceDesign` R package.
+
+Community weighted mean and variance will depend on richness (higher richness implying less choices). So we can already measure possible community weighted means and variances depending on the level of richness. To do that we sampled $10^4$ communities for each richness level. Sampling was done by attributing to each species a probability to be pick inverse of its densities in the 4-dimensional functional trait space computed with R package `ks`.  
+
+Once the sampling done we decided to reduce number of experiments for each level of richness. To do so we used `DiceDesign` R package and  WSP (Wooton, Sergent, Phan-Tan-Luu) algorithm following [@Santiago2012] to select experiments for each level of richness based on a maximum minimum distance criterion in the 4-dimensional functional space.
+
+```{r com sel}
+
+```
+
+We finally obtained following design of experiment:
+
+```{r DOE}
+
+```
+
+## Pre-disturbance forest simulation
+
+# References
