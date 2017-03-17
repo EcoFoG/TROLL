@@ -1,5 +1,5 @@
 ---
-title: "Maturity"
+title: "Disturbance"
 author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
 date: '`r Sys.Date()`'
 output:
@@ -17,6 +17,7 @@ cores <- detectCores() - 1
 # devtools::install_github('sylvainschmitt/RconTroll')
 library(TROLL)
 library(RconTroll)
+library(ggplot2)
 library(cowplot)
 library(hypervolume)
 opts_chunk$set(
@@ -30,66 +31,124 @@ Built with `RconTroll` package version `r packageVersion('RconTroll')` available
 
 ## Space of experiments
 
-```{r SOE}
+```{r Sample, include=FALSE}
+# Init
+path <- '~/Documents/ECOFOG/Results/disturbance/'
+set.seed(42)
+n <- 10^3
 dist <- 0:3*0.25
 rich <- 3^(1:4)
-set.seed(42)
-n <- 100
-species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=TRUE, dec=".", sep="", row.names = 1)
-species <- species[c('LMA', 'wsg', 'hmax', 'dmax')]
-density <- ks::kde(scale(species), eval.points = scale(species))
-proba <- (1/density$estimate) / sum(1/density$estimate)
-data <- lapply(as.list(rich), function(r) 
-  replicate(n, species[sample(row.names(species), r, F, proba),],
-            simplify = F))
-names(data) <- rich
-dataCWM <- lapply(data, function(x) lapply(x, function(y) apply(y,2, mean)))
-dataCWM <- lapply(dataCWM, function(x) data.frame(do.call('rbind', x)))
-bd <- estimate_bandwidth(scale(species))
-dataHV <- lapply(data, function(x) lapply(x, function(y) try(get_volume(hypervolume(scale(y), bandwidth = bd, verbose = F, warnings = F)))))
-dataHV <- lapply(dataHV, unlist)
-dataHV <- data.frame(do.call('cbind', dataHV))
-names(dataHV) <- paste0('HV.', rich)
-dataCentroids <- lapply(dataCWM, function(x) apply(x, 2, mean))
-dataDist <- data.frame(mapply(function(x,y) apply(x, 1, function(z) sqrt(sum((z - y)^2))), x = dataCWM, y = dataCentroids))
-names(dataDist) <- paste0('dist.', rich)
-Sample <- cbind(dataDist, dataHV)
-Sample <- lapply(as.list(rich), function(r) Sample[grep(r, names(Sample))])
-names(Sample) <- rich
-Sample <- lapply(Sample, function(x) x[x[,1] < sd(x[,1]),])
-SampleScale <- lapply(Sample, function(x) seq(from = min(x[,2]), max(x[,2]), length.out = 10))
-Sample <- mapply(function(x,y) do.call('rbind', sapply(y, function(z) x[which.min(abs(x[,2] - z)) ,], simplify = F)), 
-                 x = Sample, y = SampleScale, SIMPLIFY = F)
-Sample <- lapply(Sample, function(x) x[!duplicated(x),])
-Sample <- lapply(Sample, row.names)
-Sample <- mapply(function(x,y) x[as.numeric(y)], x = data, y = Sample, SIMPLIFY = F)
-Sample <- lapply(Sample, function(x) lapply(x, row.names))
-names(Sample) <- rich
+# # Coms
+# species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=TRUE, dec=".", sep="", row.names = 1)
+# species <- species[c('LMA', 'wsg', 'hmax', 'dmax')]
+# proba <- ks::kde(scale(species), eval.points = scale(species))$estimate
+# proba <- 1/proba
+# coms <- lapply(as.list(rich), function(r) 
+#   replicate(n, species[sample(row.names(species), r, F, proba),],
+#             simplify = F))
+# names(coms) <- rich ; rm(proba)
+# # Dists
+# CWM <- lapply(coms, function(x) do.call('rbind', lapply(x, function(y) apply(y,2, mean))))
+# Centroids <- lapply(CWM, function(x) apply(x, 2, mean))
+# Dist <- data.frame(mapply(function(x,y) apply(x, 1, function(z) sqrt(sum((z - y)^2))), x = CWM, y = Centroids))
+# names(Dist) <- paste0('dist.', rich) ; rm(CWM, Centroids)
+# # HV
+# bd <- estimate_bandwidth(scale(species))
+# HV <- lapply(coms, function(x)  lapply(x, function(y) 
+#     try(get_volume(hypervolume(scale(y), bandwidth = bd, verbose = F, warnings = F)))))
+# HV <- lapply(HV, function(x){x[which(unlist(lapply(x, function(y) inherits(y, 'try-error'))))] <- NA})
+# HV <- data.frame(do.call('cbind', lapply(coms, unlist)))
+# names(HV) <- paste0('HV.', rich) ; rm(bd)
+# # Sample
+# Sample <- cbind(Dist, HV)
+# Sample <- lapply(as.list(rich), function(r) Sample[grep(r, names(Sample))])
+# names(Sample) <- rich
+# Sample <- lapply(Sample, function(x) x[x[,1] < sd(x[,1]),])
+# Sample <- lapply(Sample, function(x) {x$num <- row.names(x) ; return(x)})
+# Scale <- lapply(Sample, function(x) seq(from = min(x[,2]), max(x[,2]), length.out = 10))
+# Sample <- mapply(function(x,y) do.call('rbind', sapply(y, function(z) 
+#   x[which.min(abs(x[,2] - z)) ,], simplify = F)),  x = Sample, y = Scale, SIMPLIFY = F)
+# Sample <- lapply(Sample, function(x) x[!duplicated(x),])
+# Sel <- lapply(Sample, function(x) x$num)
+# Sel <- mapply(function(x,y) x[as.numeric(y)], x = coms, y = Sel, SIMPLIFY = F)
+# Sel <- lapply(Sel, function(x) lapply(x, row.names))
+# names(Sel) <- rich ; rm(Scale, HV, Dist)
+# save(Sel, Sample, file = file.path(path, 'SpeciesSel.Rdata'))
+load(file.path(path, 'SpeciesSel.Rdata'))
 ```
 
 The space of experiments encompass following axes (with their abbreviations and values) :
 
 - **Disturbance:** $dist \in \left\{ `r paste(dist)` \right\}$
 - **Richness:** $rich \in \left\{ `r paste(rich)` \right\}$
-- **Community weighted mean:** $cwm$
-- **Community weighted variance:** $cwv$
+- **Community hypervolume:** $hv$
 
-Weapply(space, 2, function(x) seq(from = x[1], to = x[2], length.out = n)) will reduce it to $n_{exp}$ experiments with Ehanced Stochastic Evolutionary (ESE) algorithms following @Jin2005 with the help of `DiceDesign` R package.
+Community hypervolume will depend on richness (higher richness implying less choices). So we can already measure possible community hypervolumes depending on the level of richness for a given community mean. To do that we sampled $`r n`$ communities for each richness level. Sampling was done by attributing to each species a probability to be pick inverse of its densities in the 4-dimensional functional trait space computed with R package `ks`. Once random communities sampled, we measured each community mean and calculated community euclidean distance to the metacommunity mean. We wanted to control ecosystem functional composition with community mean. In order to do that, we decided to keep only simulated community for which community euclidean distance to metacommunity mean was smaller than the standard deviation of euclidean distances of all simulated communities. Once potential communities designated for each level of richness, we defined for each leavel of richness 10 equidistant hypervolumes size and we kept the closest community of each hypervolume level.
 
-Community weighted mean and variance will depend on richness (higher richness implying less choices). So we can already measure possible community weighted means and variances depending on the level of richness. To do that we sampled $10^4$ communities for each richness level. Sampling was done by attributing to each species a probability to be pick inverse of its densities in the 4-dimensional functional trait space computed with R package `ks`.  
-
-Once the sampling done we decided to reduce number of experiments for each level of richness. To do so we used `DiceDesign` R package and  WSP (Wooton, Sergent, Phan-Tan-Luu) algorithm following [@Santiago2012] to select experiments for each level of richness based on a maximum minimum distance criterion in the 4-dimensional functional space.
-
-```{r com sel}
-
-```
-
-We finally obtained following design of experiment:
+We obtained the followin designed of experiment (DOE) without disturbance (to replicate for each 4 levels of disturbance):
 
 ```{r DOE}
-
+data <- data.frame(
+  Richness = as.vector(mapply(function(x,y) rep(x,y), x = 3^(1:4), y = head(unlist(lapply(Sel, length)),4))),
+  Hypervolume = unlist(lapply(Sample, function(x) x[,2])),
+  Dist = unlist(lapply(Sample, function(x) x[,1])))
+row.names(data) <- 1:dim(data)[1]
+kable(data)
 ```
 
-## Pre-disturbance forest simulation
+## Pre-disturbance simulations
+
+```{r Parameters}
+path <- '~/Documents/ECOFOG/Results/disturbance/'
+dist <- 0:3*0.25
+rich <- 3^(1:4)
+load(file.path(path, 'SpeciesSel.Rdata')) ; rm(Sample) # Species Selection
+seedrain <- 50 # Seedtrain constant to fix
+ncores <- 15
+```
+
+```{r Init}
+dir.create(file.path(path, 'maturity'))
+sim <- as.vector(sapply(rich, function(r) paste(r, 1:10, sep = '.')))
+invisible(sapply(sim, function(s) dir.create(file.path(path, 'maturity', s))))
+Sel <- unlist(Sel, recursive = F)
+names(Sel) <- sim
+species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=TRUE, dec=".", sep="")
+Sel <- lapply(Sel, function(com){
+  com <- species[which(species$Name %in% com),]
+  com$Freg <- 1/dim(com)[1]
+})
+invisible(sapply(sim, function(s){
+  init(path = file.path(path, 'maturity'),
+       input = paste0(s, '.txt'),
+       species = Sel[[s]],
+       numesp = dim(Sel[[s]])[1],
+       nbiter = 12*500, disturb_iter = 12*500+1,
+       seedrain = seedrain)
+}))
+```
+
+
+```{r Bash}
+if('maturity.sh' %in% list.files(file.path(path, 'maturity')))
+   unlink(file.path(path, 'maturity', 'maturity.sh'))
+bash <- file(file.path(path, 'maturity', 'maturity.sh'), open = 'a')
+cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
+cat(' echo "maturity forest parrallel modelling in TROLL" \n\n', file = bash, append = TRUE)
+for(i in seq_len(length(sim))){
+  command <- paste0('./TROLL.out',
+                    ' -i"', sim[i], '.txt"',
+                    ' -o./', sim[i], '/', sim[i], ' &\n')
+  cat(command, file = bash, append = TRUE)
+  if(i %/% ncores == i/ncores)
+  cat('wait\n', file = bash, append = TRUE)
+}
+cat('wait\n', file = bash, append = TRUE)
+cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
+close(bash)
+```
+
+
+
 
 # References
