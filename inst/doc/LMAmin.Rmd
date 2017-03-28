@@ -29,7 +29,7 @@ opts_chunk$set(
 
 # Issue
 
-```{r mm Results, fig.height=12, fig.width=12}
+```{r mm Results}
 # Load stack
 load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/Run1/Run1.Rdata')
 
@@ -46,31 +46,40 @@ species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt',
                       header=T, dec=".", sep="",
                       row.names = 1)[c('LMA', 'wsg', 'dmax', 'hmax')]
 species$sp = row.names(species)
-species$LL <- 1.5+(7.18+3.03*log10(species$LMA*0.0001))^10
+species$LL <- 0.5+10^(-2.509+1.71*log10(species$LMA))
 species <- species[names(mm@layers),]
-species$agemax <- as.numeric(lapply(mm@layers, function(layer) max(layer@final_pattern$age)))
+species$agemax <- as.numeric(lapply(mm@layers, function(layer) 
+  max(layer@final_pattern$age)))
+species$dbhmax <- as.numeric(lapply(mm@layers, function(layer) 
+  max(layer@final_pattern$dbh)))
+species$inf <- as.factor(species$dbhmax < species$dmax)
 rm(mm, datal)
 ```
 
-In order to study biodiversity effect on disturbance we decied to use @Loreau2001 partitionning. To do so we needed to generate a monoculture forest for each species present in community assemblages that we wanted to test. But monoculture simulations without disturbance over 500 years shown some strange results for low species with low leaf mass per area (LMA). More specifically some monoculture show really low aboveground biomass (AGB) and basal area (BA, see figure 1) and a really small maximum age in the final stand (see figure 2).
+In order to study biodiversity effect on disturbance we decied to use @Loreau2001 partitionning. To do so we needed to generate a monoculture forest for each species present in community assemblages that we wanted to test. But monoculture simulations without disturbance over 500 years shown some strange results for species with low leaf mass per area (LMA). More specifically some monoculture show really low aboveground biomass (AGB) and basal area (BA, see figure 1) and really small maximal age and diameter at breast height (dbh) in the final stand (see figure 2).
 
 ```{r AGB}
 g1 <- ggplot(data, aes(x = ba, y = agb, colour = sim)) +
   geom_point() + guides(colour = F) +
   xlab('Basal area (m2/ha)') + ylab('Aboveground biomass (kgC/ha)')
-(g1 <- plotly_POST(ggplotly(g1), filename="p1")) ; rm(g1, data)
+# (g1 <- plotly_POST(ggplotly(g1), filename="p1"))
+g1 ; rm(g1, data)
 ```
 
 Figure 1: Aboveground biomass and Basal area after 500 years. *Colour represents the species present in the monoculture simulated with TROLL over 500 years.*
 
 ```{r Agemax}
 g1 <- ggplot(species, aes(x = LMA, y = agemax, col = LL, label = sp)) + geom_point() +
-  xlab('Leaf Mass per Area (g/m2)') + ylab('Age maximum (years)') +
-  scale_color_continuous(name = 'Log10 leaf lifespan', trans = 'log10')
-(p1 <- plotly_POST(ggplotly(g1), filename="g1")) ; rm(g1, p1, species)
+  xlab('Leaf Mass per Area (LMA in g/m2)') + ylab('Age maximum (years)') +
+  scale_color_continuous(name = 'Log10 leaf\nlifespan\n(LL in months)', trans = 'log10')
+# (p1 <- plotly_POST(ggplotly(g1), filename="g1")) ; rm(g1, p1, species)
+g2 <- ggplot(species, aes(x = LMA, y = dbhmax, col = inf, label = sp)) + geom_point() +
+  xlab('Leaf Mass per Area (LMA in g/m2)') + ylab('dbh maximum (m)') +
+  scale_color_discrete(name = 'dbh max\ninferior to dmax')
+plot_grid(g1, g2, labels = c('Age', 'dbh'), nrow = 2) ; rm(g1, g2, species)
 ```
 
-Figure 2: Age maximum and Leaf Mass per Area (LMA) after 500 years. *Colour represents the leaf lifespan present in the monoculture simulated with TROLL over 500 years.*
+Figure 2: Age, dbh maximum and Leaf Mass per Area (LMA) after 500 years. *Colour represents either the leaf lifespan present in the monoculture simulated with TROLL over 500 years or if maximum dbh is inferior to dmax.*
 
 # Mathematical solution
 
@@ -92,7 +101,7 @@ Env <- data.frame(maxIrradiance = c(719.7763,	765.6474679,	769.9658806,	794.8233
                                  23.35780, 23.66990, 24.09092, 24.55815, 23.71159, 23.34976))
 ```
 
-Currently abiotic environment is varying among month. What is interesting us is the minimal environement values for which tree with low $LMA$ will stop to assimilate carbohydrates. So for further equations we will use month with minimal maximum irradiance ($Wmax_{min}$), Januar with following maximum irradiance ($Wmax_{Jan}$), temperature ($T_{Jan}$) and VPD ($VPD_{Jan}$): `r Env[1,]`.
+Currently abiotic environment is varying among month. What is interesting us is the minimal environement values for which tree with low $LMA$ will stop to assimilate carbohydrates. So for subsequent numeric applications we will use month with minimal maximum irradiance ($Wmax_{min}$), Januar with following maximum irradiance ($Wmax_{Jan}$), temperature ($T_{Jan}$) and VPD ($VPD_{Jan}$): `r Env[1,]`.
 
 For each voxel the leaf area density $dens$ depend on total leaf area ($LA$) and crown volume ($crowvolume$) and is inititalized to $dens_0 = 0.8$. Then $LAI[h]$ from a $h$ layer of crown is computed by summing each voxel with leaf from the crown layer. We finally obtain $PPFD$ from a layer with following formulae:
 $$dens_{t-1} = \frac{LA_{t-1}}{crownvolume_{t-1}}$$
@@ -139,7 +148,7 @@ Figure 4: Leaf area ($LA$), crown radius ($CrownRadius$) and PPFD ($PPFD$) for a
 So in January and for a crown depth of 1, we get:
 $$PPFD_{Jan,t}[h] = `r round(Env[1,1],2)`*e^{-`r round(0.9/3.14,2)`*\frac{LA_{t-1}}{CrownDepth_{t-1}}}$$
 
-<span style="color:red"> Still PPFD vary relatively few in TROLL simulations (see table 1). And what is interesting us is minimal values that will play more on low LMA species. So for further numeric applicaitons we will use $PPFD_{min} = 1204$. </span>
+<span style="color:red"> Still PPFD vary relatively few in TROLL simulations (see table 1). And what is interesting us is minimal values that will play more on low LMA species. So for fsubsequent numeric applications we will use $PPFD_{min} = 1204$. </span>
 
 Table 1: PPFD ($PPFD$) for a low LMA species (Symphonia sp 1) and a normal LMA species (Dicorynia guianensis).
 
@@ -150,9 +159,7 @@ PPFD <- min(site$PPFD) ; rm(site)
 
 ## Photosynthesis
 
-We will calculate leaf assimilation $A$:
-
-We got:
+Leaf assimilation $A$ is computed with following formulae inside TROLL:
 $$denTB = \frac{1}{R*10^-3*(T + 273.15)}, ~~ R = 8.314 $$
 $$vCfactor = \frac{T - 25}{298*R*10^-3*(273 + T)}, ~~ R = 8.314$$
 $$Kc_{T} = 404*e^{59.36*vCfactor}$$
@@ -184,14 +191,14 @@ species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt',
                       header=T, dec=".", sep="", row.names = 1)[c('LMA', 'Nmass', 'Pmass')]
 Vcmax <- function(sp){
   LMA <- sp[1] ; Nmass <- sp[2] ; Pmass <- sp[3]
-  VcmaxN <- LMA*(1.64 + 0.43*log10(Nmass) - 0.37*log10(LMA))^10
-  VcmaxP <- LMA*(2.00 + 0.45*log10(Pmass) - 0.25*log10(LMA))^10
+  VcmaxN <- LMA*10^(1.64 + 0.43*log10(Nmass) - 0.37*log10(LMA))
+  VcmaxP <- LMA*10^(2.00 + 0.45*log10(Pmass) - 0.25*log10(LMA))
   return(c(VcmaxN, VcmaxP))
 } 
 Jmax <- function(sp){
   LMA <- sp[1] ; Nmass <- sp[2] ; Pmass <- sp[3]
-  JmaxN <- LMA*(1.94 + 0.41*log10(Nmass) - 0.45*log10(LMA))^10
-  JmaxP <- LMA*(2.30 + 0.44*log10(Pmass) - 0.32*log10(LMA))^10
+  JmaxN <- LMA*10^(1.94 + 0.41*log10(Nmass) - 0.45*log10(LMA))
+  JmaxP <- LMA*10^(2.30 + 0.44*log10(Pmass) - 0.32*log10(LMA))
   return(c(JmaxN, JmaxP))
 }
 species <- cbind(species, t(apply(species, 1, Vcmax)), t(apply(species, 1, Jmax)))
@@ -252,7 +259,7 @@ Figure 6: A in function of observed LMA in species dataset.
 
 ## Autotrophic respiration
 
-Autotrophic respiration in TROLL simulations is partitioned between stem and roots and canopy. 
+Autotrophic respiration in TROLL simulations is partitioned between stem and roots, and canopy. 
 
 ### Stem rspiration
 
@@ -327,7 +334,7 @@ Net carbon uptake formulae are linking photosynthesis $A$ with equation $\phi$ t
 $$GPP = A * \frac{LA_y + 2*LA_m + LA_o}{2} * 189.3 * t , ~~ t \in |0,1|$$
 $$NPP = \frac{3}{4}*(GPP - \frac{3}{2}*(Rday+Rnight+Rstem)) $$
 
-<span style="color:red"> If we look at growth and net primary production (resp. $GPP$, $NPP$) and different components of autotrophic respirations, we can see that primary productions are greatly correlated ($r = 0.99$, see figure 9). So taking into account equations, we can assume that respirations are too small compared to $GPP$ variations and can be assumed as constant, excpet for cases that interest us for low LMA species: </span>
+<span style="color:red"> If we look at growth and net primary production (resp. $GPP$, $NPP$) and different components of autotrophic respirations, we can see that primary productions are greatly correlated ($r = 0.99$, see figure 9). So taking into account equations, we can assume that respirations are too small compared to $GPP$ variations and can be assumed as constant, except for cases that interest us for low LMA species: </span>
 
 ```{r GPP, fig.height=4}
 siteS <- read.delim("~/Documents/ECOFOG/Results/disturbance/monoculture/mature/Run1/Model/Symphonia_sp.1/Symphonia_sp.1_0_site3.txt", header=FALSE)[1:96,]
@@ -413,7 +420,7 @@ $$Rstem = `r round(Rstem1(),2)`*dbh^2*(-0.17+6.5078*\frac{dbh}{dbh + 0.323})$$
 
 ### Graphic
 
-```{r graph, fig.height=4}
+```{r graph}
 rm(data, site, species)
 # Right member of equation
 A <- function(LMA) A2(LMA)
@@ -466,9 +473,9 @@ g <- ggplot(data, aes(x = LMA, y = value, color = variable, shape = method, labe
 
 Figure 10: Graphic resolution of the problem. *Maximum $dbh$ for a given level of net primary production ($NPP$) after which respiration cost is too high and provoke stop in leaf area ($LA$) increase resulting in death of the tree. Leaflifespan is calculated either with Reich or Wright allometry (currently TROLL is running with Reich allometry).*
 
-# Leaflifespan allometry
+# Leaf lifespan allometry
 
-Leaflifespan is currently computed from cite Reich allometry. We suggest to find a better value with @wright_worldwide_2004 GLOPNET dataset. First we can clearly see that allometry seems to greatly change between biomes (see figure 11).
+Leaflifespan is currently computed from Reich allometry. We suggest to find a better value with @wright_worldwide_2004 GLOPNET dataset. First we can clearly see that allometry seems to greatly change between biomes (see figure 11).
 
 ```{r LL}
 rm(list = ls()) ; invisible(gc())
@@ -477,10 +484,12 @@ data <- LES[c('BIOME', 'Species', 'log.LL', 'log.LMA')]
 data <- data[-which(is.na(data$log.LL)),]
 data$LL <- 10^data$log.LL
 data$LMA <- 10^data$log.LMA
-g <- ggplot(data, aes(x = log.LMA, y = log.LL, colour = BIOME, label = Species))
-g + geom_point() + geom_smooth(method = 'lm') + facet_wrap(~ BIOME)
+g <- ggplot(data, aes(x = LMA, y = LL, colour = BIOME, label = Species))
+g + geom_point() + geom_smooth(method = 'lm') + facet_wrap(~ BIOME) +
+  scale_y_log10() + scale_x_log10() + ylab('log10 Leaf Lifespan (LL in months)') +
+  xlab('log10 Leaf Mass per Area (LMA in g/m2)')
 ```
 
-Figure 11: Leaf mass per area (LMA) and leaflifespan (LL). *Leaf mass per area (LMA) and leaflifespan (LL) are taken in GLOPTNET dataset from @wright_worldwide_2004 with a linear regression by biome.*
+Figure 11: Leaf mass per area (LMA) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004 with a linear regression by biome.*
 
 # References

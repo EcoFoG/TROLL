@@ -7,6 +7,10 @@
 * function to transform existing surveys in model outputs for comparisons
 * automatic integration of Paracou and Guyafor data into model outputs
 
+# TROLL 0.1.9025
+
+* LMAmin v2
+
 # TROLL 0.1.9024
 
 * LMAmin v1
