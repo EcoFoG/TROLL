@@ -1,3 +1,4 @@
+#' @export
 summaryPlot <- function(stack){
   agb <- plot(stack, what = 'agb', ggplot2 = T)
   ba <- plot(stack, what = 'ba', ggplot2 = T)
