@@ -1,0 +1,33 @@
+---
+title: "Sylviculture"
+author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
+date: '`r Sys.Date()`'
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+# csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+# bibliography: /home/sylvain/Documents/Bibliography/library.bib
+csl: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/csl/mee.csl
+bibliography: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/library.bib
+---
+
+```{r config, message=FALSE, warning=FALSE, include=FALSE}
+rm(list = ls()) ; invisible(gc())
+library(knitr)
+library(parallel)
+library(TROLL)
+library(RconTroll)
+library(ggplot2)
+library(cowplot)
+library(entropart)
+library(plotly)
+cores <- 15
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
+    cache = T, cache.lazy = F)
+```
+
+Built with `RconTroll` package version `r packageVersion('RconTroll')` available at https://gitlab.com/sylvain.schmitt/RconTroll and `TROLL` package version `r packageVersion('TROLL')` available at https://gitlab.com/sylvain.schmitt/TROLL with `r R.Version()$version.string` environment.
+
+# References
