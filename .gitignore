@@ -7,7 +7,6 @@ inst/extdata/species.txt
 inst/extdata/*.csv
 inst/doc/*_cache
 inst/doc/*_files
-inst/doc/*.html
 inst/doc/*.pdf
 inst/doc/*.docx
 inst/doc/vert.txt

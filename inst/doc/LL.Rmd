@@ -24,50 +24,80 @@ library(plotly)
 library(rstan)
 library(bayesplot)
 library(rstanarm)
+library(readr)
+library(doSNOW)
+library(foreach)
+library(randomForest)
 cores <- detectCores()
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
     cache = T, cache.lazy = F)
 ```
 
+# Data compilation
+
+```{r traits}
+kable(traits <- data.frame(
+  name = c('Thick', 'Tough', 'Nm', 'wsg', 'LMA', 'CN', 'P', 'C'),
+  trait = c('Leaf thickness', 'Leaf toughness', 'Leaf nitrogen mass', 'Wood specific gravity', 'Leaf mass per area', 'Leaf carbon per nitrogen', 'Leaf phosphorous', 'Leaf carbon'),
+  TRYcode = c(46, NA, 57, 4, 11, 146, 58, 570)))
+```
+
+```{r species}
+LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
+LES <- LES[which(LES$BIOME == 'TROP_RF'),]
+LES <- LES[which(LES$GF == 'T'),]
+LES <- LES[-which(is.na(LES$log.LL)),]
+LESsp <- unique(droplevels(LES$Species))
+TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TryAccSpecies.txt",
+                  "\t", escape_double = FALSE, trim_ws = TRUE)
+species <- data.frame(
+  species = LESsp,
+  TRYcode = TRY$AccSpeciesID[match(LESsp, TRY$AccSpeciesName)])
+species <- species[-which(is.na(species$TRYcode)),]
+```
+
+http://www.try-db.org - Data Portal - Request PI Center.
+
 # Leaf lifespan allometry
 
 **Leaflifespan is currently computed from Reich allometry. We suggest to find a better allometry with @wright_worldwide_2004 GLOPNET dataset. And maybe we can change the shape of the response curve to better model leaflifespan of low LMA species.**
 
 ```{r LL alo}
+rm(list = ls())
 LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
-LES <- LES[-which(is.na(LES$log.LL)),]
-LES <- LES[-which(is.na(LES$log.LMA)),]
 LES <- LES[which(LES$BIOME == 'TROP_RF'),]
 LES <- LES[which(LES$GF == 'T'),]
-LES$LL <- 10^LES$log.LL
-LES$LMA <- 10^LES$log.LMA
-data <- LES[c('Dataset', 'Species', 'LL', 'LMA')]
-g <- ggplot(data, aes(x = LMA, y = LL, label = Species)) +
-  geom_smooth(method = 'lm') +
-  geom_point(aes(colour = Dataset)) + 
-  scale_x_continuous(trans = 'log10') +
-  scale_y_continuous(trans = 'log10') +
-  ylab('Leaf Lifespan (LL in months)') +
-  xlab('Leaf Mass per Area (LMA in g/m2)') +
-  geom_label(color = 'blue', aes(x = 60, y = 50, 
-            label = "log10(LL) = 1.367 * log10(LMA) - 1.613\nN = 46, P <0.001, R2 = 0.3595"))
-g ; rm(LES, g)
+LES <- LES[-which(is.na(LES$log.LL)),]
+LES <- LES[-which(is.na(LES$log.LMA)),]
+data <- cbind(LES[c('Dataset', 'Species')],
+              10^LES[paste0('log.',c('LL', 'LMA', 'Nmass', 'Narea',
+                                     'Amass', 'Aarea', 'Gs', 'Rdmass', 'Rdarea'))])
+names(data) <- c('Dataset', 'Species', 'LL', 'LMA', 'Nmass', 'Narea',
+              'Amass', 'Aarea', 'Gs', 'Rdmass', 'Rdarea')
+data <- droplevels(data[c('Dataset', 'Species', 'LL', 'LMA', 'Nmass')])
+p <- plot_ly(data, x = ~LMA, y = ~Nmass, z = ~LL, color = ~Dataset, text = ~Species) %>%
+  add_markers() %>%
+  layout(title = 'Leaf lifespan in GLOPNET',
+         scene = list(xaxis = list(title = 'log Leaf Mass per Area (LMA in g/m2)',
+                                   type = 'log'),
+                      yaxis = list(title = 'log Leaf Notrogen per Area (Nmass in mg/g)',
+                                   type = 'log'),
+                      zaxis = list(title = 'log Leaf Lifespan (LL in months)',
+                                   type = 'log')))
+chart_link = plotly_POST(p, filename="LL")
+chart_link ; rm(LES, p)
 ```
 
-Figure 12: Leaf mass per area (LMA) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004.*
+Figure 12: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004.*
 
-**Model M1:**
+**Models**
 
-$${LL_s}_j \sim \mathcal{logN}(\mu_j,\,\sigma)\, , ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
-$$\mu_j = log({\theta_0}_s*{LMA_s}_j^{{\theta_1}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
-$${\theta_0}_s \sim \mathcal{N}({\theta_0},\,\sigma_0)\, ,~{\theta_1}_s \sim \mathcal{N}({\theta_1},\,\sigma_1)\,$$
-$$(\sigma,\sigma_0,\sigma_1) \sim \mathcal{\Gamma}(0.001,\,0.001)\, ^3$$
-**Model M2:**
-$$\mu_j = log(LL_0 +{\theta_0}_s*{LMA_s}_j^{{\theta_1}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
-**Model M3:**
-$$\mu_j = log({LL_0}_s +{\theta_0}_s*{LMA_s}_j^{{\theta_1}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
-$${LL_0}_s \sim \mathcal{N}(LL_0,\,\sigma_{LL})\,$$
+$$ {LL_s}_j \sim \mathcal{logN}({\mu_s}_j,\,\sigma)\, , ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
+$$M1:~{\mu_s}_j ^{(1)} = log({\beta_0}_s*{LMA_s}_j^{{\beta_1}_s}*{Nmass_s}_j^{{\beta_2}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
+$$M2:{\mu_s}_j ^{(2)}= log({LL_0}_s + {\beta_0}_s*{LMA_s}_j^{{\beta_1}_s}*{Nmass_s}_j^{{\beta_2}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
+$${\beta_i}_s \sim \mathcal{N}({\beta_i},\,\sigma_i)\, ,~{LL_0}_s \sim \mathcal{N}({LL_0},\,\sigma_{LL})\,, ~~i = 0,...,2$$
+
 ```{r data}
 rstan_options(auto_write = TRUE)
 options(mc.cores = detectCores())
@@ -75,6 +105,7 @@ S <- length(levels(droplevels(data$Dataset)))
 J <- as.numeric(droplevels(data$Dataset))
 N <- length(J)
 LMA <- data$LMA
+Nmass <- data$Nmass
 LL <- data$LL
 ```
 
@@ -85,32 +116,33 @@ data {
   int J[N] ;
   real LL[N] ;
   real LMA[N] ;
+  real Nmass[N] ;
 }
 parameters {
-  real<lower=0> sigma ;
-  real<lower=0> sigma_0 ;
-  real<lower=0> sigma_1 ;
-  real<lower=0> theta_0 ;
-  real<lower=0,upper=3> theta_1 ;
-  real<lower=0> theta_0s[S] ;
-  real<lower=0,upper=3>  theta_1s[S] ;
-}
-transformed parameters {
-  real mu[N] ;
-  for(n in 1:N)
-    mu[n] = log(theta_0s[J[n]]*pow(LMA[n],theta_1s[J[n]])) ;
+  real<lower=0,upper=50> sigma ;
+  real<lower=0,upper=50> sigma_0 ;
+  real<lower=0,upper=50> sigma_1 ;
+  real<lower=0,upper=50> sigma_2 ;
+  real<lower=0> beta_0 ;
+  real<lower=0> beta_0s[S] ;
+  real<lower=0,upper=3> beta_1 ;
+  real<lower=0,upper=3>  beta_1s[S] ;
+  real<lower=0,upper=3> beta_2 ;
+  real<lower=0,upper=3>  beta_2s[S] ;
 }
 model {
-  sigma ~ gamma(0.001, 0.001) ;
-  sigma_0 ~ gamma(0.001, 0.001) ;
-  sigma_1 ~ gamma(0.001, 0.001) ;
-  theta_0s ~ normal(theta_0, sigma_0) ;
-  theta_1s ~ normal(theta_1, sigma_1) ;
-  LL ~ lognormal(mu, sigma) ;
+   real mu[N] ;
+   for(n in 1:N){
+     mu[n] = log(beta_0s[J[n]]) + beta_1s[J[n]]*log(LMA[n]) + beta_2s[J[n]]*log(Nmass[n]) ;
+   }
+   beta_0s ~ normal(beta_0, sigma_0) ;
+   beta_1s ~ normal(beta_1, sigma_1) ;
+   beta_2s ~ normal(beta_2, sigma_2) ;
+   LL ~ lognormal(mu, sigma) ;
 }
 ```
 
-```{r m1}
+```{r m1, include=FALSE}
 m1 <- m1
 fit1 <- sampling(m1)
 ```
@@ -122,76 +154,39 @@ data {
   int J[N] ;
   real LL[N] ;
   real LMA[N] ;
+  real Nmass[N] ;
 }
 parameters {
-  real<lower=0> sigma ;
-  real<lower=0> sigma_0 ;
-  real<lower=0> sigma_1 ;
-  real<lower=0> theta_0 ;
-  real<lower=0,upper=3> theta_1 ;
+  real<lower=0,upper=50> sigma ;
+  real<lower=0,upper=50> sigma_0 ;
+  real<lower=0,upper=50> sigma_1 ;
+  real<lower=0,upper=50> sigma_2 ;
+  real<lower=0,upper=50> sigma_LL ;
+  real<lower=0> beta_0 ;
+  real<lower=0> beta_0s[S] ;
+  real<lower=0,upper=3> beta_1 ;
+  real<lower=0,upper=3>  beta_1s[S] ;
+  real<lower=0,upper=3> beta_2 ;
+  real<lower=0,upper=3>  beta_2s[S] ;
   real<lower=1,upper=24>  LL_0 ;
-  real<lower=0> theta_0s[S] ;
-  real<lower=0,upper=3>  theta_1s[S] ;
-}
-transformed parameters {
-  real mu[N] ;
-  for(n in 1:N)
-    mu[n] = log(LL_0 + theta_0s[J[n]]*pow(LMA[n],theta_1s[J[n]])) ;
-}
-model {
-  sigma ~ gamma(0.001, 0.001) ;
-  sigma_0 ~ gamma(0.001, 0.001) ;
-  sigma_1 ~ gamma(0.001, 0.001) ;
-  theta_0s ~ normal(theta_0, sigma_0) ;
-  theta_1s ~ normal(theta_1, sigma_1) ;
-  LL ~ lognormal(mu, sigma) ;
-}
-```
-
-```{r m2}
-m2 <- m2
-fit2 <- sampling(m2)
-```
-
-```{stan output.var='m3'}
-data {
-  int S ;
-  int N ;
-  int J[N] ;
-  real LL[N] ;
-  real LMA[N] ;
-}
-parameters {
-  real<lower=0> sigma ;
-  real<lower=0> sigma_0 ;
-  real<lower=0> sigma_1 ;
-  real<lower=0> sigma_LL ;
-  real<lower=0> theta_0 ;
-  real<lower=0,upper=3> theta_1 ;
-  real<lower=1,upper=24>  LL_0 ;
-  real<lower=0> theta_0s[S] ;
-  real<lower=0,upper=3>  theta_1s[S] ;
   real<lower=1,upper=24>  LL_0s[S] ;
 }
-transformed parameters {
-  real mu[N] ;
-  for(n in 1:N)
-    mu[n] = log(LL_0s[J[n]] + theta_0s[J[n]]*pow(LMA[n],theta_1s[J[n]])) ;
-}
 model {
-  sigma ~ gamma(0.001, 0.001) ;
-  sigma_0 ~ gamma(0.001, 0.001) ;
-  sigma_1 ~ gamma(0.001, 0.001) ;
-  theta_0s ~ normal(theta_0, sigma_0) ;
-  theta_1s ~ normal(theta_1, sigma_1) ;
-  LL_0s ~ normal(LL_0, sigma_LL) ;
-  LL ~ lognormal(mu, sigma) ;
+   real mu[N] ;
+   for(n in 1:N){
+     mu[n] = log(LL_0s[J[n]] + beta_0s[J[n]] * pow(LMA[n],beta_1s[J[n]]) * pow(Nmass[n],beta_2s[J[n]]) ) ;
+   }
+   beta_0s ~ normal(beta_0, sigma_0) ;
+   beta_1s ~ normal(beta_1, sigma_1) ;
+   beta_2s ~ normal(beta_2, sigma_2) ;
+   LL_0s ~ normal(LL_0, sigma_LL) ;
+   LL ~ lognormal(mu, sigma) ;
 }
 ```
 
-```{r m3}
-m3 <- m3
-fit3 <- sampling(m3)
+```{r m2, include=FALSE}
+m2 <- m2
+fit2 <- sampling(m2)
 ```
 
 ```{r functions}
@@ -201,8 +196,8 @@ likeligraph <- function(fit1, ...){
   m <- data.frame(do.call('cbind', m))
   names(m) <- paste0('m', 1:dim(m)[2])
   m <- melt(m)
-  return(ggplot(m, aes(x = value, color = variable, fill = variable)) + 
-           geom_density(alpha = 0.3) + xlab('log likelihood')) 
+  return(ggplot(m, aes(x = value, color = variable, fill = variable)) +
+           geom_density(alpha = 0.3) + xlab('log likelihood'))
 }
 fitgraph <- function(fit, pars){
   posterior <- as.matrix(fit)
@@ -210,19 +205,19 @@ fitgraph <- function(fit, pars){
   r <- mcmc_areas(posterior,  pars = pars, prob = 0.8) + plot_title
   color_scheme_set("mix-blue-pink")
   c <- mcmc_trace(posterior,  pars = pars, n_warmup = 2000,
-                   facet_args = list(nrow = 2, labeller = label_parsed)) + 
+                   facet_args = list(nrow = 2, labeller = label_parsed)) +
   facet_text(size = 15)
-  return(list(r = r, c = c)) 
+  return(list(r = r, c = c))
 }
 ```
 
-```{r results, cache=FALSE}
-likeligraph(fit1, fit2, fit3)
-g1 <- fitgraph(fit1, pars = c("theta_0", "theta_1", "sigma", "sigma_0", "sigma_1"))
-g2 <- fitgraph(fit2, pars = c("LL_0", "theta_0", "theta_1", "sigma", "sigma_0", "sigma_1"))
-g3 <- fitgraph(fit3, pars = c("LL_0", "theta_0", "theta_1", "sigma", "sigma_0", "sigma_1", "sigma_LL"))
-plot_grid(g1$r, g2$r, g3$r, labels = c('m1', 'm2', 'm3'), ncol = 3)
-plot_grid(g2$c, g3$c, labels = c('m2', 'm3'), nrow = 2)
+```{r results, fig.height=4}
+likeligraph(fit1, fit2)
+pars <- c("sigma", "beta_0", "sigma_0", "beta_1",  "sigma_1", "beta_2", "sigma_2")
+g1 <- fitgraph(fit1, pars = pars)
+g2 <- fitgraph(fit2, pars = c(pars, "LL_0", "sigma_LL"))
+plot_grid(g1$r, g2$r,labels = c('m1', 'm2', 'm3'), ncol = 2)
+g1$c + ggtitle('M1') ; g2$c + ggtitle('M2')
 ```
 
 # References
