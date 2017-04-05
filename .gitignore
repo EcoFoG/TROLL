@@ -3,8 +3,9 @@
 .RData
 .Ruserdata
 .Rbuildignore
-inst/extdata/species.txt
-inst/extdata/*.csv
+inst/extdata/*.xlsx
+inst/extdata/*.txt
+inst/extdata/*txt
 inst/doc/*_cache
 inst/doc/*_files
 inst/doc/*.pdf
