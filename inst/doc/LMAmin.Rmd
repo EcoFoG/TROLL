@@ -6,8 +6,8 @@ output:
   word_document: default
   pdf_document: default
   html_document: default
-csl: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/csl/mee.csl
-bibliography: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/library.bib
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
 
 ```{r config, message=FALSE, warning=FALSE, include=FALSE}
@@ -511,21 +511,36 @@ Figure 11: Fraction of leaf area $LA$ in different stages. *Shape represents the
 
 **Leaflifespan is currently computed from Reich allometry. We suggest to find a better allometry with @wright_worldwide_2004 GLOPNET dataset. And maybe we can change the shape of the response curve to better model leaflifespan of low LMA species.**
 
-<!-- First we can clearly see that allometry seems to greatly change between biomes (see figure 12). -->
+```{r LL alo}
+rm(list = ls()) ; invisible(gc()) 
+LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
+LES <- LES[-which(is.na(LES$log.LL)),]
+LES <- LES[-which(is.na(LES$log.LMA)),]
+LES <- LES[which(LES$BIOME == 'TROP_RF'),]
+LES <- LES[which(LES$GF == 'T'),]
+LES$LL <- 10^LES$log.LL
+LES$LMA <- 10^LES$log.LMA
+data <- LES[c('Dataset', 'Species', 'LL', 'LMA')]
+g <- ggplot(data, aes(x = LMA, y = LL, label = Species)) +
+  geom_smooth(method = 'lm') +
+  geom_point(aes(colour = Dataset)) + 
+  scale_x_continuous(trans = 'log10') +
+  scale_y_continuous(trans = 'log10') +
+  ylab('Leaf Lifespan (LL in months)') +
+  xlab('Leaf Mass per Area (LMA in g/m2)') +
+  geom_label(color = 'blue', aes(x = 60, y = 50, 
+            label = "log10(LL) = 1.367 * log10(LMA) - 1.613\nN = 46, P <0.001, R2 = 0.3595"))
+g ; rm(LES)
+```
 
-<!-- ```{r LL alo} -->
-<!-- rm(list = ls()) ; invisible(gc()) -->
-<!-- LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/LES.csv", skip = 10) -->
-<!-- data <- LES[c('BIOME', 'Species', 'log.LL', 'log.LMA')] -->
-<!-- data <- data[-which(is.na(data$log.LL)),] -->
-<!-- data$LL <- 10^data$log.LL -->
-<!-- data$LMA <- 10^data$log.LMA -->
-<!-- g <- ggplot(data, aes(x = LMA, y = LL, colour = BIOME, label = Species)) -->
-<!-- g + geom_point() + geom_smooth(method = 'lm') + facet_wrap(~ BIOME) + -->
-<!--   scale_y_log10() + scale_x_log10() + ylab('log10 Leaf Lifespan (LL in months)') + -->
-<!--   xlab('log10 Leaf Mass per Area (LMA in g/m2)') -->
-<!-- ``` -->
+Figure 12: Leaf mass per area (LMA) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004.*
 
-<!-- Figure 12: Leaf mass per area (LMA) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004 with a linear regression by biome.* -->
+If we assume that both leaf lifespan (LL) and LMA are following log normal distributions, we can write following model:
+
+$$LL_j \sim \mathcal{logN}(\theta_j,\,\sigma LL)\, , ~~j = 1,...,46$$
+$$\theta_j = a + b*LMA_j, ~~j = 1,...,46$$
+$$LMA_j \sim \mathcal{logN}(LMAobs_j,\,\sigma LMA)\, , ~~j = 1,...,46$$
+$$\sigma LL = \frac{1}{\tau LL}, ~~ \sigma LMA = \frac{1}{\tau LMA}$$
+$$\tau LL \sim \mathcal{\Gamma}(0.001,\,0.001)\, ,~~ \tau LMA \sim \mathcal{\Gamma}(0.001,\,0.001)\,$$
 
 # References

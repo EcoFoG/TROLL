@@ -2,10 +2,12 @@
 
 * automatic integration of Paracou and Guyafor data into virtual forest for simulations
 * sylviculture module in main.cpp
-* improve plot methods (to precise)
-* integrate plot comparisons between models (to improve)
-* function to transform existing surveys in model outputs for comparisons
-* automatic integration of Paracou and Guyafor data into model outputs
+
+# TROLL 0.1.9027
+
+* LL bayesian model
+* Tabebuia bug
+* GitHub remote
 
 # TROLL 0.1.9026
 

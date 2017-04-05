@@ -1,0 +1,228 @@
+---
+title: "A minimum LMA in TROLL ?"
+author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
+date: '`r Sys.Date()`'
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r config, message=FALSE, warning=FALSE, include=FALSE}
+rm(list = ls()) ; invisible(gc())
+library(knitr)
+library(parallel)
+library(TROLL)
+library(RconTroll)
+library(reshape2)
+library(ggplot2)
+library(cowplot)
+library(entropart)
+library(plotly)
+library(rstan)
+library(bayesplot)
+library(rstanarm)
+cores <- detectCores()
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
+    cache = T, cache.lazy = F)
+```
+
+# Leaf lifespan allometry
+
+**Leaflifespan is currently computed from Reich allometry. We suggest to find a better allometry with @wright_worldwide_2004 GLOPNET dataset. And maybe we can change the shape of the response curve to better model leaflifespan of low LMA species.**
+
+```{r LL alo}
+LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
+LES <- LES[-which(is.na(LES$log.LL)),]
+LES <- LES[-which(is.na(LES$log.LMA)),]
+LES <- LES[which(LES$BIOME == 'TROP_RF'),]
+LES <- LES[which(LES$GF == 'T'),]
+LES$LL <- 10^LES$log.LL
+LES$LMA <- 10^LES$log.LMA
+data <- LES[c('Dataset', 'Species', 'LL', 'LMA')]
+g <- ggplot(data, aes(x = LMA, y = LL, label = Species)) +
+  geom_smooth(method = 'lm') +
+  geom_point(aes(colour = Dataset)) + 
+  scale_x_continuous(trans = 'log10') +
+  scale_y_continuous(trans = 'log10') +
+  ylab('Leaf Lifespan (LL in months)') +
+  xlab('Leaf Mass per Area (LMA in g/m2)') +
+  geom_label(color = 'blue', aes(x = 60, y = 50, 
+            label = "log10(LL) = 1.367 * log10(LMA) - 1.613\nN = 46, P <0.001, R2 = 0.3595"))
+g ; rm(LES, g)
+```
+
+Figure 12: Leaf mass per area (LMA) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004.*
+
+**Model M1:**
+
+$${LL_s}_j \sim \mathcal{logN}(\mu_j,\,\sigma)\, , ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
+$$\mu_j = log({\theta_0}_s*{LMA_s}_j^{{\theta_1}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
+$${\theta_0}_s \sim \mathcal{N}({\theta_0},\,\sigma_0)\, ,~{\theta_1}_s \sim \mathcal{N}({\theta_1},\,\sigma_1)\,$$
+$$(\sigma,\sigma_0,\sigma_1) \sim \mathcal{\Gamma}(0.001,\,0.001)\, ^3$$
+**Model M2:**
+$$\mu_j = log(LL_0 +{\theta_0}_s*{LMA_s}_j^{{\theta_1}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
+**Model M3:**
+$$\mu_j = log({LL_0}_s +{\theta_0}_s*{LMA_s}_j^{{\theta_1}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
+$${LL_0}_s \sim \mathcal{N}(LL_0,\,\sigma_{LL})\,$$
+```{r data}
+rstan_options(auto_write = TRUE)
+options(mc.cores = detectCores())
+S <- length(levels(droplevels(data$Dataset)))
+J <- as.numeric(droplevels(data$Dataset))
+N <- length(J)
+LMA <- data$LMA
+LL <- data$LL
+```
+
+```{stan output.var='m1'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+}
+parameters {
+  real<lower=0> sigma ;
+  real<lower=0> sigma_0 ;
+  real<lower=0> sigma_1 ;
+  real<lower=0> theta_0 ;
+  real<lower=0,upper=3> theta_1 ;
+  real<lower=0> theta_0s[S] ;
+  real<lower=0,upper=3>  theta_1s[S] ;
+}
+transformed parameters {
+  real mu[N] ;
+  for(n in 1:N)
+    mu[n] = log(theta_0s[J[n]]*pow(LMA[n],theta_1s[J[n]])) ;
+}
+model {
+  sigma ~ gamma(0.001, 0.001) ;
+  sigma_0 ~ gamma(0.001, 0.001) ;
+  sigma_1 ~ gamma(0.001, 0.001) ;
+  theta_0s ~ normal(theta_0, sigma_0) ;
+  theta_1s ~ normal(theta_1, sigma_1) ;
+  LL ~ lognormal(mu, sigma) ;
+}
+```
+
+```{r m1}
+m1 <- m1
+fit1 <- sampling(m1)
+```
+
+```{stan output.var='m2'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+}
+parameters {
+  real<lower=0> sigma ;
+  real<lower=0> sigma_0 ;
+  real<lower=0> sigma_1 ;
+  real<lower=0> theta_0 ;
+  real<lower=0,upper=3> theta_1 ;
+  real<lower=1,upper=24>  LL_0 ;
+  real<lower=0> theta_0s[S] ;
+  real<lower=0,upper=3>  theta_1s[S] ;
+}
+transformed parameters {
+  real mu[N] ;
+  for(n in 1:N)
+    mu[n] = log(LL_0 + theta_0s[J[n]]*pow(LMA[n],theta_1s[J[n]])) ;
+}
+model {
+  sigma ~ gamma(0.001, 0.001) ;
+  sigma_0 ~ gamma(0.001, 0.001) ;
+  sigma_1 ~ gamma(0.001, 0.001) ;
+  theta_0s ~ normal(theta_0, sigma_0) ;
+  theta_1s ~ normal(theta_1, sigma_1) ;
+  LL ~ lognormal(mu, sigma) ;
+}
+```
+
+```{r m2}
+m2 <- m2
+fit2 <- sampling(m2)
+```
+
+```{stan output.var='m3'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+}
+parameters {
+  real<lower=0> sigma ;
+  real<lower=0> sigma_0 ;
+  real<lower=0> sigma_1 ;
+  real<lower=0> sigma_LL ;
+  real<lower=0> theta_0 ;
+  real<lower=0,upper=3> theta_1 ;
+  real<lower=1,upper=24>  LL_0 ;
+  real<lower=0> theta_0s[S] ;
+  real<lower=0,upper=3>  theta_1s[S] ;
+  real<lower=1,upper=24>  LL_0s[S] ;
+}
+transformed parameters {
+  real mu[N] ;
+  for(n in 1:N)
+    mu[n] = log(LL_0s[J[n]] + theta_0s[J[n]]*pow(LMA[n],theta_1s[J[n]])) ;
+}
+model {
+  sigma ~ gamma(0.001, 0.001) ;
+  sigma_0 ~ gamma(0.001, 0.001) ;
+  sigma_1 ~ gamma(0.001, 0.001) ;
+  theta_0s ~ normal(theta_0, sigma_0) ;
+  theta_1s ~ normal(theta_1, sigma_1) ;
+  LL_0s ~ normal(LL_0, sigma_LL) ;
+  LL ~ lognormal(mu, sigma) ;
+}
+```
+
+```{r m3}
+m3 <- m3
+fit3 <- sampling(m3)
+```
+
+```{r functions}
+likeligraph <- function(fit1, ...){
+  fits <- list(fit1, ...)
+  m <- lapply(fits, function(fit) unlist(lapply(fit@sim$samples, function(x) x$lp__[1000:4000])))
+  m <- data.frame(do.call('cbind', m))
+  names(m) <- paste0('m', 1:dim(m)[2])
+  m <- melt(m)
+  return(ggplot(m, aes(x = value, color = variable, fill = variable)) + 
+           geom_density(alpha = 0.3) + xlab('log likelihood')) 
+}
+fitgraph <- function(fit, pars){
+  posterior <- as.matrix(fit)
+  plot_title <- ggtitle("Posterior distributions", "with medians and 80% intervals")
+  r <- mcmc_areas(posterior,  pars = pars, prob = 0.8) + plot_title
+  color_scheme_set("mix-blue-pink")
+  c <- mcmc_trace(posterior,  pars = pars, n_warmup = 2000,
+                   facet_args = list(nrow = 2, labeller = label_parsed)) + 
+  facet_text(size = 15)
+  return(list(r = r, c = c)) 
+}
+```
+
+```{r results, cache=FALSE}
+likeligraph(fit1, fit2, fit3)
+g1 <- fitgraph(fit1, pars = c("theta_0", "theta_1", "sigma", "sigma_0", "sigma_1"))
+g2 <- fitgraph(fit2, pars = c("LL_0", "theta_0", "theta_1", "sigma", "sigma_0", "sigma_1"))
+g3 <- fitgraph(fit3, pars = c("LL_0", "theta_0", "theta_1", "sigma", "sigma_0", "sigma_1", "sigma_LL"))
+plot_grid(g1$r, g2$r, g3$r, labels = c('m1', 'm2', 'm3'), ncol = 3)
+plot_grid(g2$c, g3$c, labels = c('m2', 'm3'), nrow = 2)
+```
+
+# References
