@@ -117,8 +117,8 @@ data {
 }
 parameters {
   real<lower=0,upper=5> sigma ;
-  real<lower=2> beta_0 ;
-  real<lower=2> beta_0s[S] ;
+  real<lower=2,upper=20> beta_0 ;
+  real<lower=2,upper=20> beta_0s[S] ;
   real<lower=0,upper=50> sigma_0 ;
   real<lower=0> beta_1 ;
   real<lower=0> beta_1s[S] ;
@@ -126,15 +126,23 @@ parameters {
   real<lower=0> beta_2 ;
   real<lower=0> beta_2s[S] ;
   real<lower=0,upper=50> sigma_2 ;
+  real<lower=0,upper=3> beta_3 ;
+  real<lower=0,upper=3> beta_3s[S] ;
+  real<lower=0,upper=50> sigma_3 ;
+  real<lower=0,upper=3> beta_4 ;
+  real<lower=0,upper=3> beta_4s[S] ;
+  real<lower=0,upper=50> sigma_4 ;
 }
 model {
    real f[N] ;
    for(n in 1:N){
-     f[n] = beta_0s[J[n]] * exp(beta_1s[J[n]]*LMA[n] - beta_2s[J[n]]*Nmass[n]) ;
+     f[n] = beta_0s[J[n]] * exp(beta_1s[J[n]]*pow(LMA[n],beta_3s[J[n]]) - beta_2s[J[n]]*pow(Nmass[n],beta_4s[J[n]])) ;
    }
    beta_0s ~ normal(beta_0, sigma_0) ;
    beta_1s ~ normal(beta_1, sigma_1) ;
    beta_2s ~ normal(beta_2, sigma_2) ;
+   beta_3s ~ normal(beta_3, sigma_3) ;
+   beta_4s ~ normal(beta_4, sigma_4) ;
    LL ~ lognormal(log(f), sigma) ;
 }
 ```
@@ -170,8 +178,9 @@ fitgraph <- function(fit, pars){
 
 We obtained convergence for the model with a maximum likekihood of **`r max(as.matrix(fit1)[,'lp__'])`**. Figure 2 shows posterior distributions and their associated markov chains. Figure 3 presents model predictions.
 
-```{r results, fig.height=4}
-pars <- c("sigma", "beta_0", "sigma_0", "beta_1", "sigma_1", "beta_2", "sigma_2", "lp__")
+```{r results, fig.height=6}
+pars <- c("sigma", "beta_0", "sigma_0", "beta_1", "sigma_1", "beta_2", "sigma_2", 
+          "beta_3", "sigma_3", "beta_4", "sigma_4", "lp__")
 g1 <- fitgraph(fit1, pars = pars)
 g1$r ; g1$c
 ```
@@ -185,19 +194,21 @@ Nmass_max <- max(data$Nmass)
 beta_0 <- pars['beta_0']
 beta_1 <- pars['beta_1']
 beta_2 <- pars['beta_2']
-LLpred <- function(LMA, Nmass, LMA_max, Nmass_max, beta_0, beta_1, beta_2){
-  fact <- beta_1*(LMA/LMA_max) - beta_2*(Nmass/Nmass_max)
+beta_3 <- pars['beta_3']
+beta_4 <- pars['beta_4']
+LLpred <- function(LMA, Nmass, LMA_max, Nmass_max, beta_0, beta_1, beta_2, beta_3, beta_4){
+  fact <- beta_1*(LMA/LMA_max)^beta_3 - beta_2*(Nmass/Nmass_max)^beta_4
   unname(beta_0*exp(fact))
 }
 n <- 100
 pred <- with(data,
-             list(LMA = seq(range(LMA)[1], range(LMA)[2], length.out = n), 
+             list(LMA = seq(range(LMA)[1], range(LMA)[2], length.out = n),
                   Nmass = seq(range(Nmass)[1], range(Nmass)[2], length.out = n)))
-pred$LL <- sapply(pred$LMA, function(x) 
-  sapply(pred$Nmass, function(y) 
-    LLpred(x, y, LMA_max, Nmass_max, beta_0, beta_1, beta_2)))
+pred$LL <- sapply(pred$LMA, function(x)
+  sapply(pred$Nmass, function(y)
+    LLpred(x, y, LMA_max, Nmass_max, beta_0, beta_1, beta_2, beta_3, beta_4)))
 p <- plot_ly(x = pred$LMA, y = pred$Nmass, z = pred$LL) %>% add_surface() %>%
-  add_trace(x = data$LMA, y = data$Nmass, z = data$LL, mode = "markers", type = "scatter3d", 
+  add_trace(x = data$LMA, y = data$Nmass, z = data$LL, mode = "markers", type = "scatter3d",
             marker = list(size = 5, color = "red", symbol = 104)) %>%
   layout(title = 'Model predictions',
          scene = list(xaxis = list(title = 'LMA'),
@@ -207,8 +218,7 @@ chart_link = plotly_POST(p, filename="LL")
 chart_link
 ```
 
-Figure 3: Model predictions. 
-$$LL = `r round(beta_0,3)`*e^{`r round(beta_1,3)`*LMA - `r round(beta_2,3)`*Nmass}$$
-
+Figure 3: Model predictions.
+$$LL =  `r round(beta_0,3)` e^{`r round(beta_1/(LMA_max^beta_3),3)` *LMA^{`r round(beta_3,3)`} -`r round(beta_2/(Nmass_max^beta_3),3)`*Nmass^{`r round(beta_4,3)`} }$$
 
 # References
