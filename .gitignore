@@ -3,11 +3,10 @@
 .RData
 .Ruserdata
 .Rbuildignore
-inst/extdata/*.xlsx
-inst/extdata/*.txt
-inst/extdata/*txt
+inst/extdata/
 inst/doc/*_cache
 inst/doc/*_files
 inst/doc/*.pdf
 inst/doc/*.docx
+inst/doc/*.html
 inst/doc/vert.txt

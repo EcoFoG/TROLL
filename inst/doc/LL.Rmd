@@ -25,9 +25,6 @@ library(rstan)
 library(bayesplot)
 library(rstanarm)
 library(readr)
-library(doSNOW)
-library(foreach)
-library(randomForest)
 cores <- detectCores()
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
@@ -35,6 +32,8 @@ opts_chunk$set(
 ```
 
 # Data compilation
+
+We compiled data from both TRY and GLOPNET dataset...
 
 ```{r traits}
 kable(traits <- data.frame(
@@ -61,7 +60,9 @@ http://www.try-db.org - Data Portal - Request PI Center.
 
 # Leaf lifespan allometry
 
-**Leaflifespan is currently computed from Reich allometry. We suggest to find a better allometry with @wright_worldwide_2004 GLOPNET dataset. And maybe we can change the shape of the response curve to better model leaflifespan of low LMA species.**
+## Model
+
+Leaflifespan is currently computed from Reich allometry. We suggest to find a better allometry with @wright_worldwide_2004 GLOPNET dataset. And we may change the shape of the response curve to better fit observed leaf lifespan of low LMA species (figure 1).
 
 ```{r LL alo}
 rm(list = ls())
@@ -76,27 +77,23 @@ data <- cbind(LES[c('Dataset', 'Species')],
 names(data) <- c('Dataset', 'Species', 'LL', 'LMA', 'Nmass', 'Narea',
               'Amass', 'Aarea', 'Gs', 'Rdmass', 'Rdarea')
 data <- droplevels(data[c('Dataset', 'Species', 'LL', 'LMA', 'Nmass')])
-p <- plot_ly(data, x = ~LMA, y = ~Nmass, z = ~LL, color = ~Dataset, text = ~Species) %>%
-  add_markers() %>%
-  layout(title = 'Leaf lifespan in GLOPNET',
-         scene = list(xaxis = list(title = 'log Leaf Mass per Area (LMA in g/m2)',
-                                   type = 'log'),
-                      yaxis = list(title = 'log Leaf Notrogen per Area (Nmass in mg/g)',
-                                   type = 'log'),
-                      zaxis = list(title = 'log Leaf Lifespan (LL in months)',
-                                   type = 'log')))
-chart_link = plotly_POST(p, filename="LL")
-chart_link ; rm(LES, p)
+g <- ggplot(droplevels(data), aes(x = LMA, y = LL, size = Nmass, color = Dataset, label = Species)) +
+  geom_point(alpha = 0.5) + xlab('Leaf mass per area (LMA in g/m2)') +
+  ylab('Leaf lifespan (LL in months)') + 
+  scale_size_continuous(name = 'Leaf nitrogen content\n(Nmass, in mg/g)')
+g ; rm(LES, g)
 ```
 
-Figure 12: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004.*
+Figure 1: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004.*
 
-**Models**
+We tested different models and we kept subsequant model with the best tradeoff between log likelihood and number of parameters :
+$$ {LL_s}_j \sim \mathcal{logN}(log({\mu_s}_j),\,\sigma)\,$$
+$$s=1,...,S_{=4}~, ~~j=1,...,n_s, ~~X^{(1)}=LMA, ~~X^{(2)}=Nmass, ~~i=0,...,I_{=2}$$
 
-$$ {LL_s}_j \sim \mathcal{logN}({\mu_s}_j,\,\sigma)\, , ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
-$$M1:~{\mu_s}_j ^{(1)} = log({\beta_0}_s*{LMA_s}_j^{{\beta_1}_s}*{Nmass_s}_j^{{\beta_2}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
-$$M2:{\mu_s}_j ^{(2)}= log({LL_0}_s + {\beta_0}_s*{LMA_s}_j^{{\beta_1}_s}*{Nmass_s}_j^{{\beta_2}_s}), ~~s = 1,...,4 ~~, ~~j =1,...,n_s$$
-$${\beta_i}_s \sim \mathcal{N}({\beta_i},\,\sigma_i)\, ,~{LL_0}_s \sim \mathcal{N}({LL_0},\,\sigma_{LL})\,, ~~i = 0,...,2$$
+$${\mu_s}_j =  {\beta_0}_s*e^{{\beta_1}_s*{X_s}_j^{(1)} - {\beta_2}_s*{X_s}_j^{(2)}}$$
+$${\beta_i}_s \sim \mathcal{N}({\beta_i},\,\sigma_i)\,^I$$
+$$(\beta_i, \sigma, \sigma_i) \sim \mathcal{\Gamma}(0.001,\,0.001)\,^{2I+1}$$
+Leaf lifespan ($LL$) is following a lognormal law with location $log({\mu_s}_j)$ and scale $\sigma$. $s$ represents the dataset used to do the fit between 1 and $S=4$, it encompass environmental and protocol variations. $j$ represents the observation for a given site $s$. Finally $X^{(1)}$ represents the LMA and $X^{(2)}$ the leaf nitrogen content (Nmass). Location ${\mu_s}_j$ is the log of the exponential from the difference between LMA and Nmass with parameters ${\beta_0}_s$, ${\beta_1}_s$, and ${\beta_2}_s$. Each ${\beta_i}_s$ is following a normal law located on $\beta_i$ with scale $\sigma_i$. Finally all $beta_i$, $\sigma$, and $\sigma_i$ are assumed without presemption following gamma laws of parameters $10^-2$, $10^-2$.
 
 ```{r data}
 rstan_options(auto_write = TRUE)
@@ -104,8 +101,8 @@ options(mc.cores = detectCores())
 S <- length(levels(droplevels(data$Dataset)))
 J <- as.numeric(droplevels(data$Dataset))
 N <- length(J)
-LMA <- data$LMA
-Nmass <- data$Nmass
+LMA <- (data$LMA/max(data$LMA))
+Nmass <- (data$Nmass/max(data$Nmass))
 LL <- data$LL
 ```
 
@@ -119,26 +116,26 @@ data {
   real Nmass[N] ;
 }
 parameters {
-  real<lower=0,upper=50> sigma ;
+  real<lower=0,upper=5> sigma ;
+  real<lower=2> beta_0 ;
+  real<lower=2> beta_0s[S] ;
   real<lower=0,upper=50> sigma_0 ;
+  real<lower=0> beta_1 ;
+  real<lower=0> beta_1s[S] ;
   real<lower=0,upper=50> sigma_1 ;
+  real<lower=0> beta_2 ;
+  real<lower=0> beta_2s[S] ;
   real<lower=0,upper=50> sigma_2 ;
-  real<lower=0> beta_0 ;
-  real<lower=0> beta_0s[S] ;
-  real<lower=0,upper=3> beta_1 ;
-  real<lower=0,upper=3>  beta_1s[S] ;
-  real<lower=0,upper=3> beta_2 ;
-  real<lower=0,upper=3>  beta_2s[S] ;
 }
 model {
-   real mu[N] ;
+   real f[N] ;
    for(n in 1:N){
-     mu[n] = log(beta_0s[J[n]]) + beta_1s[J[n]]*log(LMA[n]) + beta_2s[J[n]]*log(Nmass[n]) ;
+     f[n] = beta_0s[J[n]] * exp(beta_1s[J[n]]*LMA[n] - beta_2s[J[n]]*Nmass[n]) ;
    }
    beta_0s ~ normal(beta_0, sigma_0) ;
    beta_1s ~ normal(beta_1, sigma_1) ;
    beta_2s ~ normal(beta_2, sigma_2) ;
-   LL ~ lognormal(mu, sigma) ;
+   LL ~ lognormal(log(f), sigma) ;
 }
 ```
 
@@ -147,47 +144,7 @@ m1 <- m1
 fit1 <- sampling(m1)
 ```
 
-```{stan output.var='m2'}
-data {
-  int S ;
-  int N ;
-  int J[N] ;
-  real LL[N] ;
-  real LMA[N] ;
-  real Nmass[N] ;
-}
-parameters {
-  real<lower=0,upper=50> sigma ;
-  real<lower=0,upper=50> sigma_0 ;
-  real<lower=0,upper=50> sigma_1 ;
-  real<lower=0,upper=50> sigma_2 ;
-  real<lower=0,upper=50> sigma_LL ;
-  real<lower=0> beta_0 ;
-  real<lower=0> beta_0s[S] ;
-  real<lower=0,upper=3> beta_1 ;
-  real<lower=0,upper=3>  beta_1s[S] ;
-  real<lower=0,upper=3> beta_2 ;
-  real<lower=0,upper=3>  beta_2s[S] ;
-  real<lower=1,upper=24>  LL_0 ;
-  real<lower=1,upper=24>  LL_0s[S] ;
-}
-model {
-   real mu[N] ;
-   for(n in 1:N){
-     mu[n] = log(LL_0s[J[n]] + beta_0s[J[n]] * pow(LMA[n],beta_1s[J[n]]) * pow(Nmass[n],beta_2s[J[n]]) ) ;
-   }
-   beta_0s ~ normal(beta_0, sigma_0) ;
-   beta_1s ~ normal(beta_1, sigma_1) ;
-   beta_2s ~ normal(beta_2, sigma_2) ;
-   LL_0s ~ normal(LL_0, sigma_LL) ;
-   LL ~ lognormal(mu, sigma) ;
-}
-```
-
-```{r m2, include=FALSE}
-m2 <- m2
-fit2 <- sampling(m2)
-```
+## Results
 
 ```{r functions}
 likeligraph <- function(fit1, ...){
@@ -211,13 +168,47 @@ fitgraph <- function(fit, pars){
 }
 ```
 
+We obtained convergence for the model with a maximum likekihood of **`r max(as.matrix(fit1)[,'lp__'])`**. Figure 2 shows posterior distributions and their associated markov chains. Figure 3 presents model predictions.
+
 ```{r results, fig.height=4}
-likeligraph(fit1, fit2)
-pars <- c("sigma", "beta_0", "sigma_0", "beta_1",  "sigma_1", "beta_2", "sigma_2")
+pars <- c("sigma", "beta_0", "sigma_0", "beta_1", "sigma_1", "beta_2", "sigma_2", "lp__")
 g1 <- fitgraph(fit1, pars = pars)
-g2 <- fitgraph(fit2, pars = c(pars, "LL_0", "sigma_LL"))
-plot_grid(g1$r, g2$r,labels = c('m1', 'm2', 'm3'), ncol = 2)
-g1$c + ggtitle('M1') ; g2$c + ggtitle('M2')
+g1$r ; g1$c
 ```
+
+Figure 2: Model posterior distributions and associated markov chains.
+
+```{r surf}
+pars <- as.matrix(fit1)[which.max(as.matrix(fit1)[,'lp__']),]
+LMA_max <- max(data$LMA)
+Nmass_max <- max(data$Nmass)
+beta_0 <- pars['beta_0']
+beta_1 <- pars['beta_1']
+beta_2 <- pars['beta_2']
+LLpred <- function(LMA, Nmass, LMA_max, Nmass_max, beta_0, beta_1, beta_2){
+  fact <- beta_1*(LMA/LMA_max) - beta_2*(Nmass/Nmass_max)
+  unname(beta_0*exp(fact))
+}
+n <- 100
+pred <- with(data,
+             list(LMA = seq(range(LMA)[1], range(LMA)[2], length.out = n), 
+                  Nmass = seq(range(Nmass)[1], range(Nmass)[2], length.out = n)))
+pred$LL <- sapply(pred$LMA, function(x) 
+  sapply(pred$Nmass, function(y) 
+    LLpred(x, y, LMA_max, Nmass_max, beta_0, beta_1, beta_2)))
+p <- plot_ly(x = pred$LMA, y = pred$Nmass, z = pred$LL) %>% add_surface() %>%
+  add_trace(x = data$LMA, y = data$Nmass, z = data$LL, mode = "markers", type = "scatter3d", 
+            marker = list(size = 5, color = "red", symbol = 104)) %>%
+  layout(title = 'Model predictions',
+         scene = list(xaxis = list(title = 'LMA'),
+                      yaxis = list(title = 'Nmass'),
+                      zaxis = list(title = 'LL')))
+chart_link = plotly_POST(p, filename="LL")
+chart_link
+```
+
+Figure 3: Model predictions. 
+$$LL = `r round(beta_0,3)`*e^{`r round(beta_1,3)`*LMA - `r round(beta_2,3)`*Nmass}$$
+
 
 # References
