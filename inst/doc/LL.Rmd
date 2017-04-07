@@ -1,5 +1,5 @@
 ---
-title: "A minimum LMA in TROLL ?"
+title: "Leaf lifespan allometry"
 author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
 date: '`r Sys.Date()`'
 output:
@@ -27,42 +27,13 @@ library(rstanarm)
 library(readr)
 cores <- detectCores()
 opts_chunk$set(
-  echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
+  echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
     cache = T, cache.lazy = F)
 ```
 
-# Data compilation
+# Intro
 
-We compiled data from both TRY and GLOPNET dataset...
-
-```{r traits}
-kable(traits <- data.frame(
-  name = c('Thick', 'Tough', 'Nm', 'wsg', 'LMA', 'CN', 'P', 'C'),
-  trait = c('Leaf thickness', 'Leaf toughness', 'Leaf nitrogen mass', 'Wood specific gravity', 'Leaf mass per area', 'Leaf carbon per nitrogen', 'Leaf phosphorous', 'Leaf carbon'),
-  TRYcode = c(46, NA, 57, 4, 11, 146, 58, 570)))
-```
-
-```{r species}
-LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
-LES <- LES[which(LES$BIOME == 'TROP_RF'),]
-LES <- LES[which(LES$GF == 'T'),]
-LES <- LES[-which(is.na(LES$log.LL)),]
-LESsp <- unique(droplevels(LES$Species))
-TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TryAccSpecies.txt",
-                  "\t", escape_double = FALSE, trim_ws = TRUE)
-species <- data.frame(
-  species = LESsp,
-  TRYcode = TRY$AccSpeciesID[match(LESsp, TRY$AccSpeciesName)])
-species <- species[-which(is.na(species$TRYcode)),]
-```
-
-http://www.try-db.org - Data Portal - Request PI Center.
-
-# Leaf lifespan allometry
-
-## Model
-
-Leaflifespan is currently computed from Reich allometry. We suggest to find a better allometry with @wright_worldwide_2004 GLOPNET dataset. And we may change the shape of the response curve to better fit observed leaf lifespan of low LMA species (figure 1).
+TROLL model currently compute leaf lifespan with Reich's allometry [@Reich1991a]. But we have shown that Reich's allometry is underestimating leaf lifespan for low LMA species. Moreover simulations estimated unrealistically low aboveground biomass for low LMA species. We assumed Reich's allometry underestimation of leaf lifespan for low LMA species being the source of unrealistically low aboveground biomass inside TROLL simulations. We decided to find a better allometry with @wright_worldwide_2004 GLOPNET dataset.
 
 ```{r LL alo}
 rm(list = ls())
@@ -84,9 +55,11 @@ g <- ggplot(droplevels(data), aes(x = LMA, y = LL, size = Nmass, color = Dataset
 g ; rm(LES, g)
 ```
 
-Figure 1: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPTNET dataset from @wright_worldwide_2004.*
+Figure 1: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004.*
 
-We tested different models and we kept subsequant model with the best tradeoff between log likelihood and number of parameters :
+# Model
+
+We tested different models and we kept subsequant model with the best tradeoff between log likelihood, number of parameters, and convergence :
 $$ {LL_s}_j \sim \mathcal{logN}(log({\mu_s}_j),\,\sigma)\,$$
 $$s=1,...,S_{=4}~, ~~j=1,...,n_s, ~~X^{(1)}=LMA, ~~X^{(2)}=Nmass, ~~i=0,...,I_{=2}$$
 
@@ -117,6 +90,83 @@ data {
 }
 parameters {
   real<lower=0,upper=5> sigma ;
+  real<lower=2,upper=50> beta_0 ;
+  real<lower=0> beta_1 ;
+  real<lower=0> beta_1s[S] ;
+  real<lower=0,upper=50> sigma_1 ;
+  real<lower=0> beta_2 ;
+  real<lower=0> beta_2s[S] ;
+  real<lower=0,upper=50> sigma_2 ;
+}
+model {
+   real f[N] ;
+   for(n in 1:N){
+     f[n] = beta_0 +
+     LMA[n]*beta_1s[J[n]] - 
+     Nmass[n]*beta_2s[J[n]]
+     ;
+   }
+   beta_1s ~ normal(beta_1, sigma_1) ;
+   beta_2s ~ normal(beta_2, sigma_2) ;
+   LL ~ lognormal(f, sigma) ;
+}
+```
+
+```{r m1, include=FALSE}
+m1 <- m1
+fit1 <- sampling(m1)
+```
+
+```{stan output.var='m2'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+  real Nmass[N] ;
+}
+parameters {
+  real<lower=0,upper=5> sigma ;
+  real<lower=2,upper=50> beta_0 ;
+  real<lower=0,upper=3> beta_3 ;
+  real<lower=0,upper=3> beta_3s[S] ;
+  real<lower=0,upper=50> sigma_3 ;
+  real<lower=0,upper=3> beta_4 ;
+  real<lower=0,upper=3> beta_4s[S] ;
+  real<lower=0,upper=50> sigma_4 ;
+}
+model {
+   real f[N] ;
+   for(n in 1:N){
+     f[n] = beta_0 +
+     pow(LMA[n], beta_3s[J[n]]) - 
+     pow(Nmass[n], beta_4s[J[n]])
+     ;
+   }
+   beta_3s ~ normal(beta_3, sigma_3) ;
+   beta_4s ~ normal(beta_4, sigma_4) ;
+   LL ~ lognormal(f, sigma) ;
+}
+```
+
+```{r m2, include=FALSE}
+m2 <- m2
+fit2 <- sampling(m2)
+```
+
+```{stan output.var='m3'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+  real Nmass[N] ;
+}
+parameters {
+  real<lower=0,upper=5> sigma ;
+  real<lower=2,upper=50> beta_0 ;
   real<lower=0> beta_1 ;
   real<lower=0> beta_1s[S] ;
   real<lower=0,upper=50> sigma_1 ;
@@ -133,22 +183,237 @@ parameters {
 model {
    real f[N] ;
    for(n in 1:N){
-     f[n] = exp(beta_1s[J[n]]*pow(LMA[n],beta_3s[J[n]]) - beta_2s[J[n]]*pow(Nmass[n],beta_4s[J[n]])) ;
+     f[n] = beta_0 +
+     beta_1s[J[n]]*pow(LMA[n], beta_3s[J[n]]) - 
+     beta_2s[J[n]]*pow(Nmass[n], beta_4s[J[n]])
+     ;
    }
    beta_1s ~ normal(beta_1, sigma_1) ;
    beta_2s ~ normal(beta_2, sigma_2) ;
    beta_3s ~ normal(beta_3, sigma_3) ;
    beta_4s ~ normal(beta_4, sigma_4) ;
-   LL ~ lognormal(log(f), sigma) ;
+   LL ~ lognormal(f, sigma) ;
 }
 ```
 
-```{r m1, include=FALSE}
-m1 <- m1
-fit1 <- sampling(m1)
+```{r m3, include=FALSE}
+m3 <- m3
+fit3 <- sampling(m3)
 ```
 
-## Results
+```{stan output.var='m4'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+  real Nmass[N] ;
+}
+parameters {
+  real<lower=0,upper=5> sigma ;
+  real<lower=2,upper=50> beta_0 ;
+  real<lower=0> beta_1 ;
+  real<lower=0> beta_1s[S] ;
+  real<lower=0,upper=50> sigma_1 ;
+}
+model {
+   real f[N] ;
+   for(n in 1:N){
+     f[n] = beta_0 +
+     LMA[n]*beta_1s[J[n]] - 
+     Nmass[n]
+     ;
+   }
+   beta_1s ~ normal(beta_1, sigma_1) ;
+   LL ~ lognormal(f, sigma) ;
+}
+```
+
+```{r m4, include=FALSE}
+m4 <- m4
+fit4 <- sampling(m4)
+```
+
+```{stan output.var='m5'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+  real Nmass[N] ;
+}
+parameters {
+  real<lower=0,upper=5> sigma ;
+  real<lower=2,upper=50> beta_0 ;
+  real<lower=0,upper=3> beta_3 ;
+  real<lower=0,upper=3> beta_3s[S] ;
+  real<lower=0,upper=50> sigma_3 ;
+  real<lower=0,upper=3> beta_4 ;
+  real<lower=0,upper=3> beta_4s[S] ;
+  real<lower=0,upper=50> sigma_4 ;
+}
+model {
+   real f[N] ;
+   for(n in 1:N){
+     f[n] = beta_0 +
+     pow(LMA[n], beta_3s[J[n]]) - 
+     pow(Nmass[n], beta_4s[J[n]])
+     ;
+   }
+   beta_3s ~ normal(beta_3, sigma_3) ;
+   beta_4s ~ normal(beta_4, sigma_4) ;
+   LL ~ lognormal(f, sigma) ;
+}
+```
+
+```{r m5, include=FALSE}
+m5 <- m5
+fit5 <- sampling(m5)
+```
+
+```{stan output.var='m6'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+  real Nmass[N] ;
+}
+parameters {
+  real<lower=0,upper=5> sigma ;
+  real<lower=2,upper=50> beta_0 ;
+  real<lower=0> beta_1 ;
+  real<lower=0> beta_1s[S] ;
+  real<lower=0,upper=50> sigma_1 ;
+  real<lower=0,upper=3> beta_3 ;
+  real<lower=0,upper=3> beta_3s[S] ;
+  real<lower=0,upper=50> sigma_3 ;
+  real<lower=0,upper=3> beta_4 ;
+  real<lower=0,upper=3> beta_4s[S] ;
+  real<lower=0,upper=50> sigma_4 ;
+}
+model {
+   real f[N] ;
+   for(n in 1:N){
+     f[n] = beta_0 +
+     beta_1s[J[n]]*pow(LMA[n], beta_3s[J[n]]) - 
+     pow(Nmass[n], beta_4s[J[n]])
+     ;
+   }
+   beta_1s ~ normal(beta_1, sigma_1) ;
+   beta_3s ~ normal(beta_3, sigma_3) ;
+   beta_4s ~ normal(beta_4, sigma_4) ;
+   LL ~ lognormal(f, sigma) ;
+}
+```
+
+```{r m6, include=FALSE}
+m6 <- m6
+fit6 <- sampling(m6)
+```
+
+```{stan output.var='m7'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+}
+parameters {
+  real<lower=0,upper=5> sigma ;
+  real<lower=0,upper=50> beta_0 ;
+  real<lower=0> beta_1 ;
+  real<lower=0> beta_1s[S] ;
+  real<lower=0,upper=50> sigma_1 ;
+}
+model {
+   real f[N] ;
+   for(n in 1:N){
+     f[n] = beta_0 + LMA[n]*beta_1s[J[n]] ;
+   }
+   beta_1s ~ normal(beta_1, sigma_1) ;
+   LL ~ lognormal(f, sigma) ;
+}
+```
+
+```{r m7, include=FALSE}
+m7 <- m7
+fit7 <- sampling(m7)
+```
+
+```{stan output.var='m8'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+}
+parameters {
+  real<lower=0,upper=5> sigma ;
+  real<lower=0,upper=50> beta_0 ;
+  real<lower=0,upper=3> beta_3 ;
+  real<lower=0,upper=3> beta_3s[S] ;
+  real<lower=0,upper=50> sigma_3 ;
+}
+model {
+   real f[N] ;
+   for(n in 1:N){
+     f[n] = beta_0 +
+     pow(LMA[n], beta_3s[J[n]])
+     ;
+   }
+   beta_3s ~ normal(beta_3, sigma_3) ;
+   LL ~ lognormal(f, sigma) ;
+}
+```
+
+```{r m8, include=FALSE}
+m8 <- m8
+fit8 <- sampling(m8)
+```
+
+```{stan output.var='m9'}
+data {
+  int S ;
+  int N ;
+  int J[N] ;
+  real LL[N] ;
+  real LMA[N] ;
+}
+parameters {
+  real<lower=0,upper=5> sigma ;
+  real<lower=0,upper=50> beta_0 ;
+  real<lower=0> beta_1 ;
+  real<lower=0> beta_1s[S] ;
+  real<lower=0,upper=50> sigma_1 ;
+  real<lower=0,upper=3> beta_3 ;
+  real<lower=0,upper=3> beta_3s[S] ;
+  real<lower=0,upper=50> sigma_3 ;
+}
+model {
+   real f[N] ;
+   for(n in 1:N){
+     f[n] = beta_0 +
+     beta_1s[J[n]]*pow(LMA[n], beta_3s[J[n]])
+     ;
+   }
+   beta_1s ~ normal(beta_1, sigma_1) ;
+   beta_3s ~ normal(beta_3, sigma_3) ;
+   LL ~ lognormal(f, sigma) ;
+}
+```
+
+```{r m9, include=FALSE}
+m9 <- m9
+fit9 <- sampling(m9)
+```
+ 
+# Results
 
 ```{r functions}
 likeligraph <- function(fit1, ...){
@@ -174,45 +439,193 @@ fitgraph <- function(fit, pars){
 
 We obtained convergence for the model with a maximum likekihood of **`r max(as.matrix(fit1)[,'lp__'])`**. Figure 2 shows posterior distributions and their associated markov chains. Figure 3 presents model predictions.
 
-```{r results, fig.height=6}
-pars <- c("sigma", "beta_1", "sigma_1", "beta_2", "sigma_2", "beta_3", "sigma_3", "beta_4", "sigma_4", "lp__")
+## Mcomp
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + {\beta_2}_s*N^{{\beta_4}_s},\sigma)\,$$
+
+## M1 
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA + {\beta_2}_s*N,\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit1)[,'lp__'])`**
+
+```{r results1}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_1", "sigma_1", 
+          "beta_2", "sigma_2", 
+          "lp__")
 g1 <- fitgraph(fit1, pars = pars)
-g1$r ; g1$c
+g1$r ; g1$c ; pairs(fit1, pars = c('beta_0', 'beta_1', 'beta_2'))
+```
+
+## M2
+
+$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit2)[,'lp__'])`**
+
+```{r results2}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_3", "sigma_3", 
+          "beta_4", "sigma_4", 
+          "lp__")
+g2 <- fitgraph(fit2, pars = pars)
+g2$r ; g2$c ; pairs(fit2, pars = c('beta_0', 'beta_3', 'beta_4'))
+```
+
+## M3
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + {\beta_2}_s*N^{{\beta_4}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit3)[,'lp__'])`**
+
+```{r results3}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_1", "sigma_1", 
+          "beta_2", "sigma_2", 
+          "beta_3", "sigma_3", 
+          "beta_4", "sigma_4", 
+          "lp__")
+g3 <- fitgraph(fit3, pars = pars)
+g3$r ; g3$c ; pairs(fit3, pars = c('beta_0', 'beta_1', 'beta_2', 'beta_3', 'beta_4'))
+```
+
+## M4
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA + N,\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit4)[,'lp__'])`**
+
+```{r results4}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_1", "sigma_1", 
+          "lp__")
+g4 <- fitgraph(fit4, pars = pars)
+g4$r ; g4$c ; pairs(fit4, pars = c('beta_0', 'beta_1'))
+```
+
+## M5
+
+$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit5)[,'lp__'])`**
+
+```{r results5}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_3", "sigma_3", 
+          "beta_4", "sigma_4", 
+          "lp__")
+g5 <- fitgraph(fit5, pars = pars)
+g5$r ; g5$c ; pairs(fit5, pars = c('beta_0', 'beta_3', 'beta_4'))
+```
+
+## M6
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit6)[,'lp__'])`**
+
+```{r results6}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_1", "sigma_1", 
+          "beta_3", "sigma_3", 
+          "beta_4", "sigma_4", 
+          "lp__")
+g6 <- fitgraph(fit6, pars = pars)
+g6$r ; g6$c ; pairs(fit6, pars = c('beta_0', 'beta_1', 'beta_3', 'beta_4'))
+```
+
+## M7
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA,\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit7)[,'lp__'])`**
+
+```{r results7}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_1", "sigma_1", 
+          "lp__")
+g7 <- fitgraph(fit7, pars = pars)
+g7$r ; g7$c ; pairs(fit7, pars = c('beta_0', 'beta_1'))
+```
+
+## M8
+
+$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit8)[,'lp__'])`**
+
+```{r results8}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_3", "sigma_3",
+          "lp__")
+g8 <- fitgraph(fit8, pars = pars)
+g8$r ; g8$c ; pairs(fit8, pars = c('beta_0', 'beta_3'))
+```
+
+## M9
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit9)[,'lp__'])`**
+
+```{r results9}
+pars <- c("sigma", 
+          "beta_0",
+          "beta_1", "sigma_1", 
+          "beta_3", "sigma_3",
+          "lp__")
+g9 <- fitgraph(fit9, pars = pars)
+g9$r ; g9$c ; pairs(fit9, pars = c('beta_0', 'beta_1', 'beta_3'))
 ```
 
 Figure 2: Model posterior distributions and associated markov chains.
 
+# Graph
+
+If we keep model 9: $LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s},\sigma)\,$
+
 ```{r surf}
-pars <- as.matrix(fit1)[which.max(as.matrix(fit1)[,'lp__']),]
+pars <- as.matrix(fit9)[which.max(as.matrix(fit9)[,'lp__']),]
 LMA_max <- max(data$LMA)
 Nmass_max <- max(data$Nmass)
+beta_0 <- pars['beta_0']
 beta_1 <- pars['beta_1']
-beta_2 <- pars['beta_2']
 beta_3 <- pars['beta_3']
-beta_4 <- pars['beta_4']
-LLpred <- function(LMA, Nmass, LMA_max, Nmass_max,beta_1, beta_2, beta_3, beta_4){
-  fact <- beta_1*(LMA/LMA_max)^beta_3 - beta_2*(Nmass/Nmass_max)^beta_4
+LLpred <- function(LMA, LMA_max, beta_0, beta_1, beta_3){
+  fact <- beta_0 + beta_1*(LMA/LMA_max)^beta_3
   unname(exp(fact))
 }
-n <- 100
-pred <- with(data,
-             list(LMA = seq(range(LMA)[1], range(LMA)[2], length.out = n),
-                  Nmass = seq(range(Nmass)[1], range(Nmass)[2], length.out = n)))
-pred$LL <- sapply(pred$LMA, function(x)
-  sapply(pred$Nmass, function(y)
-    LLpred(x, y, LMA_max, Nmass_max, beta_1, beta_2, beta_3, beta_4)))
-p <- plot_ly(x = pred$LMA, y = pred$Nmass, z = pred$LL) %>% add_surface() %>%
-  add_trace(x = data$LMA, y = data$Nmass, z = data$LL, mode = "markers", type = "scatter3d",
-            marker = list(size = 5, color = "red", symbol = 104)) %>%
-  layout(title = 'Model predictions',
-         scene = list(xaxis = list(title = 'LMA'),
-                      yaxis = list(title = 'Nmass'),
-                      zaxis = list(title = 'LL')))
-chart_link = plotly_POST(p, filename="LL")
-chart_link
+LLpred_sigma <- function(LMA, LMA_max, beta_0, beta_1, beta_3, sigma, n = 100){
+  mu <- beta_0 + beta_1*(LMA/LMA_max)^beta_3
+  mean(rlnorm(n, mu, sigma))
+}
+pars <- as.matrix(fit9)[-c(1:2000),]
+pred <- apply(pars, 1, function(x) 
+  sapply(data$LMA, function(y)
+    # LLpred(y, LMA_max, x['beta_0'], x['beta_1'], x['beta_3'])
+    LLpred_sigma(y, LMA_max, x['beta_0'], x['beta_1'], x['beta_3'], x['sigma'])
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$LMA <- data$LMA
+g <- ggplot(data, aes(x = LMA, y = LL)) + 
+  geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
+  stat_function(fun = function(x) LLpred(x, LMA_max, beta_0, beta_1, beta_3),
+                aes(colour = "mean")) +
+  geom_point() +
+  theme_bw() +
+  xlab('Leaf mass per area (LMA in g/m2)') +
+  ylab('Leaf lifespan (LL in months)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+g
 ```
 
 Figure 3: Model predictions.
-$$LL = e^{`r round(beta_1/(LMA_max^beta_3),3)` *LMA^{`r round(beta_3,3)`} -`r round(beta_2/(Nmass_max^beta_3),3)`*Nmass^{`r round(beta_4,3)`} }$$
+$$LL = `r round(exp(beta_0),3)`*e^{`r round(beta_1/(LMA_max^beta_3),3)` *LMA^{`r round(beta_3,3)`}}$$
 
 # References
