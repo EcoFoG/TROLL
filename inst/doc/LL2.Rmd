@@ -1,0 +1,436 @@
+---
+title: "Leaf lifespan"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r setup, include=FALSE}
+rm(list = ls()) ; invisible(gc())
+library(flexdashboard)
+library(knitr)
+library(parallel)
+library(TROLL)
+library(RconTroll)
+library(reshape2)
+library(ggplot2)
+library(cowplot)
+library(entropart)
+library(plotly)
+library(rstan)
+library(bayesplot)
+library(rstanarm)
+library(readr)
+library(GGally)
+cores <- detectCores()
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
+    cache = T, cache.lazy = F)
+```
+
+Intro
+==================
+
+Issue {data-width=200}
+-------------------------------------
+    
+TROLL model currently compute leaf lifespan with Reich's allometry [@Reich1991a]. But we have shown that Reich's allometry is underestimating leaf lifespan for low LMA species. Moreover simulations estimated unrealistically low aboveground biomass for low LMA species. We assumed Reich's allometry underestimation of leaf lifespan for low LMA species being the source of unrealistically low aboveground biomass inside TROLL simulations. We decided to find a better allometry with @wright_worldwide_2004 GLOPNET dataset.
+
+We tested different models starting from complet model **Mcomp**:
+$$ {LL_s}_j \sim \mathcal{logN}(log({\mu_s}_j),\,\sigma)\,, ~~s=1,...,S_{=4}~, ~~j=1,...,n_s$$
+
+$${\mu_s}_j =  {\beta_0}*e^{{\beta_1}_s*{LMA_s}_j^{{\beta_3}_s} - {\beta_2}_s*{Nmass_s}_j^{{\beta_4}_s}}$$
+$${\beta_i}_s \sim \mathcal{N}({\beta_i},\,\sigma_i)\,^I$$
+$$(\beta_i, \sigma, \sigma_i) \sim \mathcal{\Gamma}(0.001,\,0.001)\,^{2I+1}$$
+
+LL graph {data-width=200}
+-------------------------------------
+
+```{r LL alo}
+rm(list = ls())
+LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
+LES <- LES[which(LES$BIOME == 'TROP_RF'),]
+LES <- LES[which(LES$GF == 'T'),]
+LES <- LES[-which(is.na(LES$log.LL)),]
+LES <- LES[-which(is.na(LES$log.LMA)),]
+data <- cbind(LES[c('Dataset', 'Species')],
+              10^LES[paste0('log.',c('LL', 'LMA', 'Nmass', 'Narea',
+                                     'Amass', 'Aarea', 'Gs', 'Rdmass', 'Rdarea'))])
+names(data) <- c('Dataset', 'Species', 'LL', 'LMA', 'Nmass', 'Narea',
+              'Amass', 'Aarea', 'Gs', 'Rdmass', 'Rdarea')
+data <- droplevels(data[c('Dataset', 'Species', 'LL', 'LMA', 'Nmass')])
+g <- ggplot(droplevels(data), aes(x = LMA, y = LL, size = Nmass, color = Dataset, label = Species)) +
+  geom_point(alpha = 0.5) + xlab('Leaf mass per area (LMA in g/m2)') +
+  ylab('Leaf lifespan (LL in months)') + 
+  scale_size_continuous(name = 'Leaf nitrogen content\n(Nmass, in mg/g)')
+g ; rm(LES, g)
+```
+
+Figure 1: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004.*
+
+```{r functions}
+fitgraph <- function(fit){
+  pars <- fit@model_pars
+  beta <- pars[grep('beta', pars)]
+  beta <- beta[-grep('s', beta)]
+  sigma <- pars[grep('sigma', pars)]
+  posterior <- as.matrix(fit)
+  r <- mcmc_areas(posterior,  pars = c(beta, sigma, 'lp__'), prob = 0.8)
+  c <- mcmc_trace(posterior,  pars = c(beta, sigma), n_warmup = 2000,
+                   facet_args = list(nrow = 2, labeller = label_parsed))
+  p <- ggpairs(data.frame(posterior[,beta]))
+  return(list(r = r, c = c, p = p))
+}
+```
+
+```{r model, include=FALSE}
+mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
+rstan_options(auto_write = TRUE)
+options(mc.cores = detectCores())
+```
+
+M1
+==================
+
+```{r m1, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M1.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA + {\beta_2}_s*N,\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res1}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn1}
+g$c ; g$p
+```
+
+M2
+==================
+
+```{r m2, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M2.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res2}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn2}
+g$c ; g$p
+```
+
+
+M3
+==================
+
+```{r m3, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M3.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + {\beta_2}_s*N^{{\beta_4}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res3}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn3}
+g$c ; g$p
+```
+
+
+M4
+==================
+
+```{r m4, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M4.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA + N,\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res4}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn4}
+g$c ; g$p
+```
+
+
+M5
+==================
+
+```{r m5, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M5.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res5}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn5}
+g$c ; g$p
+```
+
+
+M6
+==================
+
+```{r m6, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M6.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res6}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn6}
+g$c ; g$p
+```
+
+
+M7
+==================
+
+```{r m7, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M7.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA,\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res7}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn7}
+g$c ; g$p
+```
+
+
+M8
+==================
+
+```{r m8, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M8.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res8}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn8}
+g$c ; g$p
+```
+
+
+M9
+==================
+
+```{r m9, include=FALSE}
+mdata <- list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/max(data$LMA)),
+              Nmass = (data$Nmass/max(data$Nmass)))
+fit <- stan(file = file.path(mpath, 'M9.stan'), data = mdata)
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s},\sigma)\,$$
+Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+
+```{r res9}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+```{r diagn9}
+g$c ; g$p
+```
+
+
+Result
+==================
+
+```{r final}
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),]
+LMA_max <- max(data$LMA)
+Nmass_max <- max(data$Nmass)
+beta_0 <- pars['beta_0']
+beta_1 <- pars['beta_1']
+beta_3 <- pars['beta_3']
+LLpred <- function(LMA, LMA_max, beta_0, beta_1, beta_3){
+  fact <- beta_0 + beta_1*(LMA/LMA_max)^beta_3
+  unname(exp(fact))
+}
+LLpred_sigma <- function(LMA, LMA_max, beta_0, beta_1, beta_3, sigma){
+  mu <- beta_0 + beta_1*(LMA/LMA_max)^beta_3
+  rlnorm(1, mu, sigma)
+}
+```
+
+Result {data-width=600}
+-------------------------------------
+$$LL = `r round(exp(beta_0),3)`*e^{`r round(beta_1/(LMA_max^beta_3),3)` *LMA^{`r round(beta_3,3)`}}$$
+
+```{r graph}
+pars <- as.matrix(fit)[-c(1:2000),]
+pred <- apply(pars, 1, function(x) 
+  sapply(data$LMA, function(y)
+    LLpred_sigma(y, LMA_max, x['beta_0'], x['beta_1'], x['beta_3'], x['sigma'])
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$LMA <- data$LMA
+g <- ggplot(data, aes(x = LMA, y = LL)) + 
+  geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
+  stat_function(fun = function(x) LLpred(x, LMA_max, beta_0, beta_1, beta_3),
+                aes(colour = "mean")) +
+  geom_point() +
+  theme_bw() +
+  xlab('Leaf mass per area (LMA in g/m2)') +
+  ylab('Leaf lifespan (LL in months)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+g
+```
+
+Figure 3: Model predictions.
+
+References
+==================
+
