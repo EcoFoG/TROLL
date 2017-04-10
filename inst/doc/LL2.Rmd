@@ -84,33 +84,71 @@ fitgraph <- function(fit){
   p <- ggpairs(data.frame(posterior[,beta]))
   return(list(r = r, c = c, p = p))
 }
+datasub <- function(data, dataset){
+  LMAmax <- max(data$LMA)
+  Nmax <- max(data$Nmass)
+  if(dataset == 'full')
+    dataset <- levels(droplevels(data$Dataset))
+  data <- data[which(data$Dataset %in% dataset),]
+  return(list(S = length(levels(droplevels(data$Dataset))), 
+                          N = length(as.numeric(droplevels(data$Dataset))),
+                          J = as.numeric(droplevels(data$Dataset)),
+                          LL = data$LL,
+                          LMA = (data$LMA/LMAmax),
+                          Nmass = (data$Nmass/Nmax)))
+}
+LLpred <- function(fit, data, one = TRUE){
+  LMA <- data$LMA
+  N <- data$Nmass
+  LMAmax <- max(data$LMA)
+  Nmax <- max(data$Nmass)
+  pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),]
+  beta <- pars[c('beta_0', 'beta_1', 'beta_2', 'beta_3', 'beta_4')]
+  if(one)
+    beta[is.na(beta)] <- 1
+  if(!one)
+    beta[is.na(beta)] <- 0
+  beta[1] + beta[2]*(LMA/LMAmax)^beta[4] + beta[3]*(N/Nmax)^beta[5]
+  return(exp(beta))
+}
+evaluate <- function(fit, data, one = TRUE){
+  mean(sapply(levels(droplevels(data$Dataset)), function(dataset){
+    fit1 <- fit[[dataset]]
+    data1 <- data[-which(data$Dataset == dataset),]
+    fi <- LLpred(fit1, data1, one = one)
+    yi <- data1$LL
+    yb <- mean(yi)
+    # SSreg = sum((fi - yb)^2)
+    SSres = sum((yi - fi)^2)
+    # SStot = sum((yi - yb)^2)
+    # R2 <- SSreg/SStot
+    SSres / length(yi)
+  }))
+}
 ```
 
 ```{r model, include=FALSE}
 mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
 rstan_options(auto_write = TRUE)
 options(mc.cores = detectCores())
+mdata <- sapply(c('full', levels(droplevels(data$Dataset))), 
+       function(x) datasub(data, x), simplify = F)
 ```
 
 M1
 ==================
 
 ```{r m1, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M1.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit1 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA + {\beta_2}_s*N,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data))`**
 
 ```{r res1}
 g$r
@@ -127,21 +165,16 @@ M2
 ==================
 
 ```{r m2, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M2.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit2 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data))`**
 
 ```{r res2}
 g$r
@@ -159,21 +192,16 @@ M3
 ==================
 
 ```{r m3, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M3.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit3 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + {\beta_2}_s*N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data))`**
 
 ```{r res3}
 g$r
@@ -191,21 +219,16 @@ M4
 ==================
 
 ```{r m4, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M4.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit4 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA + N,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data))`**
 
 ```{r res4}
 g$r
@@ -223,21 +246,16 @@ M5
 ==================
 
 ```{r m5, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M5.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit5 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data))`**
 
 ```{r res5}
 g$r
@@ -255,21 +273,16 @@ M6
 ==================
 
 ```{r m6, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M6.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit6 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data))`**
 
 ```{r res6}
 g$r
@@ -287,21 +300,16 @@ M7
 ==================
 
 ```{r m7, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M7.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit7 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data, one = FALSE))`**
 
 ```{r res7}
 g$r
@@ -319,21 +327,16 @@ M8
 ==================
 
 ```{r m8, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M8.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit8 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data, one = FALSE))`**
 
 ```{r res8}
 g$r
@@ -351,21 +354,16 @@ M9
 ==================
 
 ```{r m9, include=FALSE}
-mdata <- list(S = length(levels(droplevels(data$Dataset))), 
-              N = length(as.numeric(droplevels(data$Dataset))),
-              J = as.numeric(droplevels(data$Dataset)),
-              LL = data$LL,
-              LMA = (data$LMA/max(data$LMA)),
-              Nmass = (data$Nmass/max(data$Nmass)))
-fit <- stan(file = file.path(mpath, 'M9.stan'), data = mdata)
-g <- fitgraph(fit)
+fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+g <- fitgraph(fit$full)
+fit9 <- fit
 ```
 
 Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit)[,'lp__'])`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and $R^2$ of **`r max(evaluate(fit, data, one = FALSE))`**
 
 ```{r res9}
 g$r
@@ -379,54 +377,53 @@ g$c ; g$p
 ```
 
 
-Result
+Results
 ==================
 
-```{r final}
-pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),]
-LMA_max <- max(data$LMA)
-Nmass_max <- max(data$Nmass)
-beta_0 <- pars['beta_0']
-beta_1 <- pars['beta_1']
-beta_3 <- pars['beta_3']
-LLpred <- function(LMA, LMA_max, beta_0, beta_1, beta_3){
-  fact <- beta_0 + beta_1*(LMA/LMA_max)^beta_3
-  unname(exp(fact))
-}
-LLpred_sigma <- function(LMA, LMA_max, beta_0, beta_1, beta_3, sigma){
-  mu <- beta_0 + beta_1*(LMA/LMA_max)^beta_3
-  rlnorm(1, mu, sigma)
-}
+Results {data-width=600}
+-------------------------------------
+
+```{r table}
+fits <- list(fit1 = fit1, fit2 = fit2, fit3 = fit3, fit4 = fit4, 
+             fit5 = fit5, fit6 = fit6, fit7 = fit7, fit8 = fit8, fit9 = fit9)
+rm(fit1, fit2, fit3, fit4, fit5, fit6, fit7, fit8, fit9)
+res <- data.frame(row.names = paste0('M', 1:9),
+                  ML = unlist(lapply(fits, function(fit) round(max(as.matrix(fit$full)[,'lp__']),3))),
+                  R2 = NA)
+res$R2[1:6] <- unlist(lapply(fits[1:6], function(fit) evaluate(fit, data)))
+res$R2[2:9] <- unlist(lapply(fits[2:9], function(fit) evaluate(fit, data, one = FALSE)))
+kable(t(res))
+fit <- fits$fit9$full ; rm(fits)
+LMAmax <- max(data$LMA) ; Nmax <- max(data$Nmass)
+# pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta_0', 'beta_1', 'beta_3')]
+# $$LL = `r round(exp(beta[1]),3)`*e^{`r round(beta[2]/(LMA_max^beta[3]),3)` *LMA^{`r round(beta[3],3)`}}$$
 ```
 
-Result {data-width=600}
--------------------------------------
-$$LL = `r round(exp(beta_0),3)`*e^{`r round(beta_1/(LMA_max^beta_3),3)` *LMA^{`r round(beta_3,3)`}}$$
+
 
 ```{r graph}
-pars <- as.matrix(fit)[-c(1:2000),]
-pred <- apply(pars, 1, function(x) 
-  sapply(data$LMA, function(y)
-    LLpred_sigma(y, LMA_max, x['beta_0'], x['beta_1'], x['beta_3'], x['sigma'])
-  ))
-pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
-names(pred) <- c('5%', '95%')
-pred$LMA <- data$LMA
-g <- ggplot(data, aes(x = LMA, y = LL)) + 
-  geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
-  geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
-  geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
-  stat_function(fun = function(x) LLpred(x, LMA_max, beta_0, beta_1, beta_3),
-                aes(colour = "mean")) +
-  geom_point() +
-  theme_bw() +
-  xlab('Leaf mass per area (LMA in g/m2)') +
-  ylab('Leaf lifespan (LL in months)') +
-  scale_color_manual(name = 'Model',
-                     values = c('5%' = 'black',
-                                '95%' = 'black',
-                                'mean' = 'red'))
-g
+# pred <- apply(pars, 1, function(x)
+#   sapply(data$LMA, function(y)
+#     LLpred_sigma(y, LMA_max, x['beta_0'], x['beta_1'], x['beta_3'], x['sigma'])
+#   ))
+# pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+# names(pred) <- c('5%', '95%')
+# pred$LMA <- data$LMA
+# g <- ggplot(data, aes(x = LMA, y = LL)) +
+#   geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+#   geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
+#   geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
+#   stat_function(fun = function(x) exp((beta_0 + beta_1*(x/LMAmax)^beta_3)),
+#                 aes(colour = "mean")) +
+#   geom_point() +
+#   theme_bw() +
+#   xlab('Leaf mass per area (LMA in g/m2)') +
+#   ylab('Leaf lifespan (LL in months)') +
+#   scale_color_manual(name = 'Model',
+#                      values = c('5%' = 'black',
+#                                 '95%' = 'black',
+#                                 'mean' = 'red'))
+# g
 ```
 
 Figure 3: Model predictions.
