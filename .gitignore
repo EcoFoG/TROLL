@@ -11,3 +11,4 @@ inst/doc/*.docx
 inst/doc/*.html
 inst/doc/vert.txt
 *.rds
+*.Rdata
