@@ -25,13 +25,15 @@ library(rstan)
 library(bayesplot)
 library(rstanarm)
 library(readr)
+library(dplyr)
+library(randomForest)
 cores <- detectCores()
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
     cache = T, cache.lazy = F)
 ```
 
-# Intro
+# Introduction
 
 TROLL model currently compute leaf lifespan with Reich's allometry [@Reich1991a]. But we have shown that Reich's allometry is underestimating leaf lifespan for low LMA species. Moreover simulations estimated unrealistically low aboveground biomass for low LMA species. We assumed Reich's allometry underestimation of leaf lifespan for low LMA species being the source of unrealistically low aboveground biomass inside TROLL simulations. We decided to find a better allometry with @wright_worldwide_2004 GLOPNET dataset.
 
@@ -59,245 +61,66 @@ Figure 1: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifesp
 
 # Model
 
-We tested different models and we kept subsequant model with the best tradeoff between log likelihood, number of parameters, and convergence :
-$$ {LL_s}_j \sim \mathcal{logN}(log({\mu_s}_j),\,\sigma)\,$$
-$$s=1,...,S_{=4}~, ~~j=1,...,n_s, ~~X^{(1)}=LMA, ~~X^{(2)}=Nmass, ~~i=0,...,I_{=2}$$
+We tested different models and we kept subsequant model with the best tradeoff between model complexity, convergence, likelihoof, and prediction quality (see [leaf lifespan model](LL2.html) ):
+$$ {LL_s}_j \sim \mathcal{logN}(\beta_0*e^{{\beta_1}_s*{LMA_s}_j - {\beta_2}_s*{Nmass_s}_j},\,\sigma)\,$$
 
-$${\mu_s}_j =  {\beta_0}_s*e^{{\beta_1}_s*{X_s}_j^{(1)} - {\beta_2}_s*{X_s}_j^{(2)}}$$
-$${\beta_i}_s \sim \mathcal{N}({\beta_i},\,\sigma_i)\,^I$$
-$$(\beta_i, \sigma, \sigma_i) \sim \mathcal{\Gamma}(0.001,\,0.001)\,^{2I+1}$$
+$$s=1,...,S_{=4}~, ~~j=1,...,n_s$$
+$${\beta_i}_s \sim \mathcal{N}({\beta_i},\,\sigma_i)\,^I, ~~(\beta_i, \sigma, \sigma_i) \sim \mathcal{\Gamma}(0.001,\,0.001)\,^{2I+1}$$
+
 Leaf lifespan ($LL$) is following a lognormal law with location $log({\mu_s}_j)$ and scale $\sigma$. $s$ represents the dataset used to do the fit between 1 and $S=4$, it encompass environmental and protocol variations. $j$ represents the observation for a given site $s$. Finally $X^{(1)}$ represents the LMA and $X^{(2)}$ the leaf nitrogen content (Nmass). Location ${\mu_s}_j$ is the log of the exponential from the difference between LMA and Nmass with parameters ${\beta_0}_s$, ${\beta_1}_s$, and ${\beta_2}_s$. Each ${\beta_i}_s$ is following a normal law located on $\beta_i$ with scale $\sigma_i$. Finally all $beta_i$, $\sigma$, and $\sigma_i$ are assumed without presemption following gamma laws of parameters $10^-2$, $10^-2$.
 
+# TRY improvement
+
+We gathered data from TRY database to evaluate and improve previous model. We requested functional traits available in Bridge dataset for species with leaf lifespan present in GLOPNET dataset (see table 1).
+
+Table 1: Functional traits gathered with TRY.
+
+```{r traits}
+kable(traits <- data.frame(
+  name = c('Thick', 'Tough', 'Nm', 'wsg', 'LMA', 'CN', 'P', 'C'),
+  trait = c('Leaf thickness', 'Leaf toughness', 'Leaf nitrogen mass', 'Wood specific gravity', 'Leaf mass per area', 'Leaf carbon per nitrogen', 'Leaf phosphorous', 'Leaf carbon'),
+  TRYcode = c(46, NA, 57, 4, 11, 146, 58, 570)))
+```
+
+```{r species}
+LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
+LES <- LES[which(LES$BIOME == 'TROP_RF'),]
+LES <- LES[which(LES$GF == 'T'),]
+LES <- LES[-which(is.na(LES$log.LL)),]
+LESsp <- unique(droplevels(LES$Species))
+TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TryAccSpecies.txt",
+                  "\t", escape_double = FALSE, trim_ws = TRUE)
+species <- data.frame(
+  species = LESsp,
+  TRYcode = TRY$AccSpeciesID[match(LESsp, TRY$AccSpeciesName)])
+species <- species[-which(is.na(species$TRYcode)),]
+rm(species, traits, LESsp)
+```
+ 
 ```{r data}
-rstan_options(auto_write = TRUE)
-options(mc.cores = detectCores())
-S <- length(levels(droplevels(data$Dataset)))
-J <- as.numeric(droplevels(data$Dataset))
-N <- length(J)
-LMA <- (data$LMA/max(data$LMA))
-Nmass <- (data$Nmass/max(data$Nmass))
-LL <- data$LL
+TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TRY.txt", 
+    "\t", escape_double = FALSE, trim_ws = TRUE)
+data2 <- dcast(TRY, SpeciesName ~ TraitName, 
+               value.var = 'StdValue', fun.aggregate = mean, na.rm = T)
+names(data2) <- c('Species', 'LMAt', 'C', 'CN', 'Thick', 'wsg')
+data2$LMAt <- 1/data2$LMAt*1000
+data <- left_join(data, data2[-7], by = 'Species')
+rm(data2, LES, TRY)
 ```
 
-```{r m1, include=FALSE}
-m1 <- m1
-fit1 <- sampling(m1)
+Table 2: Variable importance calculated with out-of the bag method applied on a random forest. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
+
+```{r OOB}
+rf <- randomForest(LL ~ LMA + Nmass + LMAt + wsg, 
+                   data = data, na.action = na.omit,
+                   ntree = 1000, replace = F , importance = T,
+                   do.trace = F, keep.forest = T, keep.inbag = T)
+kable(rf$importance)
+corrplot::corrplot.mixed(
+  cor(data[c('LMA', 'Nmass', 'LMAt', 'wsg')], 
+      use = "pairwise.complete.obs"))
 ```
 
-# Results
-
-```{r functions}
-likeligraph <- function(fit1, ...){
-  fits <- list(fit1, ...)
-  m <- lapply(fits, function(fit) unlist(lapply(fit@sim$samples, function(x) x$lp__[1000:4000])))
-  m <- data.frame(do.call('cbind', m))
-  names(m) <- paste0('m', 1:dim(m)[2])
-  m <- melt(m)
-  return(ggplot(m, aes(x = value, color = variable, fill = variable)) +
-           geom_density(alpha = 0.3) + xlab('log likelihood'))
-}
-fitgraph <- function(fit, pars){
-  posterior <- as.matrix(fit)
-  plot_title <- ggtitle("Posterior distributions", "with medians and 80% intervals")
-  r <- mcmc_areas(posterior,  pars = pars, prob = 0.8) + plot_title
-  color_scheme_set("mix-blue-pink")
-  c <- mcmc_trace(posterior,  pars = pars, n_warmup = 2000,
-                   facet_args = list(nrow = 2, labeller = label_parsed)) +
-  facet_text(size = 15)
-  p <- pairs(fit1, pars = pars)
-  return(list(r = r, c = c))
-}
-```
-
-We obtained convergence for the model with a maximum likekihood of **`r max(as.matrix(fit1)[,'lp__'])`**. Figure 2 shows posterior distributions and their associated markov chains. Figure 3 presents model predictions.
-
-## Mcomp
-
-$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + {\beta_2}_s*N^{{\beta_4}_s},\sigma)\,$$
-
-## M1 
-
-$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA + {\beta_2}_s*N,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit1)[,'lp__'])`**
-
-```{r results1}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_1", "sigma_1", 
-          "beta_2", "sigma_2", 
-          "lp__")
-g1 <- fitgraph(fit1, pars = pars)
-g1$r ; g1$c ; pairs(fit1, pars = c('beta_0', 'beta_1', 'beta_2'))
-```
-
-## M2
-
-$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit2)[,'lp__'])`**
-
-```{r results2}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_3", "sigma_3", 
-          "beta_4", "sigma_4", 
-          "lp__")
-g2 <- fitgraph(fit2, pars = pars)
-g2$r ; g2$c ; pairs(fit2, pars = c('beta_0', 'beta_3', 'beta_4'))
-```
-
-## M3
-
-$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + {\beta_2}_s*N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit3)[,'lp__'])`**
-
-```{r results3}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_1", "sigma_1", 
-          "beta_2", "sigma_2", 
-          "beta_3", "sigma_3", 
-          "beta_4", "sigma_4", 
-          "lp__")
-g3 <- fitgraph(fit3, pars = pars)
-g3$r ; g3$c ; pairs(fit3, pars = c('beta_0', 'beta_1', 'beta_2', 'beta_3', 'beta_4'))
-```
-
-## M4
-
-$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA + N,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit4)[,'lp__'])`**
-
-```{r results4}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_1", "sigma_1", 
-          "lp__")
-g4 <- fitgraph(fit4, pars = pars)
-g4$r ; g4$c ; pairs(fit4, pars = c('beta_0', 'beta_1'))
-```
-
-## M5
-
-$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit5)[,'lp__'])`**
-
-```{r results5}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_3", "sigma_3", 
-          "beta_4", "sigma_4", 
-          "lp__")
-g5 <- fitgraph(fit5, pars = pars)
-g5$r ; g5$c ; pairs(fit5, pars = c('beta_0', 'beta_3', 'beta_4'))
-```
-
-## M6
-
-$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} + N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit6)[,'lp__'])`**
-
-```{r results6}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_1", "sigma_1", 
-          "beta_3", "sigma_3", 
-          "beta_4", "sigma_4", 
-          "lp__")
-g6 <- fitgraph(fit6, pars = pars)
-g6$r ; g6$c ; pairs(fit6, pars = c('beta_0', 'beta_1', 'beta_3', 'beta_4'))
-```
-
-## M7
-
-$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit7)[,'lp__'])`**
-
-```{r results7}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_1", "sigma_1", 
-          "lp__")
-g7 <- fitgraph(fit7, pars = pars)
-g7$r ; g7$c ; pairs(fit7, pars = c('beta_0', 'beta_1'))
-```
-
-## M8
-
-$$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit8)[,'lp__'])`**
-
-```{r results8}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_3", "sigma_3",
-          "lp__")
-g8 <- fitgraph(fit8, pars = pars)
-g8$r ; g8$c ; pairs(fit8, pars = c('beta_0', 'beta_3'))
-```
-
-## M9
-
-$$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit9)[,'lp__'])`**
-
-```{r results9}
-pars <- c("sigma", 
-          "beta_0",
-          "beta_1", "sigma_1", 
-          "beta_3", "sigma_3",
-          "lp__")
-g9 <- fitgraph(fit9, pars = pars)
-g9$r ; g9$c ; pairs(fit9, pars = c('beta_0', 'beta_1', 'beta_3'))
-```
-
-Figure 2: Model posterior distributions and associated markov chains.
-
-# Graph
-
-If we keep model 9: $LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s},\sigma)\,$
-
-```{r graph}
-pars <- as.matrix(fit9)[which.max(as.matrix(fit9)[,'lp__']),]
-LMA_max <- max(data$LMA)
-Nmass_max <- max(data$Nmass)
-beta_0 <- pars['beta_0']
-beta_1 <- pars['beta_1']
-beta_3 <- pars['beta_3']
-LLpred <- function(LMA, LMA_max, beta_0, beta_1, beta_3){
-  fact <- beta_0 + beta_1*(LMA/LMA_max)^beta_3
-  unname(exp(fact))
-}
-LLpred_sigma <- function(LMA, LMA_max, beta_0, beta_1, beta_3, sigma, n = 100){
-  mu <- beta_0 + beta_1*(LMA/LMA_max)^beta_3
-  mean(rlnorm(n, mu, sigma))
-}
-pars <- as.matrix(fit9)[-c(1:2000),]
-pred <- apply(pars, 1, function(x) 
-  sapply(data$LMA, function(y)
-    # LLpred(y, LMA_max, x['beta_0'], x['beta_1'], x['beta_3'])
-    LLpred_sigma(y, LMA_max, x['beta_0'], x['beta_1'], x['beta_3'], x['sigma'])
-  ))
-pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
-names(pred) <- c('5%', '95%')
-pred$LMA <- data$LMA
-g <- ggplot(data, aes(x = LMA, y = LL)) + 
-  geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
-  geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
-  geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
-  stat_function(fun = function(x) LLpred(x, LMA_max, beta_0, beta_1, beta_3),
-                aes(colour = "mean")) +
-  geom_point() +
-  theme_bw() +
-  xlab('Leaf mass per area (LMA in g/m2)') +
-  ylab('Leaf lifespan (LL in months)') +
-  scale_color_manual(name = 'Model',
-                     values = c('5%' = 'black',
-                                '95%' = 'black',
-                                'mean' = 'red'))
-g
-```
-
-Figure 3: Model predictions.
-$$LL = `r round(exp(beta_0),3)`*e^{`r round(beta_1/(LMA_max^beta_3),3)` *LMA^{`r round(beta_3,3)`}}$$
+Figvure 2: Variable correlations. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
 
 # References
