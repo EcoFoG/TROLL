@@ -163,6 +163,7 @@ LLpred <- function(fit, data){
   wsgmax <- max(data$wsg)
   pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),]
   beta <- pars[c('beta_0', 'beta_1', 'beta_2', 'beta_3')]
+  beta[is.na(beta)] <- 0
   mu <- beta[1] + beta[2]*(LMA/LMAmax) - beta[3]*(N/Nmax) + beta[4]*(wsg/wsgmax)
   return(exp(mu))
 }
@@ -187,18 +188,26 @@ mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
 # data <- data[-which(is.na(data$LMA)),]
 # LMAmax <- max(data$LMA) ; Nmax <- max(data$Nmass) ; wsgmax <- max(data$wsg)
 # mdata <- sapply(c('full', levels(droplevels(data$Dataset))),
-#                 function(x) datasub(data, x), simplify = F)
-# model <- 'M10.stan'
-# fit <- lapply(mdata, function(x) stan(file = file.path(mpath, model), data = x))
-# eval <- evaluate(fit, data)
-# fit <- list(full = fit$full, eval = eval)
-# path <- file.path(mpath, paste0(model, '.Rdata'))
-# save(fit, file = path)
-load(file.path(mpath, 'M10.stan.Rdata'))
-g <- fitgraph(fit$full)
+# function(x) datasub(data, x), simplify = F)
+# fits <- lapply(as.list(paste0('M', c(1,10))), function(model){
+#   fit <- lapply(mdata, function(x) stan(file = file.path(mpath, paste0(model, '.stan')), data = x))
+#   eval <- evaluate(fit, data)
+#   fit <- list(full = fit$full, eval = eval)
+#   path <- file.path(mpath, paste0(model, '.LL.Rdata'))
+#   save(fit, file = path)
+# })
+fits <- list()
+i <- 1
+models <- list.files(path = mpath, pattern = '.LL.Rdata')
+for(file in models){
+  load(file = file.path(mpath, file))
+  fits[[i]] <- fit ; rm(fit) ; i <- i + 1
+} 
+names(fits) <- paste0('fit', c(10,1))
+g <- fitgraph(fits$fit10$full) ; rm(file, i, models, mpath)
 ```
 
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fits$fit10$full)[,'lp__'])`** for **M10** against **`r max(as.matrix(fits$fit1$full)[,'lp__'])`** for **M1** and RMSEP of **`r round(fits$fit10$eval,3)`** for **M10** against **`r round(fits$fit1$eval,3)`** for **M1**.
 
 ```{r r10}
 g$r
