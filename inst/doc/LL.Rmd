@@ -27,6 +27,7 @@ library(rstanarm)
 library(readr)
 library(dplyr)
 library(randomForest)
+library(GGally)
 cores <- detectCores()
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
@@ -43,7 +44,6 @@ LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
 LES <- LES[which(LES$BIOME == 'TROP_RF'),]
 LES <- LES[which(LES$GF == 'T'),]
 LES <- LES[-which(is.na(LES$log.LL)),]
-LES <- LES[-which(is.na(LES$log.LMA)),]
 data <- cbind(LES[c('Dataset', 'Species')],
               10^LES[paste0('log.',c('LL', 'LMA', 'Nmass', 'Narea',
                                      'Amass', 'Aarea', 'Gs', 'Rdmass', 'Rdarea'))])
@@ -94,33 +94,125 @@ species <- data.frame(
   species = LESsp,
   TRYcode = TRY$AccSpeciesID[match(LESsp, TRY$AccSpeciesName)])
 species <- species[-which(is.na(species$TRYcode)),]
-rm(species, traits, LESsp)
+rm(species, traits, LESsp, LES, TRY)
 ```
  
 ```{r data}
 TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TRY.txt", 
     "\t", escape_double = FALSE, trim_ws = TRUE)
-data2 <- dcast(TRY, SpeciesName ~ TraitName, 
-               value.var = 'StdValue', fun.aggregate = mean, na.rm = T)
-names(data2) <- c('Species', 'LMAt', 'C', 'CN', 'Thick', 'wsg')
-data2$LMAt <- 1/data2$LMAt*1000
-data <- left_join(data, data2[-7], by = 'Species')
-rm(data2, LES, TRY)
+TRY <- dcast(TRY, SpeciesName ~ TraitName, 
+               value.var = 'StdValue', fun.aggregate = mean, na.rm = T)[-7]
+names(TRY) <- c('Species', 'LMA', 'C', 'CN', 'Thick', 'wsg')
+TRY$LMA <- 1/TRY$LMA*1000
+data <- left_join(data, TRY, by = 'Species') ; rm(TRY)
+data$LMA <- apply(data[c('LMA.x', 'LMA.y')], 1, mean, na.rm = T)
+data <- data[-c(4,6)]
 ```
 
 Table 2: Variable importance calculated with out-of the bag method applied on a random forest. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
 
 ```{r OOB}
-rf <- randomForest(LL ~ LMA + Nmass + LMAt + wsg, 
+kable(randomForest(LL ~ LMA + Nmass + LMA + wsg, 
                    data = data, na.action = na.omit,
                    ntree = 1000, replace = F , importance = T,
-                   do.trace = F, keep.forest = T, keep.inbag = T)
-kable(rf$importance)
+                   do.trace = F, keep.forest = T, keep.inbag = T)$importance)
 corrplot::corrplot.mixed(
-  cor(data[c('LMA', 'Nmass', 'LMAt', 'wsg')], 
+  cor(data[c('LMA', 'Nmass', 'wsg')], 
       use = "pairwise.complete.obs"))
 ```
 
 Figvure 2: Variable correlations. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
+
+If we try a new model **M10** with a $\beta_3$ to represent wood specific gravity *wsg*, we obtain following model:
+
+$$ {LL_s}_j \sim \mathcal{logN}(\beta_0*e^{{\beta_1}_s*{LMA_s}_j - {\beta_2}_s*{Nmass_s}_j + {\beta_3}_s*{wsg_s}_j},\,\sigma)\,$$
+
+```{r functions}
+fitgraph <- function(fit){
+  pars <- fit@model_pars
+  beta <- pars[grep('beta', pars)]
+  beta <- beta[-grep('s', beta)]
+  sigma <- pars[grep('sigma', pars)]
+  posterior <- as.matrix(fit)
+  r <- mcmc_areas(posterior,  pars = c(beta, sigma, 'lp__'), prob = 0.8)
+  c <- mcmc_trace(posterior,  pars = c(beta, sigma), n_warmup = 2000,
+                   facet_args = list(nrow = 2, labeller = label_parsed))
+  p <- ggpairs(data.frame(posterior[,beta]))
+  return(list(r = r, c = c, p = p))
+}
+datasub <- function(data, dataset){
+  LMAmax <- max(data$LMA)
+  Nmax <- max(data$Nmass)
+  wsgmax <- max(data$wsg)
+  if(dataset != 'full')
+    data <- data[-which(data$Dataset %in% dataset),]
+  return(list(S = length(levels(droplevels(data$Dataset))), 
+              N = length(as.numeric(droplevels(data$Dataset))),
+              J = as.numeric(droplevels(data$Dataset)),
+              LL = data$LL,
+              LMA = (data$LMA/LMAmax),
+              Nmass = (data$Nmass/Nmax),
+              wsg = (data$wsg/wsgmax)))
+}
+LLpred <- function(fit, data){
+  LMA <- data$LMA
+  N <- data$Nmass
+  wsg <- data$wsg
+  LMAmax <- max(data$LMA)
+  Nmax <- max(data$Nmass)
+  wsgmax <- max(data$wsg)
+  pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),]
+  beta <- pars[c('beta_0', 'beta_1', 'beta_2', 'beta_3')]
+  mu <- beta[1] + beta[2]*(LMA/LMAmax) - beta[3]*(N/Nmax) + beta[4]*(wsg/wsgmax)
+  return(exp(mu))
+}
+evaluate <- function(fit, data){
+  mean(sapply(levels(droplevels(data$Dataset)), function(dataset){
+    fit1 <- fit[[dataset]]
+    data1 <- data[which(data$Dataset == dataset),]
+    fi <- LLpred(fit1, data1)
+    yi <- data1$LL
+    ei <- yi - fi
+    rmse <- sqrt(mean(ei^2))
+  }))
+}
+```
+
+```{r model}
+mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
+# rstan_options(auto_write = TRUE)
+# options(mc.cores = detectCores())
+# data <- data[c('Dataset', 'LL', 'LMA', 'Nmass', 'wsg')]
+# data <- data[-which(is.na(data$wsg)),]
+# data <- data[-which(is.na(data$LMA)),]
+# LMAmax <- max(data$LMA) ; Nmax <- max(data$Nmass) ; wsgmax <- max(data$wsg)
+# mdata <- sapply(c('full', levels(droplevels(data$Dataset))),
+#                 function(x) datasub(data, x), simplify = F)
+# model <- 'M10.stan'
+# fit <- lapply(mdata, function(x) stan(file = file.path(mpath, model), data = x))
+# eval <- evaluate(fit, data)
+# fit <- list(full = fit$full, eval = eval)
+# path <- file.path(mpath, paste0(model, '.Rdata'))
+# save(fit, file = path)
+load(file.path(mpath, 'M10.stan.Rdata'))
+g <- fitgraph(fit$full)
+```
+
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
+
+```{r r10}
+g$r
+```
+Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+
+```{r c10}
+g$c
+```
+Parameters markov chains. *Light grey area represents warmup iterations.*
+
+```{r p10}
+g$p
+```
+Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
 
 # References
