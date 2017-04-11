@@ -49,12 +49,14 @@ We tested models M1 to M9 detailed in following tabs to find the better trade-of
 1. Complexity (and number of parameters)
 2. Convergence
 3. Likelihood
-4. Prediction quality with Root Mean Square Error (RMSE)
+4. Prediction quality with Root Mean Square Error of Prediction (RMSEP)
 
-RMSE was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSE in results are mean RMSE for each dataset. Results are shown for each models in eahc model tabs and summarized in Results tab.
+RMSEP was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSEP in results are mean RMSEP for each dataset. Results are shown for each models in eahc model tabs and summarized in Results tab.
 
 LL graph {data-width=200}
 -------------------------------------
+
+### Figure 1: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004.*
 
 ```{r LL alo}
 rm(list = ls())
@@ -75,8 +77,6 @@ g <- ggplot(droplevels(data), aes(x = LMA, y = LL, size = Nmass, color = Dataset
   scale_size_continuous(name = 'Leaf nitrogen content\n(Nmass, in mg/g)')
 g ; rm(LES, g)
 ```
-
-Figure 1: Leaf mass per area (LMA), leaf nitrogen content (Nmass) and leaflifespan (LL). *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004.*
 
 ```{r functions}
 fitgraph <- function(fit){
@@ -165,17 +165,24 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA - {\beta_2}_s*N,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
-```{r res1}
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r r1}
 g$r
 ```
 
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn1}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c1}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p1}
+g$p
 ```
 
 M2
@@ -190,8 +197,9 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} - N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r res2}
 g$r
 ```
@@ -199,10 +207,15 @@ g$r
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn2}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c2}
+g$c
 ```
 
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p2}
+g$p
+```
 
 M3
 ==================
@@ -216,8 +229,9 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} - {\beta_2}_s*N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r res3}
 g$r
 ```
@@ -225,8 +239,14 @@ g$r
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn3}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c3}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p3}
+g$p
 ```
 
 
@@ -242,8 +262,9 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA - N,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r res4}
 g$r
 ```
@@ -251,8 +272,14 @@ g$r
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn4}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c4}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p4}
+g$p
 ```
 
 
@@ -268,8 +295,9 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s} - N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r res5}
 g$r
 ```
@@ -277,10 +305,15 @@ g$r
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn5}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c5}
+g$c
 ```
 
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p5}
+g$p
+```
 
 M6
 ==================
@@ -294,8 +327,9 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s} - N^{{\beta_4}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r res6}
 g$r
 ```
@@ -303,8 +337,14 @@ g$r
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn6}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c6}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p6}
+g$p
 ```
 
 
@@ -320,8 +360,9 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA,\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r res7}
 g$r
 ```
@@ -329,10 +370,15 @@ g$r
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn7}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c7}
+g$c
 ```
 
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p7}
+g$p
+```
 
 M8
 ==================
@@ -346,8 +392,9 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + LMA^{{\beta_3}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r res8}
 g$r
 ```
@@ -355,10 +402,15 @@ g$r
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn8}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c8}
+g$c
 ```
 
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p8}
+g$p
+```
 
 M9
 ==================
@@ -372,8 +424,9 @@ Model {data-width=300}
 -------------------------------------
 
 $$ LL \sim \mathcal{logN}(\beta_0 + {\beta_1}_s*LMA^{{\beta_3}_s},\sigma)\,$$
-Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSE of **`r round(fit$eval,3)`**
+Maximum likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**
 
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r res9}
 g$r
 ```
@@ -381,25 +434,30 @@ g$r
 Convergence {data-width=300} 
 -------------------------------------
 
-```{r diagn9}
-g$c ; g$p
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r c9}
+g$c
 ```
 
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r p9}
+g$p
+```
 
 Results
 ==================
 
-Table {data-width=200}
+Column {data-width=200}
 -------------------------------------
 
 Model **M1** seemed to have shown the best trade-off between complexity ($K=6$ parameters), convergence (see tab M1), likelihood, and prediction quality (see table 1). Figure 2 presents model prediction confidence interval and figure 3 compare Reich's allometry and model M1 predictions with species functional traits used in TROLL. **Nevertheless we will test other predictors gathered from TRY database following a model with the same response curve.**
 
-Table 1: Models likelihood and prediction quality.*RMSE was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSE in results are mean RMSE for each dataset.*
+Table 1: Models likelihood and prediction quality.*Root mean square errof of prediction (RMSEP) was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSEP in results are mean RMSEP for each dataset.*
 
 ```{r table}
 res <- data.frame(row.names = paste0('M', 1:9),
                   ML = unlist(lapply(fits, function(fit) round(max(as.matrix(fit$full)[,'lp__']),3))),
-                  RMSE = unlist(lapply(fits, function(x) x$eval)))
+                  RMSEP = unlist(lapply(fits, function(x) x$eval)))
 kable(res)
 fit <- fits$fit1$full ; rm(fits)
 LMAmax <- max(data$LMA) ; Nmax <- max(data$Nmass)
@@ -408,10 +466,12 @@ beta <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta_0', 'beta_1', 
 
 $$LL = `r round(exp(beta[1]),3)`*e^{`r round(beta[2]/LMAmax,3)` *LMA -`r round(beta[3]/Nmax,3)`*Nmass }$$
 
-Graphs {data-width=400}
+Column {data-width=400}
 -------------------------------------
 
-```{r graph, fig.height=4}
+### Figure 2: Leaflifespan predictions for model **M1** with leaf mass per area (LMA), and leaf nitrogen content (Nmass). *Leaf lifespan (LL in $months$) is predicted with model M1 fit. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %) are taken in GLOPNET dataset from @wright_worldwide_2004.*
+
+```{r graph, fig.width=20}
 LLpred <- function(LMA, Nmass, LMAmax, Nmax, beta0, beta1, beta2, sigma){
   mu <- beta0 + beta1*(LMA/LMAmax) - beta2*(Nmass/Nmax)
   rlnorm(1, mu, sigma)
@@ -454,7 +514,9 @@ h <- ggplot(data, aes(x = Nmass, y = LL)) +
 plot_grid(g, h, labels = c('LMA', 'Nmass'))
 ```
 
-```{r TROLL, fig.height=4}
+### Figure 3: Leaflifespan predictions for model **M1** and Reich's allometry with leaf mass per area (LMA), and leaf nitrogen content (Nmass). *Leaf lifespan (LL in $months$) is predicted with model M1 fit or Reich's allometry [@Reich1991a]. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %) are taken in BRIDGE dataset used by TROLL [@Li].*
+
+```{r TROLL, fig.width=20}
 species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=T, dec=".", sep="", row.names = 1)[c('LMA', 'Nmass')]
 species$Reich <- 1.5 + 10^(7.18+3.03*log10(species$LMA*0.0001))
 species$Model <- with(species, exp((beta[1] + beta[2]*(LMA/LMAmax) - beta[3]*(Nmass*100/Nmax))))
