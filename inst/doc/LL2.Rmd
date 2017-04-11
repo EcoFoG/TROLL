@@ -117,11 +117,8 @@ evaluate <- function(fit, data){
     data1 <- data[which(data$Dataset == dataset),]
     fi <- LLpred(fit1, data1)
     yi <- data1$LL
-    yb <- mean(yi)
-    SSreg = sum((fi - yb)^2)
-    SSres = sum((yi - fi)^2)
-    SStot = sum((yi - yb)^2)
-    R2 <- 1 - SSres/SStot
+    ei <- yi - fi
+    rmse <- sqrt(mean(ei^2))
   }))
 }
 ```
