@@ -3,7 +3,7 @@ title: "Leaf lifespan"
 output: 
   flexdashboard::flex_dashboard:
     orientation: columns
-    vertical_layout: fill
+    vertical_layout: scroll
 csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
 bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
@@ -39,8 +39,8 @@ Issue {data-width=200}
     
 TROLL model currently compute leaf lifespan with Reich's allometry [@Reich1991a]. But we have shown that Reich's allometry is underestimating leaf lifespan for low LMA species. Moreover simulations estimated unrealistically low aboveground biomass for low LMA species. We assumed Reich's allometry underestimation of leaf lifespan for low LMA species being the source of unrealistically low aboveground biomass inside TROLL simulations. We decided to find a better allometry with @wright_worldwide_2004 GLOPNET dataset.
 
-We tested different models starting from complet model **Mcomp**:
-$$ {LL_s}_j \sim \mathcal{logN}({\beta_0}*e^{{\beta_1}_s*{LMA_s}_j^{{\beta_3}_s} - {\beta_2}_s*{Nmass_s}_j^{{\beta_4}_s}},\,\sigma)\,$$
+We tested different models starting from complet model **Mcomp** (*with logged mean*):
+$$ {LL_s}_j \sim \mathcal{logN}({\beta_0} + {\beta_1}_s*{LMA_s}_j^{{\beta_3}_s} - {\beta_2}_s*{Nmass_s}_j^{{\beta_4}_s},\,\sigma)\,$$
 
 $$s=1,...,S_{=4}~, ~~j=1,...,n_s$$
 $${\beta_i}_s \sim \mathcal{N}({\beta_i},\,\sigma_i)\,^I, ~~(\beta_i, \sigma, \sigma_i) \sim \mathcal{\Gamma}(0.001,\,0.001)\,^{2I+1}$$
@@ -52,6 +52,22 @@ We tested models M1 to M9 detailed in following tabs to find the better trade-of
 4. Prediction quality with Root Mean Square Error of Prediction (RMSEP)
 
 RMSEP was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSEP in results are mean RMSEP for each dataset. Results are shown for each models in eahc model tabs and summarized in Results tab.
+
+Table 2: Models summary.
+```{r mtab}
+mtab <- data.frame(M = paste0('M', 1:9),
+                  Model = c(
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + {\\beta_1}_s*LMA - {\\beta_2}_s*N,\\sigma)\\,$",
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + LMA^{{\\beta_3}_s} - N^{{\\beta_4}_s},\\sigma)\\,$",
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + {\\beta_1}_s*LMA^{{\\beta_3}_s} - {\\beta_2}_s*N^{{\\beta_4}_s},\\sigma)\\,$",
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + {\\beta_1}_s*LMA - N,\\sigma)\\,$",
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + LMA^{{\\beta_3}_s} - N^{{\\beta_4}_s},\\sigma)\\,$",
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + {\\beta_1}_s*LMA^{{\\beta_3}_s} - N^{{\\beta_4}_s},\\sigma)\\,$",
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + {\\beta_1}_s*LMA,\\sigma)\\,$",
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + LMA^{{\\beta_3}_s},\\sigma)\\,$",
+                    "$LL \\sim \\mathcal{logN}(\\beta_0 + {\\beta_1}_s*LMA^{{\\beta_3}_s},\\sigma)\\,$"))
+kable(mtab)
+```
 
 LL graph {data-width=200}
 -------------------------------------
@@ -147,7 +163,6 @@ mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
 fits <- list()
 i <- 1
 models <- list.files(path = mpath, pattern = '.stan.Rdata')
-models <- models[-grep('M10', models)]
 for(file in models){
   load(file = file.path(mpath, file))
   fits[[i]] <- fit ; rm(fit) ; i <- i + 1
@@ -452,9 +467,9 @@ Results
 Column {data-width=200}
 -------------------------------------
 
-Model **M1** seemed to have shown the best trade-off between complexity ($K=6$ parameters), convergence (see tab M1), likelihood, and prediction quality (see table 1). Figure 2 presents model prediction confidence interval and figure 3 compare Reich's allometry and model M1 predictions with species functional traits used in TROLL. **Nevertheless we will test other predictors gathered from TRY database following a model with the same response curve.**
+Model **M1** seemed to have shown the best trade-off between complexity ($K=6$ parameters), convergence (see tab M1), likelihood, and prediction quality (see table 2). Figure 2 presents model prediction confidence interval and figure 3 compare Reich's allometry and model M1 predictions with species functional traits used in TROLL. **Nevertheless we will test other predictors gathered from TRY database following a model with the same response curve.**
 
-Table 1: Models likelihood and prediction quality.*Root mean square errof of prediction (RMSEP) was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSEP in results are mean RMSEP for each dataset.*
+Table 2: Models likelihood and prediction quality.*Root mean square errof of prediction (RMSEP) was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSEP in results are mean RMSEP for each dataset.*
 
 ```{r table}
 res <- data.frame(row.names = paste0('M', 1:9),
@@ -471,7 +486,7 @@ $$LL = `r round(exp(beta[1]),3)`*e^{`r round(beta[2]/LMAmax,3)` *LMA -`r round(b
 Column {data-width=400}
 -------------------------------------
 
-### Figure 2: Leaflifespan predictions for model **M1** with leaf mass per area (LMA), and leaf nitrogen content (Nmass). *Leaf lifespan (LL in $months$) is predicted with model M1 fit. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %) are taken in GLOPNET dataset from @wright_worldwide_2004.*
+### Figure 2: Leaflifespan predictions for model **M1** with leaf mass per area (LMA), and leaf nitrogen content (Nmass). *Leaf lifespan (LL in $months$) is predicted with model M1 fit. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %) are taken in GLOPNET dataset from @wright_worldwide_2004.* **Warning** *Nmass (resp. LMA) is not constant and depend on the closest point value for left (resp. right) graph.*
 
 ```{r graph, fig.width=20}
 LLpred <- function(LMA, Nmass, LMAmax, Nmax, beta0, beta1, beta2, sigma){
@@ -514,6 +529,9 @@ h <- ggplot(data, aes(x = Nmass, y = LL)) +
                                 '95%' = 'black',
                                 'mean' = 'red'))
 plot_grid(g, h, labels = c('LMA', 'Nmass'))
+# p <- subplot(ggplotly(g), ggplotly(h), shareY = T, shareX = F, titleX = T)
+# chart_link <- plotly_POST(p, filename = "LL1")
+# chart_link
 ```
 
 ### Figure 3: Leaflifespan predictions for model **M1** and Reich's allometry with leaf mass per area (LMA), and leaf nitrogen content (Nmass). *Leaf lifespan (LL in $months$) is predicted with model M1 fit or Reich's allometry [@Reich1991a]. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %) are taken in BRIDGE dataset used by TROLL [@Li].*
@@ -529,6 +547,9 @@ h <- ggplot(melt(species, id = c('LMA', 'Nmass')), aes(x = Nmass, y = value, col
   geom_point() + theme_bw() +   xlab('Leaf nitrogen content (Nmass in %)') +
   ylab('Leaf lifespan (LL in months)')
 plot_grid(g, h, labels = c('LMA', 'Nmass'))
+# p <- subplot(ggplotly(g), ggplotly(h), shareY = T, shareX = F, titleX = T)
+# chart_link <- plotly_POST(p, filename = "LL2")
+# chart_link
 ```
 
 References

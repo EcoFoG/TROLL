@@ -212,16 +212,19 @@ Maximum likekihood of **`r max(as.matrix(fits$fit10$full)[,'lp__'])`** for **M10
 ```{r r10}
 g$r
 ```
+
 Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 
 ```{r c10}
 g$c
 ```
+
 Parameters markov chains. *Light grey area represents warmup iterations.*
 
 ```{r p10}
 g$p
 ```
+
 Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
 
 # References
