@@ -9,7 +9,7 @@ data {
 }
 parameters {
   real<lower=0,upper=5> sigma ;
-  real<lower=2,upper=50> beta_0 ;
+  real<lower=0,upper=50> beta_0 ;
   real<lower=0> beta_1 ;
   real<lower=0> beta_1s[S] ;
   real<lower=0,upper=50> sigma_1 ;

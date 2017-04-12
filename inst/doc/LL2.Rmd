@@ -51,7 +51,7 @@ We tested models M1 to M9 detailed in following tabs to find the better trade-of
 3. Likelihood
 4. Prediction quality with Root Mean Square Error of Prediction (RMSEP)
 
-RMSEP was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSEP in results are mean RMSEP for each dataset. Results are shown for each models in eahc model tabs and summarized in Results tab.
+RMSEP was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSEP in results are mean RMSEP for each dataset. Results are shown for each models in eahc model tabs and summarized in [Results](#Results) tab.
 
 Table 2: Models summary.
 ```{r mtab}
@@ -152,17 +152,16 @@ mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
 # options(mc.cores = detectCores())
 # mdata <- sapply(c('full', levels(droplevels(data$Dataset))),
 # function(x) datasub(data, x), simplify = F)
-# fits <- lapply(as.list(paste0('M', 1:9, '.stan')), function(model){
-#   fit <- lapply(mdata, function(x) stan(file = file.path(mpath, model), data = x))
+# fits <- lapply(as.list(paste0('M', 1:9)), function(model){
+#   fit <- lapply(mdata, function(x) stan(file = file.path(mpath, paste0(model, '.stan')), data = x))
 #   eval <- evaluate(fit, data)
 #   fit <- list(full = fit$full, eval = eval)
-#   path <- file.path(mpath, paste0(model, '.Rdata'))
+#   path <- file.path(mpath, paste0(model, '.LL2.Rdata'))
 #   save(fit, file = path)
-#   return(path)
 # })
 fits <- list()
 i <- 1
-models <- list.files(path = mpath, pattern = '.stan.Rdata')
+models <- list.files(path = mpath, pattern = '.LL2.Rdata')
 for(file in models){
   load(file = file.path(mpath, file))
   fits[[i]] <- fit ; rm(fit) ; i <- i + 1
@@ -173,7 +172,7 @@ names(fits) <- paste0('fit', 1:9)
 M1
 ==================
 
-```{r m1, include=FALSE}
+```{r m1}
 fit <- fits$fit1
 g <- fitgraph(fit$full)
 ```
@@ -205,7 +204,7 @@ g$p
 M2
 ==================
 
-```{r m2, include=FALSE}
+```{r m2}
 fit <- fits$fit2
 g <- fitgraph(fit$full)
 ```
@@ -237,7 +236,7 @@ g$p
 M3
 ==================
 
-```{r m3, include=FALSE}
+```{r m3}
 fit <- fits$fit3
 g <- fitgraph(fit$full)
 ```
@@ -270,7 +269,7 @@ g$p
 M4
 ==================
 
-```{r m4, include=FALSE}
+```{r m4}
 fit <- fits$fit4
 g <- fitgraph(fit$full)
 ```
@@ -303,7 +302,7 @@ g$p
 M5
 ==================
 
-```{r m5, include=FALSE}
+```{r m5}
 fit <- fits$fit5
 g <- fitgraph(fit$full)
 ```
@@ -335,7 +334,7 @@ g$p
 M6
 ==================
 
-```{r m6, include=FALSE}
+```{r m6}
 fit <- fits$fit6
 g <- fitgraph(fit$full)
 ```
@@ -368,7 +367,7 @@ g$p
 M7
 ==================
 
-```{r m7, include=FALSE}
+```{r m7}
 fit <- fits$fit7
 g <- fitgraph(fit$full)
 ```
@@ -400,7 +399,7 @@ g$p
 M8
 ==================
 
-```{r m8, include=FALSE}
+```{r m8}
 fit <- fits$fit8
 g <- fitgraph(fit$full)
 ```
@@ -432,7 +431,7 @@ g$p
 M9
 ==================
 
-```{r m9, include=FALSE}
+```{r m9}
 fit <- fits$fit9
 g <- fitgraph(fit$full)
 ```
@@ -467,7 +466,7 @@ Results
 Column {data-width=200}
 -------------------------------------
 
-Model **M1** seemed to have shown the best trade-off between complexity ($K=6$ parameters), convergence (see tab M1), likelihood, and prediction quality (see table 2). Figure 2 presents model prediction confidence interval and figure 3 compare Reich's allometry and model M1 predictions with species functional traits used in TROLL. **Nevertheless we will test other predictors gathered from TRY database following a model with the same response curve.**
+Model **M1** seemed to have shown the best trade-off between complexity ($K=6$ parameters), convergence (see tab [M1](#M1) ), likelihood, and prediction quality (see table 2). Figure 2 presents model prediction confidence interval and figure 3 compare Reich's allometry and model M1 predictions with species functional traits used in TROLL. **Nevertheless we will test other predictors gathered from TRY database following a model with the same response curve (see [leaf lifespan](LL.html) ).**
 
 Table 2: Models likelihood and prediction quality.*Root mean square errof of prediction (RMSEP) was computed by fitting a model without a dataset and evaluating it with the same dataset. RMSEP in results are mean RMSEP for each dataset.*
 
@@ -538,7 +537,9 @@ plot_grid(g, h, labels = c('LMA', 'Nmass'))
 
 ```{r TROLL, fig.width=20}
 species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=T, dec=".", sep="", row.names = 1)[c('LMA', 'Nmass')]
-species$Reich <- 1.5 + 10^(7.18+3.03*log10(species$LMA*0.0001))
+species$`Reich 91` <- 1.5 + 10^(7.18+3.03*log10(species$LMA*0.0001))
+species$`Reich 97` <- 10^(2.040816*(2.579713-log10(10000.0/species$LMA)))
+species$`Wright 04` <- 0.5+10^(-2.509+1.71*log10(species$LMA))
 species$Model <- with(species, exp((beta[1] + beta[2]*(LMA/LMAmax) - beta[3]*(Nmass*100/Nmax))))
 g <- ggplot(melt(species, id = c('LMA', 'Nmass')), aes(x = LMA, y = value, color = variable)) +
   geom_point() + theme_bw() +   xlab('Leaf mass per area (LMA in g/m2)') +

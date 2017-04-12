@@ -98,11 +98,11 @@ rm(species, traits, LESsp, LES, TRY)
 ```
  
 ```{r data}
-TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TRY.txt", 
+TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TRY2.txt", 
     "\t", escape_double = FALSE, trim_ws = TRUE)
-TRY <- dcast(TRY, SpeciesName ~ TraitName, 
-               value.var = 'StdValue', fun.aggregate = mean, na.rm = T)[-7]
-names(TRY) <- c('Species', 'LMA', 'C', 'CN', 'Thick', 'wsg')
+TRY <- dcast(TRY, Dataset + SpeciesName ~ TraitName, 
+               value.var = 'StdValue', fun.aggregate = mean, na.rm = T)[-11]
+names(TRY) <- c('Dataset', 'Species', 'LMA', 'C', 'CN', 'LL', 'N', 'P', 'Thick', 'wsg')
 TRY$LMA <- 1/TRY$LMA*1000
 data <- left_join(data, TRY, by = 'Species') ; rm(TRY)
 data$LMA <- apply(data[c('LMA.x', 'LMA.y')], 1, mean, na.rm = T)
@@ -135,7 +135,7 @@ fitgraph <- function(fit){
   sigma <- pars[grep('sigma', pars)]
   posterior <- as.matrix(fit)
   r <- mcmc_areas(posterior,  pars = c(beta, sigma, 'lp__'), prob = 0.8)
-  c <- mcmc_trace(posterior,  pars = c(beta, sigma), n_warmup = 2000,
+  c <- mcmc_trace(posterior,  pars = c(beta, sigma, 'lp__'), n_warmup = 2000,
                    facet_args = list(nrow = 2, labeller = label_parsed))
   p <- ggpairs(data.frame(posterior[,beta]))
   return(list(r = r, c = c, p = p))
