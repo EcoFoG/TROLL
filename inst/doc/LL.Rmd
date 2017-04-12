@@ -11,7 +11,7 @@ bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
 
 ```{r config, message=FALSE, warning=FALSE, include=FALSE}
-rm(list = ls()) ; invisible(gc())
+rm(list = ls()) ; invisible(gc()) ; set.seed(42)
 library(knitr)
 library(parallel)
 library(TROLL)
@@ -71,15 +71,22 @@ Leaf lifespan ($LL$) is following a lognormal law with location $log({\mu_s}_j)$
 
 # TRY improvement
 
-We gathered data from TRY database to evaluate and improve previous model. We requested functional traits available in Bridge dataset for species with leaf lifespan present in GLOPNET dataset (see table 1).
+## Data gathering
+
+We gathered data from TRY database to evaluate and improve previous model. We requested functional traits available in Bridge dataset and leaf lifespan for tropical species present in GLOPNET dataset and used in TROLL (see table 1).
 
 Table 1: Functional traits gathered with TRY.
 
 ```{r traits}
 kable(traits <- data.frame(
-  name = c('Thick', 'Tough', 'Nm', 'wsg', 'LMA', 'CN', 'P', 'C'),
-  trait = c('Leaf thickness', 'Leaf toughness', 'Leaf nitrogen mass', 'Wood specific gravity', 'Leaf mass per area', 'Leaf carbon per nitrogen', 'Leaf phosphorous', 'Leaf carbon'),
-  TRYcode = c(46, NA, 57, 4, 11, 146, 58, 570)))
+  name = c('LL', 'SLA', 'N', 'P', 'wsg'),
+  trait = c('Leaf lifespan (longevity)',
+            'Leaf area per leaf dry mass (specific leaf area, SLA)',
+            'Leaf nitrogen (N) content per leaf dry mass',
+            'Leaf phosphorus (P) content per leaf dry mass',
+            'Stem dry mass per stem fresh volume (stem specific density)'),
+  unit = c('month',' $m^2.kg^{-1}$', '$mg.g^{-1}$', '$mg.g^{-1}$', '$mg.mm^{-3}$'),
+  TRYcode = c(12, 11, 15, 14, 4))) ; rm(traits)
 ```
 
 ```{r species}
@@ -87,45 +94,38 @@ LES <- read.csv("~/Documents/ECOFOG/TROLL/inst/extdata/GLOPNET.csv", skip = 10)
 LES <- LES[which(LES$BIOME == 'TROP_RF'),]
 LES <- LES[which(LES$GF == 'T'),]
 LES <- LES[-which(is.na(LES$log.LL)),]
-LESsp <- unique(droplevels(LES$Species))
-TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TryAccSpecies.txt",
-                  "\t", escape_double = FALSE, trim_ws = TRUE)
+LES <- as.character(unique(droplevels(LES$Species)))
+TROLL <- row.names(read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=T, dec=".", sep="", row.names = 1))
+TROLL <- gsub('_', ' ', TROLL)
+species <- unique(c(LES, TROLL))
+TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TryAccSpecies.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 species <- data.frame(
-  species = LESsp,
-  TRYcode = TRY$AccSpeciesID[match(LESsp, TRY$AccSpeciesName)])
+  species = species,
+  TRYcode = TRY$AccSpeciesID[match(species, TRY$AccSpeciesName)])
 species <- species[-which(is.na(species$TRYcode)),]
-rm(species, traits, LESsp, LES, TRY)
+rm(species, LES, TROLL, TRY)
 ```
- 
+
 ```{r data}
-TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TRY2.txt", 
+TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TRY2.txt",
     "\t", escape_double = FALSE, trim_ws = TRUE)
-TRY <- dcast(TRY, Dataset + SpeciesName ~ TraitName, 
+TRY <- dcast(TRY, Dataset + SpeciesName ~ TraitName,
                value.var = 'StdValue', fun.aggregate = mean, na.rm = T)[-11]
-names(TRY) <- c('Dataset', 'Species', 'LMA', 'C', 'CN', 'LL', 'N', 'P', 'Thick', 'wsg')
+names(TRY) <- c('Dataset', 'Species', 'LMA', 'C', 'CN', 'LL', 'Nmass', 'P', 'Thick', 'wsg')
 TRY$LMA <- 1/TRY$LMA*1000
-data <- left_join(data, TRY, by = 'Species') ; rm(TRY)
+TRY <- TRY[c('Dataset', 'Species', 'LL', 'LMA', 'Nmass', 'P', 'wsg')]
+GLOPNET <- data
+data <- left_join(data, TRY[-1], by = 'Species')
 data$LMA <- apply(data[c('LMA.x', 'LMA.y')], 1, mean, na.rm = T)
-data <- data[-c(4,6)]
+data$LL <- apply(data[c('LL.x', 'LL.y')], 1, mean, na.rm = T)
+data$Nmass <- apply(data[c('Nmass.x', 'Nmass.y')], 1, mean, na.rm = T)
+data <- data[-which(names(data) %in% c('LMA.x', 'LMA.y', 'LL.x', 'LL.y', 'Nmass.x', 'Nmass.y'))]
+data <- data %>%
+  group_by(Dataset, Species) %>%
+  summarise_all(mean, na.rm = T)
+TRY <- TRY[-which(is.na(TRY$LL)), c('Dataset', 'Species', 'LL', 'LMA', 'Nmass')]
+TRY <- TRY[-which(is.na(TRY$LMA)),]
 ```
-
-Table 2: Variable importance calculated with out-of the bag method applied on a random forest. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
-
-```{r OOB}
-kable(randomForest(LL ~ LMA + Nmass + LMA + wsg, 
-                   data = data, na.action = na.omit,
-                   ntree = 1000, replace = F , importance = T,
-                   do.trace = F, keep.forest = T, keep.inbag = T)$importance)
-corrplot::corrplot.mixed(
-  cor(data[c('LMA', 'Nmass', 'wsg')], 
-      use = "pairwise.complete.obs"))
-```
-
-Figvure 2: Variable correlations. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
-
-If we try a new model **M10** with a $\beta_3$ to represent wood specific gravity *wsg*, we obtain following model:
-
-$$ {LL_s}_j \sim \mathcal{logN}(\beta_0*e^{{\beta_1}_s*{LMA_s}_j - {\beta_2}_s*{Nmass_s}_j + {\beta_3}_s*{wsg_s}_j},\,\sigma)\,$$
 
 ```{r functions}
 fitgraph <- function(fit){
@@ -140,38 +140,45 @@ fitgraph <- function(fit){
   p <- ggpairs(data.frame(posterior[,beta]))
   return(list(r = r, c = c, p = p))
 }
-datasub <- function(data, dataset){
+datasub <- function(data, dataset, wsg = TRUE){
   LMAmax <- max(data$LMA)
   Nmax <- max(data$Nmass)
-  wsgmax <- max(data$wsg)
+  if(wsg)
+    wsgmax <- max(data$wsg)
   if(dataset != 'full')
     data <- data[-which(data$Dataset %in% dataset),]
-  return(list(S = length(levels(droplevels(data$Dataset))), 
+  mdata <- list(S = length(levels(droplevels(data$Dataset))), 
               N = length(as.numeric(droplevels(data$Dataset))),
               J = as.numeric(droplevels(data$Dataset)),
               LL = data$LL,
               LMA = (data$LMA/LMAmax),
-              Nmass = (data$Nmass/Nmax),
-              wsg = (data$wsg/wsgmax)))
+              Nmass = (data$Nmass/Nmax))
+  if(wsg)
+    mdata$wsg <- data$wsg/wsgmax
+  return(mdata)
 }
-LLpred <- function(fit, data){
+LLpred <- function(fit, data, wsg = TRUE){
   LMA <- data$LMA
   N <- data$Nmass
-  wsg <- data$wsg
+  if(wsg)
+    wsg <- data$wsg
   LMAmax <- max(data$LMA)
   Nmax <- max(data$Nmass)
-  wsgmax <- max(data$wsg)
+  if(wsg)
+    wsgmax <- max(data$wsg)
   pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),]
   beta <- pars[c('beta_0', 'beta_1', 'beta_2', 'beta_3')]
   beta[is.na(beta)] <- 0
-  mu <- beta[1] + beta[2]*(LMA/LMAmax) - beta[3]*(N/Nmax) + beta[4]*(wsg/wsgmax)
+  mu <- beta[1] + beta[2]*(LMA/LMAmax) - beta[3]*(N/Nmax)
+  if(wsg)
+    mu <- mu + beta[4]*(wsg/wsgmax)
   return(exp(mu))
 }
-evaluate <- function(fit, data){
+evaluate <- function(fit, data, wsg = TRUE){
   mean(sapply(levels(droplevels(data$Dataset)), function(dataset){
     fit1 <- fit[[dataset]]
     data1 <- data[which(data$Dataset == dataset),]
-    fi <- LLpred(fit1, data1)
+    fi <- LLpred(fit1, data1, wsg)
     yi <- data1$LL
     ei <- yi - fi
     rmse <- sqrt(mean(ei^2))
@@ -179,16 +186,77 @@ evaluate <- function(fit, data){
 }
 ```
 
-```{r model}
+## Data test
+
+We were able to gather a complete dataset with leaf lifespan, mass per area, and nitrogen content for 17 species related to Leaf Physiology Database with TRY. We decided to first test robustness of model **M1** to those data. In order to assess model prediction quality we randomly affected species to two virtual datasets D1 and D2.
+
+```{r m1}
+TRY$Dataset <- as.factor(c('D1', 'D2')[sample(2, 17, replace = T)])
 mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
 # rstan_options(auto_write = TRUE)
 # options(mc.cores = detectCores())
-# data <- data[c('Dataset', 'LL', 'LMA', 'Nmass', 'wsg')]
-# data <- data[-which(is.na(data$wsg)),]
-# data <- data[-which(is.na(data$LMA)),]
-# LMAmax <- max(data$LMA) ; Nmax <- max(data$Nmass) ; wsgmax <- max(data$wsg)
+# LMAmax <- max(TRY$LMA) ; Nmax <- max(TRY$Nmass)
+# mdata <- sapply(c('full', levels(TRY$Dataset)),
+#                 function(x) datasub(TRY, x, wsg = F), simplify = F)
+# fit <- lapply(mdata, function(x) stan(file = file.path(mpath, 'M1.stan'), data = x))
+# eval <- evaluate(fit, TRY, wsg = F)
+# fit <- list(full = fit$full, eval = eval)
+# path <- file.path(mpath, 'M1.TRY.Rdata')
+# save(fit, file = path)
+load(file.path(mpath, 'M1.TRY.Rdata'))
+g <- fitgraph(fit$full) ; rm(TRY, mpath)
+```
+
+Model **M1** with those data obtained a maximum  likekihood of **`r max(as.matrix(fit$full)[,'lp__'])`** and RMSEP of **`r round(fit$eval,3)`**.
+
+```{r r1}
+g$r
+```
+
+Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+
+```{r c1}
+g$c
+```
+
+Parameters markov chains. *Light grey area represents warmup iterations.*
+
+```{r p1}
+g$p
+```
+
+Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+
+## New model
+
+We then compiled both GLOPNET and TRY dataset to gather the biggest dataset. Dataset origin conserved for species was the one of the leaf lifespan observed in GLOPNET. We measured variable importance in functionnal traits to explain leaf lifespan with out-if bag method applied on a random forest (see Table 2). We then sampled both model **M1** and a new model **M10** with new variables highlighted by previous test :
+
+$$ {LL_s}_j \sim \mathcal{logN}(\beta_0*e^{{\beta_1}_s*{LMA_s}_j - {\beta_2}_s*{Nmass_s}_j + {\beta_3}_s*{wsg_s}_j},\,\sigma)\,$$
+
+Table 2: Variable importance calculated with out-of the bag method applied on a random forest. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
+
+```{r OOB}
+kable(randomForest(LL ~ LMA + Nmass + LMA + wsg + P,
+                   data = data, na.action = na.omit,
+                   ntree = 1000, replace = F , importance = T,
+                   do.trace = F, keep.forest = T, keep.inbag = T)$importance)
+corrplot::corrplot.mixed(
+  cor(data[c('LMA', 'Nmass', 'wsg')],
+      use = "pairwise.complete.obs"))
+```
+
+Figvure 2: Variable correlations. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
+
+```{r model}
+data <- data[c('Dataset', 'Species', 'LL', 'LMA', 'Nmass', 'wsg')] # Not enough data for P currently
+data <- data[-which(is.na(data$wsg)),]
+data <- data[-which(is.na(data$LMA)),]
+LMAmax <- max(data$LMA) ; Nmax <- max(data$Nmass) ; wsgmax <- max(data$wsg)
+mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
+# rstan_options(auto_write = TRUE)
+# options(mc.cores = detectCores())
 # mdata <- sapply(c('full', levels(droplevels(data$Dataset))),
-# function(x) datasub(data, x), simplify = F)
+#                 function(x) datasub(data, x), simplify = F)
 # fits <- lapply(as.list(paste0('M', c(1,10))), function(model){
 #   fit <- lapply(mdata, function(x) stan(file = file.path(mpath, paste0(model, '.stan')), data = x))
 #   eval <- evaluate(fit, data)
@@ -202,7 +270,7 @@ models <- list.files(path = mpath, pattern = '.LL.Rdata')
 for(file in models){
   load(file = file.path(mpath, file))
   fits[[i]] <- fit ; rm(fit) ; i <- i + 1
-} 
+}
 names(fits) <- paste0('fit', c(10,1))
 g <- fitgraph(fits$fit10$full) ; rm(file, i, models, mpath)
 ```
