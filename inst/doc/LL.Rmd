@@ -28,6 +28,7 @@ library(readr)
 library(dplyr)
 library(randomForest)
 library(GGally)
+library(BIOMASS)
 cores <- detectCores()
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
@@ -106,7 +107,7 @@ species <- species[-which(is.na(species$TRYcode)),]
 rm(species, LES, TROLL, TRY)
 ```
 
-```{r data}
+```{r data, include=FALSE}
 TRY <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/TRY2.txt",
     "\t", escape_double = FALSE, trim_ws = TRUE)
 TRY <- dcast(TRY, Dataset + SpeciesName ~ TraitName,
@@ -123,6 +124,10 @@ data <- data[-which(names(data) %in% c('LMA.x', 'LMA.y', 'LL.x', 'LL.y', 'Nmass.
 data <- data %>%
   group_by(Dataset, Species) %>%
   summarise_all(mean, na.rm = T)
+data$wsg2 <- apply(do.call('rbind', strsplit(data$Species, ' ', fixed = T)),
+                   1, function(x) getWoodDensity(x[1], x[2], region = 'SouthAmericaTrop')$meanWD)
+data$wsg <- apply(data[c('wsg', 'wsg2')], 1, mean, na.rm = T)
+data <- data[c('Dataset', 'Species', 'LL', 'LMA', 'Nmass', 'wsg')] # Not enough data for P currently
 TRY <- TRY[-which(is.na(TRY$LL)), c('Dataset', 'Species', 'LL', 'LMA', 'Nmass')]
 TRY <- TRY[-which(is.na(TRY$LMA)),]
 ```
@@ -229,14 +234,14 @@ Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson'
 
 ## New model
 
-We then compiled both GLOPNET and TRY dataset to gather the biggest dataset. Dataset origin conserved for species was the one of the leaf lifespan observed in GLOPNET. We measured variable importance in functionnal traits to explain leaf lifespan with out-if bag method applied on a random forest (see Table 2). We then sampled both model **M1** and a new model **M10** with new variables highlighted by previous test :
+We then compiled GLOPNET, TRY, and DRYAD dataset to gather the biggest dataset. Dataset origin conserved for species was the one of the leaf lifespan observed in GLOPNET corresponding also to LMA and Nmass in most of cases. We measured variable importance in functionnal traits to explain leaf lifespan with out-if bag method applied on a random forest (see Table 2). We then sampled both model **M1** and a new model **M10** with new variables highlighted by previous test. We removed dataset random effect on $\beta_3$ due to the fact that all wsg were provided by DRYAD database.
 
-$$ {LL_s}_j \sim \mathcal{logN}(\beta_0*e^{{\beta_1}_s*{LMA_s}_j - {\beta_2}_s*{Nmass_s}_j + {\beta_3}_s*{wsg_s}_j},\,\sigma)\,$$
+$$M10~~ {LL_s}_j \sim \mathcal{logN}(\beta_0*e^{{\beta_1}_s*{LMA_s}_j - {\beta_2}_s*{Nmass_s}_j + {\beta_3}*{wsg}_j},\,\sigma)\,$$
 
 Table 2: Variable importance calculated with out-of the bag method applied on a random forest. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
 
 ```{r OOB}
-kable(randomForest(LL ~ LMA + Nmass + LMA + wsg + P,
+kable(randomForest(LL ~ LMA + Nmass + LMA + wsg,
                    data = data, na.action = na.omit,
                    ntree = 1000, replace = F , importance = T,
                    do.trace = F, keep.forest = T, keep.inbag = T)$importance)
@@ -245,10 +250,9 @@ corrplot::corrplot.mixed(
       use = "pairwise.complete.obs"))
 ```
 
-Figvure 2: Variable correlations. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in ) are taken in TRY database (https://www.try-db.org).*
+Figvure 2: Variable correlations. *Leaf mass per area (LMA in $g.m^{-2}$), leaf nitrogen content (Nmass, in $mg.g^-1$) and leaf lifespan (LL in $months$) are taken in GLOPNET dataset from @wright_worldwide_2004. Leaf mass per area in TRY (LMAt in $g.m^{-2}$), leaf carbon content (C, in $mg.g^-1$) and leaf carbon per nitrogen (CN , in $g.g^-1$), leaf thickness (Thick in ) and wood specific gravity (wsg in $mg.mm^{-3}$) are taken in TRY database (https://www.try-db.org).*
 
 ```{r model}
-data <- data[c('Dataset', 'Species', 'LL', 'LMA', 'Nmass', 'wsg')] # Not enough data for P currently
 data <- data[-which(is.na(data$wsg)),]
 data <- data[-which(is.na(data$LMA)),]
 LMAmax <- max(data$LMA) ; Nmax <- max(data$Nmass) ; wsgmax <- max(data$wsg)
@@ -257,7 +261,7 @@ mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/LL_models"
 # options(mc.cores = detectCores())
 # mdata <- sapply(c('full', levels(droplevels(data$Dataset))),
 #                 function(x) datasub(data, x), simplify = F)
-# fits <- lapply(as.list(paste0('M', c(1,10))), function(model){
+# fits <- lapply(as.list(paste0('M', c(1, 10))), function(model){
 #   fit <- lapply(mdata, function(x) stan(file = file.path(mpath, paste0(model, '.stan')), data = x))
 #   eval <- evaluate(fit, data)
 #   fit <- list(full = fit$full, eval = eval)
@@ -273,9 +277,12 @@ for(file in models){
 }
 names(fits) <- paste0('fit', c(10,1))
 g <- fitgraph(fits$fit10$full) ; rm(file, i, models, mpath)
+beta <- as.matrix(fits$fit10$full)[which.max(as.matrix(fits$fit10$full)[,'lp__']),c('beta_0', 'beta_1', 'beta_2', 'beta_3')]
 ```
 
 Maximum likekihood of **`r max(as.matrix(fits$fit10$full)[,'lp__'])`** for **M10** against **`r max(as.matrix(fits$fit1$full)[,'lp__'])`** for **M1** and RMSEP of **`r round(fits$fit10$eval,3)`** for **M10** against **`r round(fits$fit1$eval,3)`** for **M1**.
+
+$$LL = `r round(exp(beta[1]),3)`*e^{`r round(beta[2]/LMAmax,3)` *LMA -`r round(beta[3]/Nmax,3)`*Nmass +`r round(beta[4]/wsgmax,3)`*wsg }$$
 
 ```{r r10}
 g$r
@@ -294,5 +301,100 @@ g$p
 ```
 
 Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+
+```{r graph, fig.height=12, fig.width=12}
+fit <- fits$fit10$full
+LLpred <- function(LMA, Nmass, wsg, LMAmax, Nmax, wsgmax, beta0, beta1, beta2, beta3, sigma){
+  mu <- beta0 + beta1*(LMA/LMAmax) - beta2*(Nmass/Nmax) + beta3*(wsg/wsgmax)
+  rlnorm(1, mu, sigma)
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data)[1]), function(i)
+      LLpred(data$LMA[i], data$Nmass[i], data$wsg[i], LMAmax, Nmax, wsgmax, x['beta_0'], x['beta_1'], x['beta_2'], x['beta_3'], x['sigma'])
+    ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- exp((beta[1] + beta[2]*(data$LMA/LMAmax) - beta[3]*(data$Nmass/Nmax) + beta[4]*(data$wsg/wsgmax)))
+pred$LMA <- data$LMA
+pred$Nmass <- data$Nmass
+pred$wsg <- data$wsg
+g <- ggplot(data, aes(x = LMA, y = LL)) +
+  geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$LMA, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() +
+  theme_bw() +
+  xlab('Leaf mass per area (LMA in g/m2)') +
+  ylab('Leaf lifespan (LL in months)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+h <- ggplot(data, aes(x = Nmass, y = LL)) +
+  geom_ribbon(aes(x = pred$Nmass, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$Nmass, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$Nmass, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$Nmass, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() +
+  theme_bw() +
+  xlab('Leaf nitrogen content (Nmass in %)') +
+  ylab('Leaf lifespan (LL in months)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+f <- ggplot(data, aes(x = wsg, y = LL)) +
+  geom_ribbon(aes(x = pred$wsg, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$wsg, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$wsg, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$wsg, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() +
+  theme_bw() +
+  xlab('Leaf nitrogen content (Nmass in %)') +
+  ylab('Leaf lifespan (LL in months)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+plot_grid(g, h, f, labels = c('LMA', 'Nmass', 'wsg'))
+# p <- subplot(ggplotly(g, width = 800, height = 400), ggplotly(h, width = 800, height = 400), shareY = T, shareX = F, titleX = T)
+# chart_link <- plotly_POST(p, filename = "LL1")
+# save(chart_link,
+     # file = '~/Documents/ECOFOG/TROLL/inst/doc/LL_models/LL1.Rdata')
+# load('~/Documents/ECOFOG/TROLL/inst/doc/LL_models/LL1.Rdata')
+# chart_link
+```
+
+Figure 3: Leaflifespan predictions for model **M10** with leaf mass per area (LMA), leaf nitrogen content (Nmass), and wood specific gravity (wsg). *Leaf lifespan (LL in $months$) is predicted with model M10 fit. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %), and wood specific gravity (wsg in $mg.mm^{-3}$) are taken in GLOPNET dataset from @wright_worldwide_2004.* **Warning** *LMA (resp. Nmass and wsg) is not constant and depend on the closest point value for right (resp. center and left) graph.* 
+
+```{r TROLL, fig.height=12, fig.width=12}
+species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=T, dec=".", sep="", row.names = 1)[c('LMA', 'Nmass', 'wsg')]
+species$`Reich 91` <- 1.5 + 10^(7.18+3.03*log10(species$LMA*0.0001))
+species$`Reich 97` <- 10^(2.040816*(2.579713-log10(10000.0/species$LMA)))
+species$`Wright 04` <- 0.5+10^(-2.509+1.71*log10(species$LMA))
+beta <- as.matrix(fits$fit1$full)[which.max(as.matrix(fits$fit1$full)[,'lp__']),c('beta_0', 'beta_1', 'beta_2')]
+species$Model1 <- with(species, exp((beta[1] + beta[2]*(LMA/LMAmax) - beta[3]*(Nmass*100/Nmax))))
+beta <- as.matrix(fits$fit10$full)[which.max(as.matrix(fits$fit10$full)[,'lp__']),c('beta_0', 'beta_1', 'beta_2', 'beta_3')]
+species$Model10 <- with(species, exp((beta[1] + beta[2]*(LMA/LMAmax) - beta[3]*(Nmass*100/Nmax) + beta[4]*(wsg/wsgmax))))
+g <- ggplot(melt(species, id = c('LMA', 'Nmass', 'wsg')), aes(x = LMA, y = value, color = variable)) +
+  geom_point() + theme_bw() +   xlab('Leaf mass per area (LMA in g/m2)') +
+  ylab('Leaf lifespan (LL in months)')
+h <- ggplot(melt(species, id = c('LMA', 'Nmass', 'wsg')), aes(x = Nmass, y = value, color = variable)) +
+  geom_point() + theme_bw() +   xlab('Leaf nitrogen content (Nmass in %)') +
+  ylab('Leaf lifespan (LL in months)')
+f <- ggplot(melt(species, id = c('LMA', 'Nmass', 'wsg')), aes(x = wsg, y = value, color = variable)) +
+  geom_point() + theme_bw() +   xlab('Wood specific gravity (wsg in )') +
+  ylab('Leaf lifespan (LL in months)')
+plot_grid(g, h, f, labels = c('LMA', 'Nmass', 'wsg'))
+# p <- subplot(ggplotly(g, width = 800, height = 400), ggplotly(h, width = 800, height = 400), shareY = T, shareX = F, titleX = T) 
+# chart_link <- plotly_POST(p, filename = "LL2")
+# save(chart_link,
+#      file = '~/Documents/ECOFOG/TROLL/inst/doc/LL_models/LL2.Rdata')
+# load('~/Documents/ECOFOG/TROLL/inst/doc/LL_models/LL2.Rdata')
+# chart_link
+```
+
+Figure 4: Leaflifespan predictions for model **M10** and Reich's allometry with leaf mass per area (LMA), and leaf nitrogen content (Nmass), and wood specific gravity (wsg). *Leaf lifespan (LL in $months$) is predicted with model M10 fit or Reich's allometry [@Reich1991a]. Leaf mass per area (LMA in $g.m^{-2}$) leaf nitrogen content (Nmass, in %) , and wood specific gravity (wsg in $mg.mm^{-3}$) are taken in BRIDGE dataset used by TROLL [@Li].*
 
 # References

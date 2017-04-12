@@ -17,8 +17,6 @@ parameters {
   real<lower=0> beta_2s[S] ;
   real<lower=0,upper=50> sigma_2 ;
   real<lower=0> beta_3 ;
-  real<lower=0> beta_3s[S] ;
-  real<lower=0,upper=50> sigma_3 ;
 }
 model {
    real f[N] ;
@@ -26,11 +24,10 @@ model {
      f[n] = beta_0 +
      LMA[n]*beta_1s[J[n]] - 
      Nmass[n]*beta_2s[J[n]] +
-     wsg[n]*beta_3s[J[n]]
+     wsg[n]*beta_3
      ;
    }
    beta_1s ~ normal(beta_1, sigma_1) ;
    beta_2s ~ normal(beta_2, sigma_2) ;
-   beta_3s ~ normal(beta_3, sigma_3) ;
    LL ~ lognormal(f, sigma) ;
 }
