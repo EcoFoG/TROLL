@@ -384,7 +384,15 @@ plot_grid(g, h, f, labels = c('LMA', 'Nmass', 'wsg'))
 
 Figure 6: Leaflifespan predictions for model **M11** with leaf mass per area (LMA), leaf nitrogen content (Nmass), and wood specific gravity (wsg). *Leaf lifespan (LL in $months$) is predicted with model M10 fit. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %), and wood specific gravity (wsg in $mg.mm^{-3}$) are taken in a composite dataset of GLOPNET, TRY and DRYAD  datasets.* **Warning** *LMA (resp. Nmass and wsg) is not constant and depend on the closest point value for right (resp. center and left) graph.* 
 
-### TROLL predictions
+$$M11:~~ LL = e^{`r round(beta[1]/LMAmax,3)`*LMA-`r round(beta[2]/Nmax,3)`*Nmass + `r round(beta[3]/wsgmax,3)`*wsg}$$
+
+# TROLL tests
+
+We finally tested the new allometry obtained with **M11** on TROLL data (figure 7) and with TROLL simulations (figure 8). 
+
+## TROLL predictions
+
+Minimum leaf lifespan is now above 3 months for model **M11** with TROLL species dataset. Moreover lowest leaf lifespan species are not the one with the smallest LMA with new model. Lastly, model **M11** variation of leaf lifespan is almost spanning all previous allometries prediciton on LMA axis.
 
 ```{r TROLL, fig.height=12, fig.width=12}
 # species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=T, dec=".", sep="", row.names = 1)[c('LMA', 'Nmass', 'wsg')]
@@ -420,12 +428,22 @@ chart_link
 
 Figure 7: Leaflifespan predictions for model different allometries with leaf mass per area (LMA), and leaf nitrogen content (Nmass), and wood specific gravity (wsg). *Leaf lifespan (LL in $months$) is predicted with model M1, M10, and M11 fits or Reich's and Wright's allometries [@Reich1991a]. Leaf mass per area (LMA in $g.m^{-2}$) leaf nitrogen content (Nmass, in %) , and wood specific gravity (wsg in $mg.mm^{-3}$) are taken in BRIDGE dataset used by TROLL [@Li].*
 
-### TROLL simulation
+## TROLL simulation
 
-```{r sim}
-m <- loadOutputOld('symphonia', '~/Documents/ECOFOG/Results/LL/symphonia200/')
-plot(m, what = 'agb', ggplot2 = T)
+Simulations are validating that this new allometry resolve the issue of unrealistically low aboveground biomass for low LMA species due to an early edath of individuals inside simulations. For instance with this allometry Symphonia sp 1 (a low LMA species) is now reaching a realistic aboveground biomass above 3.5 tonnes of C/ha and realistic diameter and age distribution inside the final population (see figure 8).
+
+```{r sim, fig.height=10, fig.width=10}
+new <- loadOutputOld('symphonia', '~/Documents/ECOFOG/Results/LL/symphonia500/')
+new@name <- 'M11'
+old <- loadOutputOld('Symphonia_sp.1', '~/Documents/ECOFOG/Results/LL/symphoniaOld/')
+old@name <- 'Reich91'
+a <- plot(new, what = 'agb', ggplot2 = T)
+b <- plot(old, what = 'agb', ggplot2 = T)
+c <- plot(stack(new, old), what = 'dbh', ggplot2 = T)
+d <- plot(stack(new, old), what = 'age', ggplot2 = T)
+plot_grid(a, b, c, d, labels = LETTERS[1:4])
 ```
 
+Figure 8: TROLL simulations with allometry from Reich 1991 and new model **M11** for Symphonia sp 1 over 500 years. *Top graphics present aboveground biomass (AGB) for Symphonia simulations inside TROLL over 500 years with respectively Reich's 1991 allometry (A) and model M11 (B). Bottom graphics show respectively age (C) and diameter at breast heigh (D) histograms for Symphonia simulations inside TROLL over 500 years with both Reich's 1991 allometry and model M11.*
 
 # References
