@@ -19,7 +19,6 @@ rm(list = ls()) ; invisible(gc()) ; set.seed(42)
 library(knitr)
 library(parallel)
 library(TROLL)
-library(RconTroll)
 library(reshape2)
 library(ggplot2)
 library(cowplot)
@@ -33,6 +32,7 @@ library(dplyr)
 library(randomForest)
 library(GGally)
 library(BIOMASS)
+library(RconTroll)
 cores <- detectCores()
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
@@ -419,5 +419,13 @@ chart_link
 ```
 
 Figure 7: Leaflifespan predictions for model different allometries with leaf mass per area (LMA), and leaf nitrogen content (Nmass), and wood specific gravity (wsg). *Leaf lifespan (LL in $months$) is predicted with model M1, M10, and M11 fits or Reich's and Wright's allometries [@Reich1991a]. Leaf mass per area (LMA in $g.m^{-2}$) leaf nitrogen content (Nmass, in %) , and wood specific gravity (wsg in $mg.mm^{-3}$) are taken in BRIDGE dataset used by TROLL [@Li].*
+
+### TROLL simulation
+
+```{r sim}
+m <- loadOutputOld('symphonia', '~/Documents/ECOFOG/Results/LL/symphonia200/')
+plot(m, what = 'agb', ggplot2 = T)
+```
+
 
 # References

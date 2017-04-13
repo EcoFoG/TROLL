@@ -103,7 +103,7 @@ _NDD=0,                 /* if defined, negative density dependant processes affe
 _OUTPUT_reduced=0,      /* reduced set of ouput files */
 _OUTPUT_last100=0,      /* output that tracks the last 100 years of the simulation for the whole grid (2D) */
 _OUTPUT_fullLAI=0,       /* output of full final voxel field */
-_FromData=0;            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
+_FromData=0,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
 _DISTURBANCE=1;			/* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
 
 
@@ -301,7 +301,8 @@ UpdateTreefall(void),               // _BASICTREEFALL
 UpdateTree(void),
 Average(void),
 OutputField(void),
-FreeMem(void);
+FreeMem(void),
+Disturbance(void);					// _DISTURBANCE
 
 /**********************/
 /** Output routines ***/
@@ -482,7 +483,7 @@ void Species::Init(int nesp,fstream& is) {
     //s_leaflifespan=pow(10,(2.040816*(2.579713-log10(SLA))));    //this is the expression from Reich et al. 1997 PNAS (provides probably more realistic estimates for species with high LMA).
     //s_leaflifespan=0.5+pow(10,(-2.509+1.71*log10(s_LMA)));    //this is the expression from Wright et al 2004 Nature (leaf economics spectrum).
     if(_DISTURBANCE){
-    	s_leaflifespan=1.529*exp(0.149*pow(s_LMA,0.558)); //this is the expression we found with regression in GLOPNET dataset for DISTURBANCE study
+    	s_leaflifespan=exp(0.00843*s_LMA - 6.95*s_Nmass + 3.66*s_wsg); //this is the expression from model M11 in search for a new allometry https://sylvainschmitt.github.io/TROLL/LL
     }
     s_time_young=1;
     s_time_mature=s_leaflifespan/3.0;

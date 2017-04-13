@@ -12,3 +12,6 @@ inst/doc/*.html
 inst/doc/vert.txt
 *.rds
 *.Rdata
+inst/tools/*.txt
+inst/tools/troll
+inst/tools/OUTPUT
