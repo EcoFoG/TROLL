@@ -1,0 +1,52 @@
+---
+title: "TROLL"
+author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    theme: journal
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+  pdf_document: default
+  word_document: default
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+This page summaries the study of sylviculture on forest ecosystem with TROLL model. 
+
+# Introduction
+
+To study resistance and resilience of ecosystem face to disturbance, highlighting the role of biodiversity, we decided to use TROLL model simulations [@Chave1999]. 
+
+# Sensitivity
+
+In order to get a finer study of simulations response, we needed to assess first sensitivity of the TROLL model to different parameters. More particularly we needed to assess the importance of functional traits to further better control functional diversities in simulations. We also needed to assess sensitivity of the model to see rain constant because we assume it is one of the main factor of tree recruitments after disturbance in the model.
+
+Results are available in [sensitivity](sensitivity.html) page.
+
+We concluded that we will control biodiversity in input with a 3-dimensionnal functional space including ah, wsg and dmax. And we can let seedrain constant to its default value without any risk of untaken side effect.
+
+# Disturbance
+
+We then started to realize the disturbance experiments:
+
+Results are available in [disturbance](disturbance.html) page.
+
+But we found simulations issues with low LMA species :
+
+Results are available in [low LMA species](LMAmin.html) page.
+
+The issue seemed link to leaf lifespan allometry. We searched for a new allometry :
+
+Results are available in leaf lifespan [first](LL2.html) and [second](LL.html) model pages.
+
+# Sylviculture
+
+We first needed to implement a realistic module to simulate sylviculture inside TROLL :
+
+Results are available in [sylviculture](sylviculture.html) page.
+
+# References
+
