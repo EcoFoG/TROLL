@@ -222,9 +222,138 @@ div.tocify {
 </div>
 
 
-<p>Built with <code>RconTroll</code> package version 0.1.9007 available at <a href="https://gitlab.com/sylvain.schmitt/RconTroll" class="uri">https://gitlab.com/sylvain.schmitt/RconTroll</a> and <code>TROLL</code> package version 0.1.9025 available at <a href="https://gitlab.com/sylvain.schmitt/TROLL" class="uri">https://gitlab.com/sylvain.schmitt/TROLL</a> with R version 3.3.3 (2017-03-06) environment.</p>
-<div id="references" class="section level1">
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<p>In order to simulate sylviculture with TROLL we need to implement a new sylviculture module inside TROLL model code. After a litterature review it seems we can split sylviculture simulation between <strong>logging</strong> and <strong>damages</strong>. Each parts encompass differents sylviculture processes or effects:</p>
+<ul>
+<li>Logging
+<ul>
+<li>Species <em>composition, type, number, fuelwood</em></li>
+<li>Intensity <em>minimum and maximum extraction objectives</em></li>
+<li>Harvesting criteria <em>minimum and maximum diameter, harvesting order</em></li>
+</ul></li>
+<li>Damages <em>Reduced impact logging (RIL)</em>
+<ul>
+<li>Directly hurted trees
+<ul>
+<li>By harvested tree</li>
+<li>By skidding</li>
+</ul></li>
+<li>Roads</li>
+<li>Increased mortality for 10 years</li>
+</ul></li>
+</ul>
+<p>We can model all this process and consequences of sylviculture in two ways:</p>
+<ul>
+<li>With an explicit modelling of the process <em>for well known process or deterministic events</em></li>
+<li>By only taking into account the effect of the processes <em>e.g. a local increased mortality</em></li>
+</ul>
+</div>
+<div id="logging" class="section level1">
+<h1>Logging</h1>
+<p>To simulate selective logging we can use the selection harvesting algorithm from <span class="citation">Arii <em>et al.</em> (2008)</span>. To do that we need to build three parameters:</p>
+<ol style="list-style-type: decimal">
+<li>Probabilty for a tree to be cut <span class="math inline">\(P_t\)</span></li>
+<li>Probability of cutting it’s nearest neighbor <span class="math inline">\(P_n\)</span></li>
+<li>Extraction objective(s) <span class="math inline">\(O_t\)</span></li>
+</ol>
+<p>This algorithm is a nearest neighbor algorithm which simulates selective logging as a contagious spatial process thus similar to spread of fire in the forest. The tree with the highest probability to be cut <span class="math inline">\(P_t\)</span> is selected, then the algorithm compare the nearest neighbor probability of cutting <span class="math inline">\(P_n\)</span> to a random value between 0 and 1 to choose to cut it or not. If succesful the algorithm continue to spred the gap until the test is negative. When the test is negatvie the algorithm select the tree with the highest probability to be cut <span class="math inline">\(P_t\)</span> which is still alive. The algorithm run untill it reaches extraction objective(s) <span class="math inline">\(O_t\)</span>.</p>
+<p><strong>This algorithm was developped and test with a dataset from Haliburton, Canada. Consequently it is simulating correctly temperate selective logging which may highly differ from selective logging we may encounter in french Guiana. As a results we may have to adapt the algorithm. A first major limit is to which extent can we allow the model to grow a gap (a limit gap size) ?</strong></p>
+<p>Still if we want to adapt this algorithm, probability of cutting a tree <span class="math inline">\(P_t\)</span> will depend on species and harvesting criteria whereas extraction objective(s) <span class="math inline">\(O_t\)</span> will represents intensity (table 1). Extraction objective(s) <span class="math inline">\(O_t\)</span> can be based on one or multiple criteria encompassing number of trees harvested (N in <span class="math inline">\(nb.ha^{-1}\)</span>), harvested basal area (BA in <span class="math inline">\(m^2.ha^{-1}\)</span>), and canopy maximum opening (CO in <span class="math inline">\(m^2.ha^{-1}\)</span>) (<strong>Other criterion ?</strong>). Probability to be cut <span class="math inline">\(P_t\)</span> will be computed for each tree regarding its species and diameter. Probability to be cut regarding the tree diameter <span class="math inline">\({P_t}_{dbh}\)</span> will be specific and vary from 0 to 1 between minimum and maximum harvesting diameter of the species (resp. <span class="math inline">\(dbh_{min}\)</span> and <span class="math inline">\(dbh_{max}\)</span>) (<strong>Probability increase curve is to be defined</strong>). Consequently <span class="math inline">\(dbh_{min}\)</span> and <span class="math inline">\(dbh_{max}\)</span> have to be precised for each harvested species in input. Probability to be cut regarding the tree species <span class="math inline">\({P_t}_{sp}\)</span> will be proportional to defined proportion of species in harvesting. Consequently <span class="math inline">\({P_t}_{sp}\)</span> have to be precised for each harvested species in input. Then probability to be cut <span class="math inline">\(P_t\)</span> can be defined as: <span class="math display">\[ P_t = {P_t}_{dbh} * {P_t}_{sp} = f(dbh_{min}, dbh_{max}) * {P_t}_{sp}\]</span></p>
+<p>Table 1: Parameters for the algorithm. <em>Parameters with their names and related factors.</em></p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Parameter</th>
+<th align="left">Name</th>
+<th align="left">Factors</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left"><span class="math inline">\(P_t\)</span></td>
+<td align="left">Probabilty to be cut</td>
+<td align="left">Species x Diameter</td>
+</tr>
+<tr class="even">
+<td align="left"><span class="math inline">\(O_t\)</span></td>
+<td align="left">Extrcation objective(s)</td>
+<td align="left">N, BA, Canopy opening, multicriteria</td>
+</tr>
+</tbody>
+</table>
+<p>Consequently following the scheme we are able to simulate completely selective logging. We now need to model resulting damages.</p>
+</div>
+<div id="damages" class="section level1">
+<h1>Damages</h1>
+<p>First few articles did not considered damages in sylviculture simulations <span class="citation">(Tietjen &amp; Huth 2006; Arii <em>et al.</em> 2008)</span>. So we may consider damages to be an option of sylviculture module inside TROLL (<strong>?</strong>).</p>
+<div id="harvested-treefall" class="section level2">
+<h2>Harvested treefall</h2>
+<p>Harvested treefall can be considered random or oriented toward a direction of interest. Both <span class="citation">Huth <em>et al.</em> (2004)</span> and <span class="citation">Rüger <em>et al.</em> (2008)</span> assumed falling logged tree toward already logged patch for reduced impact logging method (RIL) against random direction for conventional sylviculture. Nevertheless in our context falling logged tree toward a direction of interest can be considered as dubious (Traissac personnal communication) (<strong>?</strong>). In both cases we can use TROLL function <code>FallTree</code> in its original version for random fall or in an adapted version to explicitly model harvesting damages due to harvested treefall.</p>
+</div>
+<div id="roads-and-skidding" class="section level2">
+<h2>Roads and skidding</h2>
+<p>Currently TROLL model assumed a flat environment. Consequently roads might be relatively easy to simulate. Roads and skidding are related and depend on sylviculture method (<strong>To discuss</strong>). All articles modelled roads and skidding not explicitly but as an increased mortality <span class="citation">(Huth <em>et al.</em> 2004; K�hler &amp; Huth 2004; Rüger <em>et al.</em> 2008)</span>. I argue that we can model both roads and skidding explicitly (<strong>?</strong>). Roads on a flat environment may be obvious and skidding damages depend on tree diameter and closest point on the closest road. Consequently, I think we can have a more precise sylviculture module by simulating all direct effects of sylviculture explicitly (i.e. logging, treefall, roads and skidding).</p>
+</div>
+<div id="long-term-effects" class="section level2">
+<h2>Long term effects</h2>
+<p>Long term effects can be related to hurted tree, dead seed and seedlings and soil damages. Long term effects results in an increased mortality. It seems not possible to explicitly model those long term effects. All articles modelling damages only assumed a constant increased mortality for 10 years after the harvesting <span class="citation">(Huth <em>et al.</em> 2004; K�hler &amp; Huth 2004; Rüger <em>et al.</em> 2008)</span>. We can relate this to basal death rate <span class="math inline">\(m\)</span> inside TROLL and increase it by a factor after harvesting. Two aspects have to be defined the increased mortality intensity <span class="math inline">\(I_m\)</span> and duration <span class="math inline">\(\Delta t_m\)</span>. Due to an increased mortality reducing in time, I suggest that the increased mortality intensity after logging is function of the time after logging <span class="math inline">\(I_m = f(t_m)\)</span> instead of constant. I suggest to fit it with Paracou data by measuring global difference of mortality before logging and after logging along time (<strong>?</strong>).</p>
+</div>
+</div>
+<div id="conclusion" class="section level1">
+<h1>Conclusion</h1>
+<p>Any points of previous reasoning can be discussed. Anyway I will just summarise points to discuss by paragraphs :</p>
+<ul>
+<li>Logging
+<ul>
+<li><em>Use of <span class="citation">Arii <em>et al.</em> (2008)</span> algorithm ?</em></li>
+<li><em>Limit gap size ?</em></li>
+<li><em>Extraction objectives criteria ?</em></li>
+<li><em>Probability to be cut calculation ?</em></li>
+</ul></li>
+<li>Damages
+<ul>
+<li><em>Damages as an option ?</em></li>
+<li>Harvested treefall
+<ul>
+<li><em>Explicit simulation of treefall ?</em></li>
+<li><em>Random or directed treefall for harvested tree ?</em></li>
+</ul></li>
+<li>Roads and skidding
+<ul>
+<li><em>Explicit simulation of road ?</em></li>
+<li><em>Designed of road on a flat environment ?</em></li>
+<li><em>Road and skidding related to sylviculture method (RIL, conventional…) ?</em></li>
+<li><em>Explicit simulation of skidding ?</em></li>
+</ul></li>
+<li>Long term effects
+<ul>
+<li><em>Implicit long term effects ?</em></li>
+<li><em>Increased mortality decreasing in time ?</em></li>
+<li><em>Fit a model with Paracou data ?</em></li>
+</ul></li>
+</ul></li>
+</ul>
+</div>
+<div id="references" class="section level1 unnumbered">
 <h1>References</h1>
+<div id="refs" class="references">
+<div id="ref-Arii2008">
+<p>Arii, K., Caspersen, J.P., Jones, T.A. &amp; Thomas, S.C. (2008). A selection harvesting algorithm for use in spatially explicit individual-based forest simulation models. <em>Ecological Modelling</em>, <strong>211</strong>, 251–266.</p>
+</div>
+<div id="ref-Huth2004">
+<p>Huth, A., Drechsler, M. &amp; Köhler, P. (2004). Multicriteria evaluation of simulated logging scenarios in a tropical rain forest. <em>Journal of Environmental Management</em>, <strong>71</strong>, 321–333.</p>
+</div>
+<div id="ref-Khler2004">
+<p>K�hler, P. &amp; Huth, A. (2004). Simulating growth dynamics in a South-East Asian rainforest threatened by recruitment shortage and tree harvesting. <em>Climatic Change</em>, <strong>67</strong>, 95–117.</p>
+</div>
+<div id="ref-Ruger2008">
+<p>Rüger, N., Williams-Linera, G., Kissling, W.D. &amp; Huth, A. (2008). Long-Term Impacts of Fuelwood Extraction on a Tropical Montane Cloud Forest. <em>Ecosystems</em>, <strong>11</strong>, 868–881.</p>
+</div>
+<div id="ref-Tietjen2006">
+<p>Tietjen, B. &amp; Huth, A. (2006). Modelling dynamics of managed tropical rainforests—An aggregated approach. <em>Ecological Modelling</em>, <strong>199</strong>, 421–432.</p>
+</div>
+</div>
 </div>
 
 
