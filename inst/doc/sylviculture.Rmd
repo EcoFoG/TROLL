@@ -1,5 +1,5 @@
 ---
-title: "Sylviculture"
+title: "Sylviculture modelling"
 author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
 date: '`r Sys.Date()`'
 output:
@@ -31,89 +31,128 @@ opts_chunk$set(
 
 # Introduction
 
-In order to simulate sylviculture with TROLL we need to implement a new sylviculture module inside TROLL model code. After a litterature review it seems we can split sylviculture simulation between **logging** and **damages**. Each parts encompass differents sylviculture processes or effects:
+In order to simulate sylviculture with TROLL we need to implement a new sylviculture module inside TROLL model code. A first litterature review was completed by an interview with Laurent Descroix of the Office Nationale des Forêts. This document presents results of both the review and the interview.
 
-- Logging
-    - Species *composition, type, number, fuelwood*
-    - Intensity *minimum and maximum extraction objectives*
-    - Harvesting criteria *minimum and maximum diameter, harvesting order*
-- Damages *Reduced impact logging (RIL)*
-    - Directly hurted trees
-        - By harvested tree
-        - By skidding
-    - Roads
-    - Increased mortality for 10 years
-    
-We can model all this process and consequences of sylviculture in two ways:
+This document focuses explicitly on sylviculture as it is realized in french guiana. In this context sylviculture can be narrow to selective logging (besides we will address other questions). Selective logging can be splitted in two parts: **designation** and **harvesting**. Both **designation** and **harvesting** encompass different sylviculture process and effects :
 
-- With an explicit modelling of the process *for well known process or deterministic events*
-- By only taking into account the effect of the processes *e.g. a local increased mortality*
+- Designation
+    - Harvestable areas
+    - Tree designation
+- Harvesting
+    - Logging
+    - Roads and skidding
+    - Other damages
 
-# Logging
+We can model all this process and effects in two ways:
 
-To simulate selective logging we can use the selection harvesting algorithm from @Arii2008. To do that we need to build three parameters:
+- **Explicitly** by modelling the process *(for well known process or deterministic events)*
+- **Implicitly** by taking only into account the result of the processes *(e.g. a local increased mortality)*
 
-1. Probabilty for a tree to be cut $P_t$
-2. Probability of cutting it's nearest neighbor $P_n$
-3. Extraction objective(s) $O_t$
+All processes detailed after are splitted in two parts: **Reality** explaining what is currently done in french Guiana and **Modelling** which suggest ways to model it and assumption we can do in TROLL regarding described process.
 
-This algorithm is a nearest neighbor algorithm which simulates selective logging as a contagious spatial process thus similar to spread of fire in the forest. The tree with the highest probability to be cut $P_t$ is selected, then the algorithm compare the nearest neighbor probability of cutting $P_n$ to a random value between 0 and 1 to choose to cut it or not. If succesful the algorithm continue to spred the gap until the test is negative. When the test is negatvie the algorithm select the tree with the highest probability to be cut $P_t$ which is still alive. The algorithm run untill it reaches extraction objective(s) $O_t$.
+# Designation
 
-**This algorithm was developped and test with a dataset from Haliburton, Canada. Consequently it is simulating correctly temperate selective logging which may highly differ from selective logging we may encounter in french Guiana. As a results we may have to adapt the  algorithm. A first major limit is to which extent can we allow the model to grow a gap (a limit gap size) ?**
+Before logging we first need to designate and select trees which will be harvested inside simulations.
 
-Still if we want to adapt this algorithm, probability of cutting a tree $P_t$ will depend on species and harvesting criteria whereas extraction objective(s) $O_t$ will represents intensity (table 1). Extraction objective(s) $O_t$ can be based on one or multiple criteria encompassing number of trees harvested (N in $nb.ha^{-1}$), harvested basal area (BA in $m^2.ha^{-1}$), and canopy maximum opening (CO in $m^2.ha^{-1}$) (**Other criterion ?**). Probability to be cut $P_t$ will be computed for each tree regarding its species and diameter. Probability to be cut regarding the tree diameter ${P_t}_{dbh}$ will be specific and vary from 0 to 1 between minimum and maximum harvesting diameter of the species (resp. $dbh_{min}$ and $dbh_{max}$) (**Probability increase curve is to be defined**). Consequently $dbh_{min}$ and $dbh_{max}$ have to be precised for each harvested species in input. Probability to be cut regarding the tree species ${P_t}_{sp}$ will be proportional to defined proportion of species in harvesting. Consequently ${P_t}_{sp}$ have to be precised for each harvested species in input. Then probability to be cut $P_t$ can be defined as:
-$$ P_t = {P_t}_{dbh} * {P_t}_{sp} = f(dbh_{min}, dbh_{max}) * {P_t}_{sp}$$
+## Harvestable areas
 
-Table 1: Parameters for the algorithm. *Parameters with their names and related factors.*
-```{r table}
-tab1 <- data.frame(
-  Parameter = c('$P_t$', '$O_t$'),
-  Name = c('Probabilty to be cut', 'Extrcation objective(s)'),
-  Factors = c('Species x Diameter', 'N, BA, Canopy opening, multicriteria')
-  )
-kable(tab1)
-```
+### Reality
 
-Consequently following the scheme we are able to simulate completely selective logging. We now need to model resulting damages.
+First, havrestable areas are defined by keeping all areas with a slope lower than 22 percent. A buffer of 30 meters is added to all harvestable areas representing engine capacity to extract wood with cables. Note that hazards like climate (dry or drought) can reduce or increase capacity of engine to explore a given area. In case of need bulldozer can be used to go in steeper slopes and grading can be realized to join harvestable areas.
 
-# Damages
+### Modelling
 
-First few articles did not considered damages in sylviculture simulations [@Arii2008; @Tietjen2006]. So we may consider damages to be an option of sylviculture module inside TROLL (**?**).
+One major limit of current implementation of TROLL model is that it assumes a flat environment. Consequently the whole simulated area inside TROLL can be considered has an harvestable zone. It conequently simplifies this first part but we need to keep in mind this major assumption in subsequent analysis.
 
-## Harvested treefall
+## Tree designation
 
-Harvested treefall can be considered random or oriented toward a direction of interest. Both @Huth2004 and @Ruger2008 assumed falling logged tree toward already logged patch for reduced impact logging method (RIL) against random direction for conventional sylviculture. Nevertheless in our context falling logged tree toward a direction of interest can be considered as dubious  (Traissac personnal communication) (**?**). In both cases we can use TROLL function `FallTree` in its original version for random fall or in an adapted version to explicitly model harvesting damages due to harvested treefall.
+### Reality
+
+Tree are then designated directly in the field in three categories: reserve trees for individuals with an ecological interest, future trees for individuals which can be harvested in the next cycle, and harvestable trees which will be sold for harvesting in current cycle. Harvestable trees are designated according to their species and maximum and minimum harvestable diameter associated to the species (detailed available in sylviculture guide **ref**). Total basal area of designated trees is then computed and aims 25 $m^3.ha^{-1}$ to be harvested. But because 20-30 percent of designated trees are considered as rotten once probed by the lumber, total harvestable volume aims 30 $m^3.ha^{-1}$. Finally, because the harvesters are focusing on few rare species with more precious wood (Angéliques, Gonfolo, Grignon franc, Balata and few rares), about only 20 $m^3.ha^{-1}$ are harvested. In addition to that, few rules are added for some species when designating trees (e.g. no more than one Angélique every 50 meters and only one Bagasse for two). Finally it happens that there is more or less than 30 $m^3.ha^{-1}$ of designated trees. If there is fewer it will be sold in this state, if there is more the minimum harvestable diameter is increased. The global idea is to gain maximum profit without exceding 25% of aboveground biomass (AGB) disturbance. Last but not least, this direct designation on the field before harvesting does not seems to result in aggregated extraction.
+
+*NB: In fact only 50 percent of designated trees considered as rotten once probed by the lumber would be really entirely rotten. 50% of theim would be vital on 90% of the volume. Moreover if fuelwood economy is developped rotten tree could be used and the risk to cut a rotten tree could be taken (especially if 50% of theim are actually harvestable). But this fact only represent a perspective for the moment.*
+
+### Modelling
+
+In previous document I suggested to use the selection harvesting algorithm from @Arii2008. This algorithm is a nearest neighbor algorithm which simulates selective logging as a contagious spatial process thus similar to spread of fire in the forest. The tree with the highest probability to be cut $P_t$ is selected, then the algorithm compare the nearest neighbor probability of cutting $P_n$ to a random value between 0 and 1 to choose to cut it or not. If succesful the algorithm continue to spred the gap until the test is negative. When the test is negatvie the algorithm select the tree with the highest probability to be cut $P_t$ which is still alive. The algorithm run untill it reaches extraction objective(s) $O_t$. This algorithm was developped and test with a dataset from Haliburton, Canada. And it seems it can not be directly adapted to sylviculture in french guiana. So we may have to think a new way to simulate sylviculture following all previous informations.
+
+The harvestable area will be the whole simulated forest. We will need to integrate an external file with all harvestable species precising their minimum and maximum harvestable diameter (following the sylviculture guide). Following those data the model can calculate the total harvestable volume ${V_h}_{tot}$ and retains all trees id as **can be designated**. If ${V_h}_{tot} < 30*n_{ha}$, then all **can be designated** tree are considered as **designated**. If ${V_h}_{tot} > 30*n_{ha}$, then minimum harvestable diameter $D_{min}$ is increased untill ${V_h}_{tot} < 30*n_{ha}$, and finally all **can be designated** tree are considered as **designated**. Thereafter we need to split **designated** trees between **harvested** and **designated but not harvested**. This distinction is due to two reasons: rotten trees and trees considered as not interesting by the harvester. The most complicated parts is to split **designated** trees between those kept or not by the harvester. Once this is done we can simply randomly remove 10-20 percent of theim considered as rotten. **Designated** trees kept by the harvester could be linked to an additional data representing the species interest in external file. Each harvestable species could be ranked on its economic value. Then the model will kept only 20 $m^3.ha^{-1}$ inside designated trees by taking only higher rank species. 
+
+*I'm open on suggestion and other way to model designated trees kept by the harvester ?*
+
+# Harvesting
+
+Once designated we can proceed to logging and associated damages.
+
+## Logging
+
+### Reality
+
+Main issue around the logging will be treefall direction. Due to crown aspects treefall is often considered as random. Whereas difficult to manage, treefall can still be oriented. In fact 4 orientations are available for treefall when logging (see figure 1). Oriented treefall idea is to get logs oriented at 45° two skidding ways to reduce damages when skidding. Currently few harvesters are applying this practice.
+
+![figure 1. Treefall orientations when logging](treefall.png)
+
+### Modelling
+
+Whereas interessant to test, due to the fact it is not much applied in french guiana, I think we should not model oriented logging. We should consider logging treefall as random like current treefall implementation inside TROLL.
 
 ## Roads and skidding
 
-Currently TROLL model assumed a flat environment. Consequently roads might be relatively easy to simulate. Roads and skidding are related and depend on sylviculture method (**To discuss**). All articles modelled roads and skidding not explicitly but as an increased mortality [@Huth2004; @Khler2004; @Ruger2008]. I argue that we can model both roads and skidding explicitly (**?**). Roads on a flat environment may be obvious and skidding damages depend on tree diameter and closest point on the closest road. Consequently, I think we can have a more precise sylviculture module by simulating all direct effects of sylviculture explicitly (i.e. logging, treefall, roads and skidding).
+### Reality
 
-## Long term effects
+Roads are split in three classes: truck roads, main tractor track, and secondary track ('cloisonement'). Main tractor roads are used by skidding engines and follow crest model ; a function can calculate in advance their volume of transit by summing all pixels they serve and assuming 20 $m^3.ha^{-1}$. Secondary track are computed once trees have been designated and the geolocation taken. Secondary track are all at a maximum distance of 30 meters from designated trees (because engine cables reach 50 meters but with an angle of 45°). Last thing taken into account is secondary track slope between track border ('devers') ; it need to be under 4%.
 
-Long term effects can be related to hurted tree, dead seed and seedlings and soil damages. Long term effects results in an increased mortality. It seems not possible to explicitly model those long term effects. All articles modelling damages only assumed a constant increased mortality for 10 years after the harvesting [@Huth2004; @Khler2004; @Ruger2008]. We can relate this to basal death rate $m$ inside TROLL and increase it by a factor after harvesting. Two aspects have to be defined the increased mortality intensity $I_m$ and duration $\Delta t_m$. Due to an increased mortality reducing in time, I suggest that the increased mortality intensity after logging is function of the time after logging $I_m = f(t_m)$ instead of constant. I suggest to fit it with Paracou data by measuring global difference of mortality before logging and after logging along time (**?**).
+*NB: A perspective in skidding is the logs length for skidding. For time purposes, currently logs are skidded in one piece. But because damages are proportionnal two the square of the length of the logs it could be questionned. Effectively long logs have increased damages in curves during skidding.*
+
+### Modelling
+
+One more time, one major assumption of TROLL is a flat environment. Consequently the main track can be considered as a way starting from the middle of one side of the simulated forest and reaching the center. Thereafter secondary track can be modelled with `piste 2` software or algorithm using designated trees inside TROLL. Last thing is to model damages during skidding. We can imagine to explicitly kill trees in a radius around the secondary track depending on logs length (fitted with Paracou data on plot 9). The question of logs length for skidding is interesting and could be tested if we explicitly model damages around secondary track in that way. *Beside I don't think to integrate this issue in the context of my internships.*
+
+## Other damages
+
+### Reality
+
+The Office Nationale des Forêts is realizing diagnostic of disturbance from harvesting (DPE). First results suggests that the time for the ecosystem to come back to its original death rate depend on the original death rate intensity. But this time seems lower thant the 10 years often used in simulations [@Huth2004; @Khler2004; @Ruger2008].
+
+### Modelling
+
+Nevertheless, in addition to trees killed or hurted by treefall, roads and skidding explicitly modelled, it seems that we need to take into account an implicit extra mortality. This increased mortality following harvesting is decreasing in time untill null. It could be fitted on Paracou data.
 
 # Conclusion
 
-Any points of previous reasoning can be discussed. Anyway I will just summarise points to discuss by paragraphs :
+## Paracou
 
-- Logging
-    - *Use of @Arii2008 algorithm ?*
-    - *Limit gap size ?*
-    - *Extraction objectives criteria ?*
-    - *Probability to be cut calculation ?*
-- Damages
-    - *Damages as an option ?*
-    - Harvested treefall
-        - *Explicit simulation of treefall ?*
-        - *Random or directed treefall for harvested tree ?*
+Paracou harvesting effectively represents more volume than current logging in french guiana. Still damages are similar to what we can have now. Consequently it appears as a correct site to fit different parameters for the model.
+
+## Model
+
+We can summarize modelling of selective logging in few steps :
+
+- Designation
+    - Harvestable area: the whole simulated forest
+    - Tree designation
+        - Can be designated: all trees meeting species minimum and maximum harvestable diameters
+        - Designated: all trees meeting species minimum and maximum harvestable diameters under or equal to a total volume of 30 $m^3.ha^{-1}$
+        - Probed: first ranked trees according to harvesters reaching a total volume of 20 $m^3.ha^{-1}$
+        - Harvested: probed trees less 10-20% of randomly selected trees considered as rotten
+- Harvesting
+    - Logging: hurted to death and treefall at random direction
     - Roads and skidding
-        - *Explicit simulation of road ?*
-        - *Designed of road on a flat environment ?*
-        - *Road and skidding related to sylviculture method (RIL, conventional...) ?*
-        - *Explicit simulation of skidding ?*
-    - Long term effects
-        - *Implicit long term effects ?*
-        - *Increased mortality decreasing in time ?*
-        - *Fit a model with Paracou data ?*
+        - Main track: from the middle of one side of the simulated forest to the center
+        - Secondary tracks: using `piste 2` algorithm and damages around the track in a radius proportionnal to logs length (fitted with Paracou data)
+    - Other damages: increased mortality after harvesting decreasing until null (fitted with Paracou data)
+
+## Perspectives
+
+Current slective logging in french guiana encompass different perspective to evolve. Some are summarized here:
+
+- Diversification: harvesting more species (harvesters select species with higher economical interest)
+- Oriented treefall: see section about logging
+- Logs length for skidding: see section about roads and skidding
+- Thinning: remove trees to increase growth grom trees of interest
+
+## Internship question
+
+One major advantage of TROLL model compare to other simulators spatially-explicits and individual-based (e.g. FORMIND and SORTIE) is the use of species and not of plant functionnal types (PFT). In that way, TROLL outperform other simulators to simulates biodiversity and its related effects. This is the reason why I think I could use the implementation of the sylviculture module inside TROLL to study the perspective if diversification. *In which order reducing damages on global diversity by increasing harvesting diversity will affect forest ecosystem answer to the distruabnce brought by selective logging ?*
 
 # References

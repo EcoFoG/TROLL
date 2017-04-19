@@ -1,0 +1,141 @@
+---
+title: "Paracou"
+author: "Sylvain Schmitt"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+runtime: shiny
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r config, message=FALSE, warning=FALSE, include=FALSE}
+rm(list = ls()) ; invisible(gc())
+library(knitr)
+library(parallel)
+library(TROLL)
+library(RconTroll)
+library(ggplot2)
+library(cowplot)
+library(plotly)
+library(readr)
+library(dplyr)
+library(shiny)
+library(rgdal)
+library(raster)
+library(leaflet)
+library(htmltools)
+cores <- detectCores()
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
+    cache = T, cache.lazy = F)
+```
+
+```{r Paracou, include=FALSE}
+# Getting files
+path <- '~/Documents/ECOFOG/TROLL/inst/extdata/Paracou/'
+files <- list.files(path, pattern = '.csv')
+# Opening code and species
+code <- read_csv(file.path(path, files[grep('code', files)]))
+code$MesuMort <- c('FAUX', 'VRAI')[as.factor(code$MesuMort)]
+names(code) <- c('code_vivant', 'code_mesure', 'status')
+species <- read_csv(file.path(path, files[grep('species', files)]))
+species <- species[!duplicated(species$idTaxon),]
+species$name <- apply(species, 1, function(x) paste(x[3], x[4]))
+names(species) <- c('speciesID', 'family', 'genus', 'species', 'name')
+# Opening data
+data <- sapply(files[grep(19, files)], function(x) read_delim(file.path(path, x), ";", escape_double = F, trim_ws = T), simplify = F)
+data <- do.call('rbind', data) ; rm(files)
+data <- left_join(data, code) ; rm(code)
+data$harvesting <- 'Post'
+data$harvesting[which(data$campagne < 1987)] <- 'Pre'
+data$logged <- 0 ; data$logged[which(data$status == 'Logged tree')] <- 1
+data$dbh <- data$circonf / pi
+data <- data[c('Xutm', 'Yutm', 'idArbre', 'X', 'Y', 'n_carre', 'n_parcelle', 
+               'campagne',  'harvesting', 'dbh', 'code_vivant', 'code_mesure', 'status', 'logged', 'idTaxon')]
+names(data) <- c('Xutm', 'Yutm', 'id', 'x', 'y', 'square', 'plot',  'census', 
+                 'harvesting',  'dbh', 'alive', 'statusID', 'status', 'logged', 'speciesID')
+data$logged <- as.factor(data$logged)
+data$alive <- as.factor(data$alive)
+data$plot <- as.factor(data$plot)
+data$square <- as.factor(data$square)
+data$status <- as.factor(data$status)
+# data <- left_join(data, species) ; rm(species)
+```
+
+```{r function}
+library(sp)
+yearData <- function(data, species, year = 1987, plot = 9, square = NA, alive = TRUE, dead = TRUE, label = 'name'){
+  if(!alive)
+    data <- data[-which(data$alive == 'VRAI'),]
+  if(!dead)
+    data <- data[-which(data$alive == 'FAUX'),]
+  data <- data[which(data$census == year),]
+  if(!is.na(plot[1]))
+    data <- data[which(data$plot %in% plot),]
+  if(!is.na(square))
+    data <- data[which(data$square == square),]
+  if(!is.na(species[1,1]))
+    data <- data.frame(left_join(data, species))
+  data$label <- data[,which(names(data) == label)]
+  coordinates(data) <- ~Xutm + Yutm
+  proj4string(data) <- '+proj=utm +zone=22 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0'
+  data <- spTransform(data, CRSobj = '+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0')
+  return(data)
+}
+```
+
+```{r data, include=FALSE}
+dsn <- '/home/sylvain/Documents/ECOFOG/TROLL/inst/extdata/Paracou/sig'
+crs <- '+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0'
+layers <- as.character(ogrListLayers(dsn))
+shp <- sapply(layers, function(l) readOGR(dsn, layer = l))
+shp <- lapply(shp, function(l) spTransform(l, CRSobj = crs))
+mnt <- raster(file.path(dsn, 'MNT_5m/MNT_ParacouAvril2009_5m.tif'))
+mnt <- projectRaster(mnt, crs = crs)
+MNTpal <- colorNumeric(c("#f7f7f7", "#cccccc", "#969696", "#525252"), 
+                    values(mnt), na.color = "transparent")
+l <- leaflet(width = 1800, height = 900) %>% 
+    addTiles(group = 'Background') %>%
+    addRasterImage(mnt, colors = MNTpal, opacity = 0.8, group = 'MNT') %>%
+    addPolylines(data = shp$RoadsPaths, group = 'Road paths', color = 'black') %>%
+    addPolylines(data = shp$SkidTrails, group = 'Skid trails', color = 'black') %>%
+    addPolygons(data = shp$DisturbedAreas, group = 'Disturbed areas', color = 'green') %>%
+    addPolygons(data = shp$Gaps, group = 'Gaps', color = 'green') %>%
+    addPolylines(data = shp$LoggingDirection, group = 'Logging direction', color = 'red') %>%
+    addLayersControl(overlayGroups = c('Background', 'MNT',
+                                       'Skid trails', 'Gaps', 'Road paths',
+                                       'Logging direction', 'Disturbed areas'),
+                     options = layersControlOptions(collapsed = F))
+```
+
+Maps
+==================
+
+Inputs {.sidebar}
+-------------------------------------
+```{r parms, echo=FALSE, cache=FALSE}
+checkboxInput('a', 'Alive', TRUE)
+checkboxInput('d', 'Dead', FALSE)
+selectInput('l', 'Label', c('name', 'status', 'alive', 'square', 'logged'), 'name')
+sliderInput("p", "Plot", 1, 15, 9)
+sliderInput("y", "Census", 1984, 2016, 1987)
+```
+
+Map {data-width=1800, data-height=900}
+-------------------------------------
+```{r plot, echo=FALSE, cache=FALSE, fig.height=900, fig.width=1800}
+fillCol(height = 800, flex = c(NA, 1), 
+  leafletOutput('map', width = "100%", height = 900)
+)
+
+output$map <- renderLeaflet({
+  test <- yearData(data, species, year = input$y, plot = input$p, alive = input$a, dead = input$d, label = input$l)
+  TREEpal <- colorFactor("viridis", as.factor(test@data$label), na.color = "transparent")
+  l %>%
+    addCircles(data = test, radius = ~dbh/100, color = ~TREEpal(label), label = ~htmlEscape(label), group = 'Trees') %>%
+    addLegend(pal = TREEpal, values = levels(as.factor(test@data$label)), title = 'Label')
+})
+```
+
