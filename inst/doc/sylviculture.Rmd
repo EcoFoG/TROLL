@@ -39,7 +39,7 @@ This document focuses explicitly on sylviculture as it is realized in french gui
     - Harvestable areas
     - Tree designation
 - Harvesting
-    - Logging
+    - Felling and logging
     - Roads and skidding
     - Other damages
 
@@ -58,7 +58,7 @@ Before logging we first need to designate and select trees which will be harvest
 
 ### Reality
 
-First, havrestable areas are defined by keeping all areas with a slope lower than 22 percent. A buffer of 30 meters is added to all harvestable areas representing engine capacity to extract wood with cables. Note that hazards like climate (dry or drought) can reduce or increase capacity of engine to explore a given area. In case of need bulldozer can be used to go in steeper slopes and grading can be realized to join harvestable areas.
+First, havrestable areas are defined out of lowland areas and in the remainder by keeping all areas with a slope lower than 22 percent. A buffer of 30 meters is added to all harvestable areas representing engine capacity to extract wood with cables. Note that hazards like climate (dry or drought) can reduce or increase capacity of engine to explore a given area. In case of need bulldozer can be used to go in steeper slopes and grading can be realized to join harvestable areas.
 
 ### Modelling
 
@@ -68,7 +68,7 @@ One major limit of current implementation of TROLL model is that it assumes a fl
 
 ### Reality
 
-Tree are then designated directly in the field in three categories: reserve trees for individuals with an ecological interest, future trees for individuals which can be harvested in the next cycle, and harvestable trees which will be sold for harvesting in current cycle. Harvestable trees are designated according to their species and maximum and minimum harvestable diameter associated to the species (detailed available in sylviculture guide **ref**). Total basal area of designated trees is then computed and aims 25 $m^3.ha^{-1}$ to be harvested. But because 20-30 percent of designated trees are considered as rotten once probed by the lumber, total harvestable volume aims 30 $m^3.ha^{-1}$. Finally, because the harvesters are focusing on few rare species with more precious wood (Angéliques, Gonfolo, Grignon franc, Balata and few rares), about only 20 $m^3.ha^{-1}$ are harvested. In addition to that, few rules are added for some species when designating trees (e.g. no more than one Angélique every 50 meters and only one Bagasse for two). Finally it happens that there is more or less than 30 $m^3.ha^{-1}$ of designated trees. If there is fewer it will be sold in this state, if there is more the minimum harvestable diameter is increased. The global idea is to gain maximum profit without exceding 25% of aboveground biomass (AGB) disturbance. Last but not least, this direct designation on the field before harvesting does not seems to result in aggregated extraction.
+Trees are then designated directly in the field in three categories: reserve trees for individuals with an ecological interest, future trees for individuals which can be harvested in the next cycles, and harvestable trees which will be sold for harvesting in current cycle. Harvestable trees are designated according to their species and maximum and minimum harvestable diameter associated to the species (detailed available in sylviculture guide **ref**). Total basal area of designated trees is then computed and aims 25 $m^3.ha^{-1}$ to be harvested. But because 20-30 percent of designated trees are considered as rotten once probed by the lumberman, total harvestable volume aims 30 $m^3.ha^{-1}$. Finally, because the harvesters are focusing on few species with easier marketable wood for the moment (Angélique, Gonfolo, Grignon franc, Balata and few rares), about only 20 $m^3.ha^{-1}$ are harvested, and sometimes less, especially in the West forests of French Guiana. In addition to that, few rules are added for some species when designating trees (e.g. protecting no more than one Angélique and Gonfolo every 100 meters for seeding and only one Bagasse for two). Finally it happens that there is more or less than 30 $m^3.ha^{-1}$ of designated trees. If there is fewer it will be sold in this state, if there is more the minimum harvestable diameter is increased. The global idea is to gain maximum profit without exceding 25% of aboveground biomass (AGB) disturbance. Last but not least, this direct designation on the field before harvesting does not seems to result in aggregated extraction.
 
 *NB: In fact only 50 percent of designated trees considered as rotten once probed by the lumber would be really entirely rotten. 50% of theim would be vital on 90% of the volume. Moreover if fuelwood economy is developped rotten tree could be used and the risk to cut a rotten tree could be taken (especially if 50% of theim are actually harvestable). But this fact only represent a perspective for the moment.*
 
@@ -76,7 +76,7 @@ Tree are then designated directly in the field in three categories: reserve tree
 
 In previous document I suggested to use the selection harvesting algorithm from @Arii2008. This algorithm is a nearest neighbor algorithm which simulates selective logging as a contagious spatial process thus similar to spread of fire in the forest. The tree with the highest probability to be cut $P_t$ is selected, then the algorithm compare the nearest neighbor probability of cutting $P_n$ to a random value between 0 and 1 to choose to cut it or not. If succesful the algorithm continue to spred the gap until the test is negative. When the test is negatvie the algorithm select the tree with the highest probability to be cut $P_t$ which is still alive. The algorithm run untill it reaches extraction objective(s) $O_t$. This algorithm was developped and test with a dataset from Haliburton, Canada. And it seems it can not be directly adapted to sylviculture in french guiana. So we may have to think a new way to simulate sylviculture following all previous informations.
 
-The harvestable area will be the whole simulated forest. We will need to integrate an external file with all harvestable species precising their minimum and maximum harvestable diameter (following the sylviculture guide). Following those data the model can calculate the total harvestable volume ${V_h}_{tot}$ and retains all trees id as **can be designated**. If ${V_h}_{tot} < 30*n_{ha}$, then all **can be designated** tree are considered as **designated**. If ${V_h}_{tot} > 30*n_{ha}$, then minimum harvestable diameter $D_{min}$ is increased untill ${V_h}_{tot} < 30*n_{ha}$, and finally all **can be designated** tree are considered as **designated**. Thereafter we need to split **designated** trees between **harvested** and **designated but not harvested**. This distinction is due to two reasons: rotten trees and trees considered as not interesting by the harvester. The most complicated parts is to split **designated** trees between those kept or not by the harvester. Once this is done we can simply randomly remove 10-20 percent of theim considered as rotten. **Designated** trees kept by the harvester could be linked to an additional data representing the species interest in external file. Each harvestable species could be ranked on its economic value. Then the model will kept only 20 $m^3.ha^{-1}$ inside designated trees by taking only higher rank species. 
+The harvestable area will be the whole simulated forest. We will need to integrate an external file with all harvestable species precising their minimum and maximum harvestable diameter (following the sylviculture guide). Following those data the model can calculate the total harvestable volume ${V_h}_{tot}$ and retains all trees id as **can be designated**. If ${V_h}_{tot} < 30*n_{ha}$, then all **can be designated** tree are considered as **designated**. If ${V_h}_{tot} > 30*n_{ha}$, then minimum harvestable diameter $D_{min}$ is increased untill ${V_h}_{tot} < 30*n_{ha}$, and finally all **can be designated** tree are considered as **designated**. Thereafter we need to split **designated** trees between **felled** and **designated but not felled**. This distinction is due to two reasons: rotten trees and trees considered as not interesting by the lumberman. The most complicated parts is to split **designated** trees between those kept or not by the harvester. Once this is done we can simply randomly remove 10-20 percent of theim considered as rotten. **Designated** trees kept by the harvester could be linked to an additional data representing the species interest in external file. Each harvestable species could be ranked on its economic value. Then the model will kept only 20 $m^3.ha^{-1}$ inside designated trees by taking only higher rank species. 
 
 *I'm open on suggestion and other way to model designated trees kept by the harvester ?*
 
@@ -88,21 +88,21 @@ Once designated we can proceed to logging and associated damages.
 
 ### Reality
 
-Main issue around the logging will be treefall direction. Due to crown aspects treefall is often considered as random. Whereas difficult to manage, treefall can still be oriented. In fact 4 orientations are available for treefall when logging (see figure 1). Oriented treefall idea is to get logs oriented at 45° two skidding ways to reduce damages when skidding. Currently few harvesters are applying this practice.
+Main issue around the logging will be treefall direction. Due to crown aspects treefall is often considered as random. Whereas difficult to manage, treefall can still be oriented. In fact 4 orientations are available for treefall when logging (see figure 1). Oriented treefall idea is to get logs oriented at 45° two skidding ways to reduce damages when skidding. Currently few harvesters are applying this practice which is to be developed.
 
 ![figure 1. Treefall orientations when logging](treefall.png)
 
 ### Modelling
 
-Whereas interessant to test, due to the fact it is not much applied in french guiana, I think we should not model oriented logging. We should consider logging treefall as random like current treefall implementation inside TROLL.
+Whereas interessant to test, due to the fact it is not much applied in french guiana, I think we should not model oriented logging for the moment. We should consider logging treefall as random like current treefall implementation inside TROLL.
 
 ## Roads and skidding
 
 ### Reality
 
-Roads are split in three classes: truck roads, main tractor track, and secondary track ('cloisonement'). Main tractor roads are used by skidding engines and follow crest model ; a function can calculate in advance their volume of transit by summing all pixels they serve and assuming 20 $m^3.ha^{-1}$. Secondary track are computed once trees have been designated and the geolocation taken. Secondary track are all at a maximum distance of 30 meters from designated trees (because engine cables reach 50 meters but with an angle of 45°). Last thing taken into account is secondary track slope between track border ('devers') ; it need to be under 4%.
+Roads are split in three classes: truck roads, main tractor track, and secondary track ('cloisonement'). Main skidtrails are used by skidding engines and follow crest model ; a function can calculate in advance their volume of transit by summing all pixels they serve and assuming 20 $m^3.ha^{-1}$. Secondary track are computed once trees have been designated and the geolocation taken. Secondary track are all at a maximum distance of 30 meters from designated trees (because engine cables reach 50 meters but with an angle of 45°). Last thing taken into account is secondary track slope between track border ('devers') ; it need to be under 4%.
 
-*NB: A perspective in skidding is the logs length for skidding. For time purposes, currently logs are skidded in one piece. But because damages are proportionnal two the square of the length of the logs it could be questionned. Effectively long logs have increased damages in curves during skidding.*
+*NB: A perspective in skidding is the logs length for skidding. For time purposes, currently logs are skidded in one piece. But because damages are proportionnal to the square of the length of the logs it could be questionned. Effectively long logs have increased damages in curves during skidding.*
 
 ### Modelling
 
@@ -112,11 +112,11 @@ One more time, one major assumption of TROLL is a flat environment. Consequently
 
 ### Reality
 
-The Office Nationale des Forêts is realizing diagnostic of disturbance from harvesting (DPE). First results suggests that the time for the ecosystem to come back to its original death rate depend on the original death rate intensity. But this time seems lower thant the 10 years often used in simulations [@Huth2004; @Khler2004; @Ruger2008].
+The Office Nationale des Forêts is realizing diagnostic of disturbance from harvesting (DPE). The question of increased mortality is also studied with GUYAFOR and TmFO plots. First results suggests that the time for the ecosystem to come back to its original death rate depend on the original death rate intensity. But this time seems lower thant the 10 years often used in simulations [@Huth2004; @Khler2004; @Ruger2008].
 
 ### Modelling
 
-Nevertheless, in addition to trees killed or hurted by treefall, roads and skidding explicitly modelled, it seems that we need to take into account an implicit extra mortality. This increased mortality following harvesting is decreasing in time untill null. It could be fitted on Paracou data.
+Nevertheless, in addition to trees killed or hurted by treefall, roads and skidding explicitly modelled, it seems that we need to take into account an implicit extra mortality. This increased mortality following harvesting is decreasing in time untill null. It could be fitted on Paracou and/or TmFO data.
 
 # Conclusion
 
@@ -134,22 +134,23 @@ We can summarize modelling of selective logging in few steps :
         - Can be designated: all trees meeting species minimum and maximum harvestable diameters
         - Designated: all trees meeting species minimum and maximum harvestable diameters under or equal to a total volume of 30 $m^3.ha^{-1}$
         - Probed: first ranked trees according to harvesters reaching a total volume of 20 $m^3.ha^{-1}$
-        - Harvested: probed trees less 10-20% of randomly selected trees considered as rotten
+        - Harvested: probed trees less 20-30% of randomly selected trees considered as rotten
 - Harvesting
     - Logging: hurted to death and treefall at random direction
     - Roads and skidding
         - Main track: from the middle of one side of the simulated forest to the center
-        - Secondary tracks: using `piste 2` algorithm and damages around the track in a radius proportionnal to logs length (fitted with Paracou data)
+        - Secondary tracks: using `piste 3` or a similar algorithm plus damages around the track in a radius proportionnal to logs length (fitted with Paracou data)
     - Other damages: increased mortality after harvesting decreasing until null (fitted with Paracou data)
 
 ## Perspectives
 
 Current slective logging in french guiana encompass different perspective to evolve. Some are summarized here:
 
-- Diversification: harvesting more species (harvesters select species with higher economical interest)
+- Diversification: harvesting more species (harvesters select species with higher economical interest) to reach 25 $m^3.ha^{-1}$
 - Oriented treefall: see section about logging
 - Logs length for skidding: see section about roads and skidding
 - Thinning: remove trees to increase growth grom trees of interest
+- Decreasing the maximum distance of skid trail from felled trees from 30 to 20 m, which will result in an increase in the skid trails network, in the fuelwood harvest and a decrease of the skidding costs
 
 ## Internship question
 

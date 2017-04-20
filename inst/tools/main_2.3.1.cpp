@@ -27,6 +27,7 @@
  ###    version 2.3.0 --- IM & JC - janv-feb 2017: new tree size threshold to maturity (dbhmature), changes in input file structure, corrections of temperature dependencies in GPPleaf. Code acceleration (use of lookup tables instead of functions in the calculations of the Fluxh() and GPPleaf() routines; faster whole-tree GPP calculation. This results in an increase in speed of a factor 4.
  ###    version 2.3.1 --- IM & JC - feb-mar 2017: introduces the dispersal cell, or dcell concept (square subplot of linear size length_dcell)
  ###    version 2.3.1.dev --- SS - febr 2017 disturbance module implementation
+ ###    version 2.3.1.dev --- SS - apr 2017 logging module implementation
  ###    code acceleration FASTGPP concept improved.
  ###    DCELL: GNU scientific library is needed -- on osx, type "brew install gsl"
  ###    DCELL: Compile command (osx/linux):
@@ -71,7 +72,7 @@ using namespace std;
 # define twoPi 6.2831853071
 # define Pis2 1.570796327
 # define iPi 0.3183099
-char buffer[256], inputfile[256], outputinfo[256], inputfile_data[256], *bufi(0), *buf(0), *bufi_data(0);
+char buffer[256], inputfile[256], outputinfo[256], inputfile_data[256], inputfile_sylviculture[256], *bufi(0), *buf(0), *bufi_data(0), *bufi_sylviculture(0);
 
 
 /* random number generators */
@@ -82,7 +83,7 @@ void sgenrand2i(unsigned long);
 
 /* file output streams */
 
-fstream out,out2;
+fstream out,out2,out3;
 
 fstream output[38];
 
@@ -95,16 +96,17 @@ fstream output[38];
 
 bool
 _FASTGPP=1,             /* This defines an option to compute only GPP from the topmost value of PPFD and GPP, instead of looping within the crown. Much faster and more accurate */
-_BASICTREEFALL=0,       /* if defined: treefall is a source of tree death (and if TREEFALL not defined, this is modeled through simple comparison between tree height and a threshold t_Ct, if not defined, treefall is not represented as a separated and independent source of death, but instead, all tree death are due to the deathrate value) */
-_TREEFALL=0,            /* computation of the force field if TREEFALL is defined, neighboring trees contribute to fell each tree */
+_BASICTREEFALL=1,       /* if defined: treefall is a source of tree death (and if TREEFALL not defined, this is modeled through simple comparison between tree height and a threshold t_Ct, if not defined, treefall is not represented as a separated and independent source of death, but instead, all tree death are due to the deathrate value) */
+_TREEFALL=1,            /* computation of the force field if TREEFALL is defined, neighboring trees contribute to fell each tree */
 _DAILYLIGHT=1,          /* if defined: the rate of carbon assimilation integrates an average daily fluctuation of light (thanks to GPPDaily). Should be defined to ensure an appropriate use of Farquhar model */
 _SEEDTRADEOFF=0,        /* if defined: the number of seeds produced by each tree is determined by the tree NPP allocated to reproduction and the species seed mass, otherwise the number of seeds is fixed; besides, seedling recruitment in one site is not made by randomly and 'equiprobably' picking one species among the seeds present at that site but the probability of recruitment among the present seeds is proportional to the number of seeds (in s_Seed[site]) time the seed mass of each species */
-_NDD=0,                 /* if defined, negative density dependant processes affect both the probability of seedling recruitment and the local tree death rate. The term of density-dependance is computed as the sum of conspecific tree basal area divided by their distance to the focal tree within a neighbourhood (circle of radius 15m) */
+_NDD=1,                 /* if defined, negative density dependant processes affect both the probability of seedling recruitment and the local tree death rate. The term of density-dependance is computed as the sum of conspecific tree basal area divided by their distance to the focal tree within a neighbourhood (circle of radius 15m) */
 _OUTPUT_reduced=0,      /* reduced set of ouput files */
 _OUTPUT_last100=0,      /* output that tracks the last 100 years of the simulation for the whole grid (2D) */
 _OUTPUT_fullLAI=0,       /* output of full final voxel field */
 _FromData=0,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
-_DISTURBANCE=1;			/* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
+_DISTURBANCE=0,			/* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
+_LOGGING=0;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
 
 
 /********************************/
@@ -158,8 +160,14 @@ float daily_vpd[24];      /* normalized (ie between 0 and 1) daily vpd variation
 float daily_T[24];        /* normalized (ie between 0 and 1) daily T variation (used if DAILYLIGHTdefined) */
 
 /* new disturbance module */
-int disturb_iter;       /* iteration step where the disturbation occure */
-float disturb_intensity;      /* intensity of disturbance in percent of BA */
+int disturb_iter;			/* iteration step where the disturbation occure */
+float disturb_intensity;	/* intensity of disturbance in percent of BA */
+
+/* new logging module */
+int numespharvestable,		/* number of harvestable species */
+designated_volume,			/* volume designated for harvesting in m3/ha */
+harvested_volume;       	/* volume harvested in m3/ha */
+float rotten;      			/* percentage of rotten tree in probed trees */
 
 /*********************************************/
 /* Environmental variables of the simulation */
@@ -293,6 +301,7 @@ MPI_ShareTreefall(unsigned short **,int);
 void
 Initialise(void),
 InitialiseFromData(void),
+InitialiseLogging(fstream&),	// _LOGGING
 AllocMem(void),
 BirthInit(void),
 Evolution(void),
@@ -302,7 +311,8 @@ UpdateTree(void),
 Average(void),
 OutputField(void),
 FreeMem(void),
-Disturbance(void);					// _DISTURBANCE
+Disturbance(void),					// _DISTURBANCE
+SelectiveLogging(void);				// _LOGGING
 
 /**********************/
 /** Output routines ***/
@@ -403,7 +413,12 @@ public:
 #ifdef MPI
     unsigned char *s_Gc[4]; /* MPI: seeds on neighboring procs */
 #endif
-    
+
+   	/* species logging parameters */
+	bool s_harvestable;		/*is the species in the list of harvestable species*/
+	float s_dbhmin,			/*minimum harvestable diameter*/
+	s_dbhmax,				/*maximum harvestable diameter*/
+	s_interest;				/*species interest to filter harvested trees in designated trees*/
     
     Species() {
         s_nbind=0;
@@ -420,7 +435,7 @@ public:
 #endif
     };                              /* destructor */
     
-    void Init(int,fstream&);        /* init Species class */
+  void Init(int,fstream&);        /* init Species class */
 #ifdef DCELL
     void FillSeed(int,int,int);         /* assigns the produced seeds to s_DCELL */
 #else
@@ -482,7 +497,7 @@ void Species::Init(int nesp,fstream& is) {
     s_leaflifespan=1.5+pow(10,(7.18+3.03*log10(s_LMA*0.0001)));           //this is the expression from Reich et al 1991 Oecologia (San Carlos Rio Negro).
     //s_leaflifespan=pow(10,(2.040816*(2.579713-log10(SLA))));    //this is the expression from Reich et al. 1997 PNAS (provides probably more realistic estimates for species with high LMA).
     //s_leaflifespan=0.5+pow(10,(-2.509+1.71*log10(s_LMA)));    //this is the expression from Wright et al 2004 Nature (leaf economics spectrum).
-    if(_DISTURBANCE){
+    if(_DISTURBANCE || _LOGGING){
     	s_leaflifespan=exp(0.00843*s_LMA - 6.95*s_Nmass + 3.66*s_wsg); //this is the expression from model M11 in search for a new allometry https://sylvainschmitt.github.io/TROLL/LL
     }
     s_time_young=1;
@@ -525,8 +540,9 @@ void Species::Init(int nesp,fstream& is) {
     
     //    cerr <<"s_Rdark for spp\t" <<s_name << "\t"<< s_Rdark<<"\ts_LCP\t"<< s_LCP << "\ts_nbext\t"<< s_nbext << "\ts_Vcmax\t" << s_Vcmax << "\ts_leaflifespan\t" << s_leaflifespan << "\ts_time_young\t" << s_time_young << "\ts_time_mature\t" << s_time_mature << "\ts_time_old\t" << s_time_old << endl;
     
-    
-    
+  	/*** Sylviculture parameters ***/  
+    s_harvestable=0;
+
 #ifdef DCELL
     if (NULL==(s_DCELL = new int[nbdcells])) cerr<<"!!! Mem_Alloc s_DCELLn";
     for(int dcell=0;dcell<nbdcells;dcell++) s_DCELL[dcell]=0;
@@ -546,7 +562,6 @@ void Species::Init(int nesp,fstream& is) {
     }
 #endif
 }
-
 
 /*############################
  ###     Species Seeds     ###
@@ -1623,6 +1638,9 @@ int main(int argc,char *argv[]) {
                 case 'f':                      /* new v.2.3: initialisation from field, 'f' for "forest", "field data" */
                     bufi_data = argv[argn]+2;
                     break;
+                case 's':                      /* new sylviculture module: initialisation from field, 's' for "sylviculture" parameters */
+                    bufi_sylviculture = argv[argn]+2;
+                    break;
                 case 'n':
                     easympi_rank=atoi(argv[argn]+2); /* new v.2.2 */
             }
@@ -1643,6 +1661,9 @@ int main(int argc,char *argv[]) {
     if(_FromData){
         sprintf(inputfile_data,"%s",bufi_data);
     }
+    if(_DISTURBANCE || _LOGGING){
+        sprintf(inputfile_sylviculture,"%s",bufi_sylviculture);
+    }
     //in this version of the code, the code user is expected to use the input txt file name with its extension name, as eg. "input.txt", when setting the program's argument
     //sprintf(inputfile,"%s.txt",bufi);
     
@@ -1655,6 +1676,9 @@ int main(int argc,char *argv[]) {
         sprintf(outputinfo,"%s_%i_info.txt",buf, easympi_rank);
         out2.open(outputinfo, ios::out);
         if(!out2) cerr<< "ERROR with info file"<< endl;
+        sprintf(outputinfo,"%s_%i_paramsylviculture.txt",buf, easympi_rank);		/* sylviculture module parameters */
+        out3.open(outputinfo, ios::out);
+        if(!out3) cerr<< "ERROR with sylviculture par file"<< endl;
     }
     Initialise();           /* Read global parameters */
     
@@ -1774,8 +1798,6 @@ void Initialise() {
         if(nbout) freqout = nbiter/nbout;
         In >> numesp; In.getline(buffer,128,'\n');
         In >> p_nonvert; In.getline(buffer,128,'\n');
-        In >> disturb_iter; In.getline(buffer,128,'\n');
-        In >> disturb_intensity; In.getline(buffer,128,'\n');
         total_daily_light=0.0;
         for (int i=0; i<=23; i++) {
             In >> daily_light[i];
@@ -1826,8 +1848,7 @@ void Initialise() {
     
     else {
         cout<< "ERROR with the input file of parameters" << endl;
-    }
-    
+    }    
     
     /*** Information in file info ***/
     /***********************************/
@@ -2072,6 +2093,49 @@ void Initialise() {
     
     In.close();
     /* Close ifstream In */
+
+     if(_DISTURBANCE || _LOGGING){							// new sylviculture module parameters
+    	fstream In(inputfile_sylviculture, ios::in);
+    
+    	/*** Initialization of the sylviculture parametres ***/
+    	/***************************************************/
+    
+    	if (In) {
+        	for(ligne=0;ligne<4;ligne++) In.getline(buffer,128,'\n');
+        	/* general parameters */
+        	In >> disturb_iter; In.getline(buffer,128,'\n');
+       		In.getline(buffer,128,'\n');
+       		/* disturbance parameters */
+        	In >> disturb_intensity; In.getline(buffer,128,'\n');
+        	In.getline(buffer,128,'\n');
+        	/* logging parameters */
+        	In >> designated_volume; In.getline(buffer,128,'\n');
+        	designated_volume *= cols*NV*rows*NH/10000;
+        	In >> harvested_volume; In.getline(buffer,128,'\n');
+        	harvested_volume *= cols*NV*rows*NH/10000;
+        	In >> rotten; In.getline(buffer,128,'\n');
+        	In >> numespharvestable; In.getline(buffer,128,'\n');
+        	/* species parameters */
+        	for(ligne=0;ligne<3;ligne++) In.getline(buffer,128,'\n');                           /* Read species parameters (ifstream In) */
+    		for(sp=1;sp<=numespharvestable;sp++) {
+        		InitialiseLogging(In);
+    		}
+    	}
+    	else {
+        	cout<< "ERROR with the input file of sylviculture parameters" << endl;
+    	}
+    	In.close();
+
+    	/*** Sylviculture parameters in par file ***/
+    	/******************************************/
+    	In.open(inputfile_sylviculture, ios::in);
+        	do{
+            	In.getline(buffer,256,'\n');
+            	out3 << buffer <<endl;
+        	}while (!In.eof()) ;
+
+    	In.close();
+	}
     
     
     
@@ -2170,8 +2234,7 @@ void Initialise() {
             output[35].open(nnn, ios::out);
 
             // output[36] to register killed trees during a disturbance event
-
-            if(_DISTURBANCE){
+            if(_DISTURBANCE || _LOGGING){
 				sprintf(nnn,"%s_%i_disturbance.txt",buf, easympi_rank);
             	output[36].open(nnn, ios::out);
             }
@@ -2196,6 +2259,27 @@ void Initialise() {
     }
     
 
+}
+
+/*****************************************
+ *** Initialisation logging parameters ***
+ ****************************************/
+
+
+void InitialiseLogging(fstream& is){
+
+	char name[256];
+	int sp;
+	float dbhmin, dbhmax, interest;
+	
+    /*** Read parameters ***/
+    is  >> name >> sp >> dbhmin >> dbhmax >> interest;
+
+    /* Adding parameters to the species */
+    S[sp].s_harvestable=1;
+    S[sp].s_dbhmin=dbhmin;
+    S[sp].s_dbhmax=dbhmax;
+    S[sp].s_interest=interest;        
 }
 
 
@@ -2233,7 +2317,7 @@ void InitialiseFromData(){
             // cout << "col: " << round(col_data) << " row: " << round(row_data) << " species: " << sp_lab_data << " dbh: " << dbh_measured << " data measured \n";
             
             dbh_measured = 0.001*dbh_measured;          //here given in mm, converting to m
-            cout << dbh_measured << "\n";
+            /*cout << dbh_measured << "\n";*/
             col_int = (int) (col_data+0.5f);            //rounding, works since negatives have been eliminated before
             row_int = (int) (row_data+0.5f);
             
@@ -2251,10 +2335,10 @@ void InitialiseFromData(){
         data_read++;
     }
     
-    cout << "\n" << data_read << " rows read from file. " << data_initialised << " rows usable for initialisation from data. \n";
+    cout << data_read << " rows read from file. " << data_initialised << " rows usable for initialisation from data. \n";
     cout << "Maximum height of trees included is: " << height_max << "\n";
     cout << "NBtrees from Data:\t" << nblivetrees << "\n";
-    cout << "Initialisation from data finished \n";
+    cout << "Initialisation from data finished" << endl;
 }
 
 
@@ -2403,6 +2487,7 @@ void BirthInit() {
 void Evolution() {
     
     if(_DISTURBANCE) Disturbance();		                    /* Create a disturbance for a given iteration */
+    if(_LOGGING) SelectiveLogging();		                /* Simulate selective logging for a given iteration */
     UpdateField();                                          /* Update light fields and seed banks */
     UpdateTree();                                           /* Update trees */
     if(_BASICTREEFALL) UpdateTreefall();                    /* Compute and distribute Treefall events */
@@ -2436,6 +2521,48 @@ void Disturbance() {
             	T[site].Death();
         	} 
         }
+    }
+}
+
+/*#######################################
+ ####    Simulate selective logging   ###
+ #######################################*/
+
+void SelectiveLogging() {
+
+    if(iter == disturb_iter) {
+
+        cout << designated_volume << " m3 will be designated." <<  endl;
+        cout << rotten * designated_volume << " m3 will be considered as rotten." <<  endl;
+        cout << harvested_volume << " m3 will be harvested." <<  endl;
+
+        int site;
+        int status[sites];
+        float volume=0.0;
+
+        /* DESIGNATION */
+        for(site=1;site<=sites;site++){
+        	if(S[T[site].t_sp_lab].s_harvestable 						/*harvestable species*/
+        		&& T[site].t_dbh >= S[T[site].t_sp_lab].s_dbhmin		/*reached minimum dbh*/
+        		&& T[site].t_dbh <= S[T[site].t_sp_lab].s_dbhmax){		/*under maximum dbh*/
+        		status[site]=1;
+        		volume += T[site].t_dbh*(T[site].t_Tree_Height - T[site].t_Crown_Depth);
+        	} else {
+        		status[site]=0;
+        	}
+        }
+        cout << volume << " m3 have been designated." << endl;	
+
+        /* LOGGING */
+        for(site=1;site<=sites;site++){
+        	if(status[site]){
+        		output[36] << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+            	/*T[site].Death();*/
+            	/*T[site].FallTree();*/
+            	T[site].t_hurt += 10*T[site].t_Tree_Height;
+        	}
+        }
+
     }
 }
 

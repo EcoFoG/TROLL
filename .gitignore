@@ -13,6 +13,8 @@ inst/doc/vert.txt
 *.rds
 *.Rdata
 inst/tools/*.txt
-inst/tools/troll
+inst/tools/troll*
 inst/tools/OUTPUT
+inst/tools/test
+inst/tools/mature
 *.png
