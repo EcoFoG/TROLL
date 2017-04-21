@@ -16,5 +16,5 @@ inst/tools/*.txt
 inst/tools/troll*
 inst/tools/OUTPUT
 inst/tools/test
-inst/tools/mature
+inst/tools/mature*
 *.png

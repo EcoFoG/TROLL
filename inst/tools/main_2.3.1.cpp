@@ -104,9 +104,9 @@ _NDD=1,                 /* if defined, negative density dependant processes affe
 _OUTPUT_reduced=0,      /* reduced set of ouput files */
 _OUTPUT_last100=0,      /* output that tracks the last 100 years of the simulation for the whole grid (2D) */
 _OUTPUT_fullLAI=0,       /* output of full final voxel field */
-_FromData=0,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
+_FromData=1,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
 _DISTURBANCE=0,			/* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
-_LOGGING=0;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
+_LOGGING=1;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
 
 
 /********************************/
@@ -2505,7 +2505,7 @@ void Disturbance() {
     if(iter == disturb_iter) {
         cout << "Disturbance of " << disturb_intensity * 100 << "% of BA." << endl;
 
-        int site;
+        int site, row, col;
     	float dbh=0.0, disturb_dbh=0.0;
 
         for(site=1;site<=sites;site++)
@@ -2517,7 +2517,9 @@ void Disturbance() {
         	if(T[site].t_age != 0) {
         		disturb_dbh += T[site].t_dbh;
         		// saving killed tree in disturbance.txt file
-        		output[36] << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+        		row = floor(site/cols);
+        		col = site - (row*cols);
+        		output[36] << "L" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
             	T[site].Death();
         	} 
         }
@@ -2532,37 +2534,107 @@ void SelectiveLogging() {
 
     if(iter == disturb_iter) {
 
-        cout << designated_volume << " m3 will be designated." <<  endl;
-        cout << rotten * designated_volume << " m3 will be considered as rotten." <<  endl;
-        cout << harvested_volume << " m3 will be harvested." <<  endl;
-
-        int site;
+    	cout << "###   Selective Logging   ###" << endl;
+        int site, col, row, sp, designated;
         int status[sites];
-        float volume=0.0;
+        float volume=designated_volume*2;
 
         /* DESIGNATION */
-        for(site=1;site<=sites;site++){
-        	if(S[T[site].t_sp_lab].s_harvestable 						/*harvestable species*/
-        		&& T[site].t_dbh >= S[T[site].t_sp_lab].s_dbhmin		/*reached minimum dbh*/
-        		&& T[site].t_dbh <= S[T[site].t_sp_lab].s_dbhmax){		/*under maximum dbh*/
-        		status[site]=1;
-        		volume += T[site].t_dbh*(T[site].t_Tree_Height - T[site].t_Crown_Depth);
-        	} else {
-        		status[site]=0;
+        while(volume > designated_volume*1.05){
+        	volume=0.0;
+        	designated=0;
+        	for(site=1;site<=sites;site++){
+        		if(T[site].t_age > 0										/*alive tree*/
+        			&& S[T[site].t_sp_lab].s_harvestable 					/*harvestable species*/
+        			&& T[site].t_dbh >= S[T[site].t_sp_lab].s_dbhmin		/*reached minimum dbh*/
+        			&& T[site].t_dbh <= S[T[site].t_sp_lab].s_dbhmax){		/*under maximum dbh*/
+        			status[site]=1;
+        			volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+        			designated++;
+        		} else {
+        			status[site]=0;
+        		}
+        	}	
+        	if(volume > designated_volume){
+        		for(sp=1;sp<=numesp;sp++) {
+        			if(S[sp].s_harvestable){
+        				S[sp].s_dbhmin += 0.01;
+        			}
+    			}
         	}
         }
-        cout << volume << " m3 have been designated." << endl;	
+        cout << designated << " trees have been designated, representing " << volume << " m3." << endl;
+        sp=1;
+        while(!S[sp].s_harvestable)
+        	sp++;
+        cout << S[sp].s_name << " dbh min is now " << S[sp].s_dbhmin << endl;
+
+        /* SELECTION */
+        if(volume <= harvested_volume)
+        	cout << "All designated trees will be harvested." << endl;
+        if(volume >= harvested_volume){
+			int rank=0, individuals=0;
+        	for(site=1;site<=sites;site++)
+        		if(status[site]==1 && S[T[site].t_sp_lab].s_interest > rank)
+        			rank = S[T[site].t_sp_lab].s_interest;
+        	for(site=1;site<=sites;site++)
+        		if(status[site]==1 && S[T[site].t_sp_lab].s_interest==rank)
+        			individuals++;
+        	cout << individuals << " trees have the maximum rank of " << rank << "." << endl;
+        }
+
+        /* ROTTEN */
+        volume=0.0;
+        rotten=floor(rotten*designated);
+        cout << rotten << " trees are rotten, representing ";
+        while(rotten > 0){
+        	int site=floor(genrand2()*sites);
+        	if(status[site]==1){
+        		volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+        		status[site]=0;
+        		rotten--;
+        	}
+        }
+        cout << volume << " m3." << endl;
 
         /* LOGGING */
+        int individuals=0;
+        volume=0.0;
         for(site=1;site<=sites;site++){
-        	if(status[site]){
-        		output[36] << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+        	if(status[site]==1){
+        		row = floor(site/cols);
+        		col = site - (row*cols);
+        		output[36] << "L" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
             	/*T[site].Death();*/
             	/*T[site].FallTree();*/
             	T[site].t_hurt += 10*T[site].t_Tree_Height;
+            	individuals ++;
+            	volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
         	}
         }
+        cout << individuals << " trees have been logged representing " << volume << "m3." << endl;
 
+        /* MAIN TRACK */
+        int width=5;
+        individuals=0;
+        for(int j=0;j<=200;j++){
+        	for(int i=0;i<=width-1;i++){
+        		site = cols/2 -(width - 1)/2 + i + j*cols;
+        		if(T[site].t_age != 0) {
+        			row = floor(site/cols);
+        			col = site - (row*cols);
+        			output[36] << "MT" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+            		T[site].Death();
+            		individuals++;
+        		}
+        	}
+    	}
+        cout << individuals << " trees have been killed for the main track." << endl;
+
+        /* SECONDARY TRACK */
+
+
+        cout << "### Selective Logging done ###" << endl;
     }
 }
 
