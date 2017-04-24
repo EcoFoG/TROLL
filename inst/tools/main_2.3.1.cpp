@@ -2508,7 +2508,7 @@ void Disturbance() {
         int site, row, col;
     	float dbh=0.0, disturb_dbh=0.0;
 
-        for(site=1;site<=sites;site++)
+        for(site=0;site<sites;site++)
         	dbh += T[site].t_dbh;  
 
         while (disturb_dbh/dbh < disturb_intensity) {
@@ -2543,7 +2543,7 @@ void SelectiveLogging() {
         while(volume > designated_volume*1.05){
         	volume=0.0;
         	designated=0;
-        	for(site=1;site<=sites;site++){
+        	for(site=0;site<sites;site++){
         		if(T[site].t_age > 0										/*alive tree*/
         			&& S[T[site].t_sp_lab].s_harvestable 					/*harvestable species*/
         			&& T[site].t_dbh >= S[T[site].t_sp_lab].s_dbhmin		/*reached minimum dbh*/
@@ -2574,7 +2574,7 @@ void SelectiveLogging() {
         	cout << "All designated trees will be harvested." << endl;
         if(volume >= harvested_volume){
 			int rank=0, individuals=0;
-        	for(site=1;site<=sites;site++)
+        	for(site=0;site<sites;site++)
         		if(status[site]==1 && S[T[site].t_sp_lab].s_interest > rank)
         			rank = S[T[site].t_sp_lab].s_interest;
         	for(site=1;site<=sites;site++)
@@ -2588,7 +2588,7 @@ void SelectiveLogging() {
         rotten=floor(rotten*designated);
         cout << rotten << " trees are rotten, representing ";
         while(rotten > 0){
-        	int site=floor(genrand2()*sites);
+        	site=floor(genrand2()*sites);
         	if(status[site]==1){
         		volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
         		status[site]=0;
@@ -2600,13 +2600,11 @@ void SelectiveLogging() {
         /* LOGGING */
         int individuals=0;
         volume=0.0;
-        for(site=1;site<=sites;site++){
+        for(site=0;site<sites;site++){
         	if(status[site]==1){
         		row = floor(site/cols);
-        		col = site - (row*cols);
+        		col = site-(row*cols);
         		output[36] << "L" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
-            	/*T[site].Death();*/
-            	/*T[site].FallTree();*/
             	T[site].t_hurt += 10*T[site].t_Tree_Height;
             	individuals ++;
             	volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
@@ -2615,23 +2613,108 @@ void SelectiveLogging() {
         cout << individuals << " trees have been logged representing " << volume << "m3." << endl;
 
         /* MAIN TRACK */
-        int width=5;
-        individuals=0;
-        for(int j=0;j<=200;j++){
-        	for(int i=0;i<=width-1;i++){
-        		site = cols/2 -(width - 1)/2 + i + j*cols;
+        int MTindividuals=0;
+        int MT[sites];
+        for(site=0;site<sites;site++)
+        	MT[site] = 0;
+        for(row=0;row<(rows/2);row++){
+        	for(col=(cols/2-7);col<(cols/2+8);col++){
+        		site = col+row*cols;
+        		MT[site] = 1;
         		if(T[site].t_age != 0) {
-        			row = floor(site/cols);
-        			col = site - (row*cols);
         			output[36] << "MT" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
             		T[site].Death();
-            		individuals++;
+            		MTindividuals++;
         		}
         	}
     	}
-        cout << individuals << " trees have been killed for the main track." << endl;
+        cout << MTindividuals << " trees have been killed for the main track." << endl;
 
         /* SECONDARY TRACK */
+        int load[sites], ST[sites], STindividuals=0;
+        int site0, row0, col0, siteMT, rowMT, colMT;
+        float d, d0;
+        for(site=0;site<sites;site++){
+        	ST[site] = 0;
+        }
+        while(individuals > 0){
+        	for(site0=0;site0<sites;site0++){ /*loadings*/
+        		load[site0]=0;
+        		row0 = floor(site0/cols);
+        		col0 = site0-(row0*cols);
+        		for(site=0;site<sites;site++){
+        			if(status[site]==1){
+        				row = floor(site/cols);
+        				col = site-(row*cols);
+        				d = sqrt(pow((row - row0),2) + pow((col - col0),2));
+        				if(d <= 30)
+        					load[site0]++;
+        			}
+        		}
+        	}
+        	site0=0;
+        	for(site=0;site<sites;site++)	/*best load*/
+        		if(load[site]>=load[site0])
+        			site0=site;
+        	row0 = floor(site0/cols);
+        	col0 = site0-(row0*cols);
+        	d0 = pow(rows*cols,2); /* closest MT*/
+        	for(site=0;site<sites;site++){
+        		if(MT[site]==1){
+        			rowMT = floor(site/cols);
+        			colMT = site-(rowMT*cols);
+        			d = sqrt(pow(row0 - rowMT,2) + pow(col0 - colMT,2));
+        			if(d<d0){
+        				siteMT=site;
+        				d0=d;
+        			}
+        		}
+        	}
+        	rowMT = floor(siteMT/cols);
+        	colMT = siteMT-(rowMT*cols);
+        	do{ /*trace ST*/
+        		do {
+            		for(int i=-2;i<=2;i++){ /*flag ST*/
+        				for(int j=-2;j<=2;j++){
+        					site = (col0+i)+(row0+j)*cols;
+        					if(site>=0 && site<sites){
+        						ST[site]=1; 
+        						MT[site]=1;
+        					}
+        				}
+        			}
+        			for(site=0;site<sites;site++){ /*unflag served trees*/
+        				if(status[site]==1){
+        					row = floor(site/cols);
+        					col = site-(row*cols);
+        					d = sqrt(pow(row - row0,2) + pow(col - col0,2));
+        					if(d <= 33){
+        						status[site]=0;
+        						individuals--;
+        					}
+        				}
+        			}
+        			if(col0 > colMT)
+        				col0--;
+        			if(col0 < colMT)
+        				col0++;
+        			if(row0 > rowMT)
+        				row0--;
+        			if(row0 < rowMT)
+        				row0++;
+        		} while(row0 != rowMT);
+        	} while(col0 != colMT);
+		}
+        for(site=0;site<sites;site++){ /*removing trees*/
+        	if(ST[site]==1 && T[site].t_age != 0){
+        		row = (site/cols);
+        		col = site-(row*cols);
+        		output[36] << "ST" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+            	T[site].Death();
+            	STindividuals ++;
+        	}
+        }
+        cout << STindividuals << " trees have been killed for secondary tracks." << endl;
 
 
         cout << "### Selective Logging done ###" << endl;
