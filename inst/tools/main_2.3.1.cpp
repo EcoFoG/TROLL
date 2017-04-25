@@ -2631,31 +2631,37 @@ void SelectiveLogging() {
         cout << MTindividuals << " trees have been killed for the main track." << endl;
 
         /* SECONDARY TRACK */
-        int load[sites], ST[sites], STindividuals=0;
+        int load[sites], tracks[sites], ST[sites], STindividuals=0;
         int site0, row0, col0, siteMT, rowMT, colMT;
         float d, d0;
         for(site=0;site<sites;site++){
         	ST[site] = 0;
         }
         while(individuals > 0){
-        	for(site0=0;site0<sites;site0++){ /*loadings*/
+        	for(site0=0;site0<sites;site0++){ /*loadings and tracks distance*/
         		load[site0]=0;
+        		tracks[site0]=pow(rows*cols,2);
         		row0 = floor(site0/cols);
         		col0 = site0-(row0*cols);
         		for(site=0;site<sites;site++){
-        			if(status[site]==1){
+        			if(status[site]==1 || MT[site]==1){
         				row = floor(site/cols);
         				col = site-(row*cols);
         				d = sqrt(pow((row - row0),2) + pow((col - col0),2));
-        				if(d <= 30)
+        				if(status[site]==1 && d <= 30)
         					load[site0]++;
+        				if(MT[site]==1 && d < tracks[site0])
+        					tracks[site0]=d;
         			}
         		}
         	}
         	site0=0;
-        	for(site=0;site<sites;site++)	/*best load*/
-        		if(load[site]>=load[site0])
+        	for(site=0;site<sites;site++){ /*best candidate*/
+        		if(load[site]>load[site0])
         			site0=site;
+        		if(load[site]==load[site0] && tracks[site]<tracks[site0])
+        			site0=site;
+        	}	
         	row0 = floor(site0/cols);
         	col0 = site0-(row0*cols);
         	d0 = pow(rows*cols,2); /* closest MT*/
@@ -2704,6 +2710,7 @@ void SelectiveLogging() {
         				row0++;
         		} while(row0 != rowMT);
         	} while(col0 != colMT);
+        	cout << "A secondary track have been traced." << endl;
 		}
         for(site=0;site<sites;site++){ /*removing trees*/
         	if(ST[site]==1 && T[site].t_age != 0){
