@@ -35,12 +35,16 @@ In order to simulate sylviculture with TROLL we need to implement a new sylvicul
 
 This document focuses explicitly on sylviculture as it is realized in french guiana. In this context sylviculture can be narrow to selective logging (besides we will address other questions). Selective logging can be splitted in two parts: **designation** and **harvesting**. Both **designation** and **harvesting** encompass different sylviculture process and effects :
 
-- Designation
-    - Harvestable areas
-    - Tree designation
+- Trees choice
+    - *Harvestable areas*
+    - Designation
+    - Selection
+    - Rotten
 - Harvesting
-    - Felling and logging
-    - Roads and skidding
+    - Felling
+    - Main track
+    - Secondary track (cloisonnement)
+    - Skidding
     - Other damages
 
 We can model all this process and effects in two ways:
@@ -48,43 +52,156 @@ We can model all this process and effects in two ways:
 - **Explicitly** by modelling the process *(for well known process or deterministic events)*
 - **Implicitly** by taking only into account the result of the processes *(e.g. a local increased mortality)*
 
-All processes detailed after are splitted in two parts: **Reality** explaining what is currently done in french Guiana and **Modelling** which suggest ways to model it and assumption we can do in TROLL regarding described process.
+All processes detailed after are splitted in two parts: 
 
-# Designation
+- **Reality** explaining what is currently done in french Guiana 
+- **Model** explaining how it is model model in TROLL code (giving the algorithm) and suggesting modifications
+
+New code for this module is available [online](https://github.com/sylvainschmitt/TROLL/blob/master/inst/tools/main_2.3.1.cpp) (take care it is a work in progress).
+
+# Trees choice
 
 Before logging we first need to designate and select trees which will be harvested inside simulations.
 
-## Harvestable areas
+## *Harvestable areas*
 
 ### Reality
 
 First, havrestable areas are defined out of lowland areas and in the remainder by keeping all areas with a slope lower than 22 percent. A buffer of 30 meters is added to all harvestable areas representing engine capacity to extract wood with cables. Note that hazards like climate (dry or drought) can reduce or increase capacity of engine to explore a given area. In case of need bulldozer can be used to go in steeper slopes and grading can be realized to join harvestable areas.
 
-### Modelling
+### Model
 
 One major limit of current implementation of TROLL model is that it assumes a flat environment. Consequently the whole simulated area inside TROLL can be considered has an harvestable zone. It conequently simplifies this first part but we need to keep in mind this major assumption in subsequent analysis.
 
-## Tree designation
+## Designation
 
 ### Reality
 
-Trees are then designated directly in the field in three categories: reserve trees for individuals with an ecological interest, future trees for individuals which can be harvested in the next cycles, and harvestable trees which will be sold for harvesting in current cycle. Harvestable trees are designated according to their species and maximum and minimum harvestable diameter associated to the species (detailed available in sylviculture guide **ref**). Total basal area of designated trees is then computed and aims 25 $m^3.ha^{-1}$ to be harvested. But because 20-30 percent of designated trees are considered as rotten once probed by the lumberman, total harvestable volume aims 30 $m^3.ha^{-1}$. Finally, because the harvesters are focusing on few species with easier marketable wood for the moment (Angélique, Gonfolo, Grignon franc, Balata and few rares), about only 20 $m^3.ha^{-1}$ are harvested, and sometimes less, especially in the West forests of French Guiana. In addition to that, few rules are added for some species when designating trees (e.g. protecting no more than one Angélique and Gonfolo every 100 meters for seeding and only one Bagasse for two). Finally it happens that there is more or less than 30 $m^3.ha^{-1}$ of designated trees. If there is fewer it will be sold in this state, if there is more the minimum harvestable diameter is increased. The global idea is to gain maximum profit without exceding 25% of aboveground biomass (AGB) disturbance. Last but not least, this direct designation on the field before harvesting does not seems to result in aggregated extraction.
+Trees are then designated directly in the field in three categories: reserve trees for individuals with an ecological interest, future trees for individuals which can be harvested in the next cycles, and harvestable trees which will be sold for harvesting in current cycle. Harvestable trees are designated according to their species and maximum and minimum harvestable diameter associated to the species (detailed available in sylviculture guide). Total basal area of designated trees is then computed and aims 25 $m^3.ha^{-1}$ to be harvested. But because 20-30 percent of designated trees are considered as rotten once probed by the lumberman, total harvestable volume aims 30 $m^3.ha^{-1}$. Finally it happens that there is more or less than 30 $m^3.ha^{-1}$ of designated trees. If there is fewer it will be sold in this state, if there is more the minimum harvestable diameter is increased. The global idea is to gain maximum profit without exceding 25% of aboveground biomass (AGB) disturbance. Last but not least, this direct designation on the field before harvesting does not seems to result in aggregated extraction.
+
+### Model
+
+The harvestable area is the whole simulated forest. We needed to integrate an external file with all harvestable species precising their minimum and maximum harvestable diameter (following the sylviculture guide). We added to this sylviculture parameter file all parameters related to sylviculture or disturbance module (see code 1).
+
+```{bash par, eval=FALSE, echo=TRUE}
+##########################################################	
+###  Sylviculture parameter file for the TROLL program ###	
+##########################################################
+###	GENERAL PARAMETERS
+1	/* disturb_iter # iteration step where the disturbation occure */
+###	disturbance
+0.4	/* disturb_intensity # intensity of disturbance in percent of BA */
+###	logging
+30	/* designated_volume # volume designated for harvesting in m3/ha */
+25	/* harvested_volume # volume harvested in m3/ha */
+0.25	/* rotten # percentage of rotten tree in probed trees */
+7	/* numespharvestable # number of harvestable species */	
+
+###	Species
+****	spnum	dbhmin	dbhmax	interest
+Dicorynia_guianensis	35	0.55	2.0	1
+Qualea_rosea	130	0.55	2.0	1
+Ruizterania_albiflora	134	0.55	2.0	1
+Vouacapoua_americana	161	0.55	0.70	2
+Brosimum_rubescens	8	0.55	2.0	3
+Moronobea_coccinea	90	0.55	2.0	3
+Bocoa_prouacensis	6	0.55	2.0	3
+```
+
+Code 1: Example of Sylviculture parameter file for the TROLL program.
+
+Following those data the model can calculate the total harvestable volume ${V_h}_{tot}$ and retains all trees id as **can be designated**. If ${V_h}_{tot} < 30*n_{ha}$, then all **can be designated** tree are considered as **designated**. If ${V_h}_{tot} > 30*n_{ha}$, then minimum harvestable diameter $dbh_{min}$ is increased untill ${V_h}_{tot} < 30*n_{ha}$, and finally all **can be designated** tree are considered as **designated** (see code 2).
+
+```{rcpp designation, eval=FALSE, echo=TRUE}
+/* DESIGNATION */
+while(volume > designated_volume*1.05){
+  volume=0.0;
+  designated=0;
+  for(site=0;site<sites;site++){
+    if(T[site].t_age > 0 /*alive tree*/
+&& S[T[site].t_sp_lab].s_harvestable  /*harvestable species*/
+&& T[site].t_dbh >= S[T[site].t_sp_lab].s_dbhmin /*reached minimum dbh*/
+&& T[site].t_dbh <= S[T[site].t_sp_lab].s_dbhmax){ /*under maximum dbh*/
+status[site]=1;
+      volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+designated++;
+    } else {
+      status[site]=0;
+    }
+  }	
+  if(volume > designated_volume){
+    for(sp=1;sp<=numesp;sp++) {
+      if(S[sp].s_harvestable){
+        S[sp].s_dbhmin += 0.01;
+      }
+    }
+  }
+}
+cout << designated << " trees have been designated, representing " << volume << " m3." << endl;
+sp=1;
+while(!S[sp].s_harvestable)
+  sp++;
+cout << S[sp].s_name << " dbh min is now " << S[sp].s_dbhmin << endl;
+```
+
+Code 2: Designation module.
+
+## Selection
+
+### Reality
+
+Because the harvesters are focusing on few species with easier marketable wood for the moment (Angélique, Gonfolo, Grignon franc, Balata and few rares), about only 20 $m^3.ha^{-1}$ are harvested, and sometimes less, especially in the West forests of French Guiana. In addition to that, few rules are added for some species when designating trees (e.g. protecting no more than one Angélique and Gonfolo every 100 meters for seeding and only one Bagasse for two).
+
+### Model
+
+Thereafter we need to split **designated** trees between **selected** and **designated but not selected**. **Designated** trees kept by the harvester could be linked to an additional data representing the species interest in external file (see code 1). Each harvestable species could be ranked on its economic value. Then the model will kept only 25 $m^3.ha^{-1}$ inside designated trees by keeping only higher rank species. The selection module is still to be written (see code 3).
+
+```{rcpp selection, eval=FALSE, echo=TRUE}
+/* SELECTION */
+if(volume <= harvested_volume)
+  cout << "All designated trees will be harvested." << endl;
+if(volume >= harvested_volume){
+  /*Not implemented yet*/
+}
+```
+
+Code 3: Selection module.
+
+## Rotten
+
+### Reality
+
+20-30 percent of designated trees are considered as rotten once probed by the lumberman.
 
 *NB: In fact only 50 percent of designated trees considered as rotten once probed by the lumber would be really entirely rotten. 50% of theim would be vital on 90% of the volume. Moreover if fuelwood economy is developped rotten tree could be used and the risk to cut a rotten tree could be taken (especially if 50% of theim are actually harvestable). But this fact only represent a perspective for the moment.*
 
-### Modelling
+### Model
 
-In previous document I suggested to use the selection harvesting algorithm from @Arii2008. This algorithm is a nearest neighbor algorithm which simulates selective logging as a contagious spatial process thus similar to spread of fire in the forest. The tree with the highest probability to be cut $P_t$ is selected, then the algorithm compare the nearest neighbor probability of cutting $P_n$ to a random value between 0 and 1 to choose to cut it or not. If succesful the algorithm continue to spred the gap until the test is negative. When the test is negatvie the algorithm select the tree with the highest probability to be cut $P_t$ which is still alive. The algorithm run untill it reaches extraction objective(s) $O_t$. This algorithm was developped and test with a dataset from Haliburton, Canada. And it seems it can not be directly adapted to sylviculture in french guiana. So we may have to think a new way to simulate sylviculture following all previous informations.
+We can simply randomly remove 10-20 percent of **Selected** trees considering theim as rotten (see code 4). But in fact rotten trees are not random, we will use rotten inventories from ONF to realize a model predictiong rotten trees volume from their species and diameter (some species seems more touched by rotten trees and trees seems more rotten when dbh is increasing).
 
-The harvestable area will be the whole simulated forest. We will need to integrate an external file with all harvestable species precising their minimum and maximum harvestable diameter (following the sylviculture guide). Following those data the model can calculate the total harvestable volume ${V_h}_{tot}$ and retains all trees id as **can be designated**. If ${V_h}_{tot} < 30*n_{ha}$, then all **can be designated** tree are considered as **designated**. If ${V_h}_{tot} > 30*n_{ha}$, then minimum harvestable diameter $D_{min}$ is increased untill ${V_h}_{tot} < 30*n_{ha}$, and finally all **can be designated** tree are considered as **designated**. Thereafter we need to split **designated** trees between **felled** and **designated but not felled**. This distinction is due to two reasons: rotten trees and trees considered as not interesting by the lumberman. The most complicated parts is to split **designated** trees between those kept or not by the harvester. Once this is done we can simply randomly remove 10-20 percent of theim considered as rotten. **Designated** trees kept by the harvester could be linked to an additional data representing the species interest in external file. Each harvestable species could be ranked on its economic value. Then the model will kept only 20 $m^3.ha^{-1}$ inside designated trees by taking only higher rank species. 
+```{rcpp rotten, eval=FALSE, echo=TRUE}
+/* ROTTEN */
+volume=0.0;
+rotten=floor(rotten*designated);
+cout << rotten << " trees are rotten, representing ";
+while(rotten > 0){
+  site=floor(genrand2()*sites);
+  if(status[site]==1){
+    volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+status[site]=0;
+rotten--;
+  }
+}
+cout << volume << " m3." << endl;
+```
 
-*I'm open on suggestion and other way to model designated trees kept by the harvester ?*
+Code 4: Rotten module. *It will be changed in next implementation because rotten trees are not random.*
 
 # Harvesting
 
 Once designated we can proceed to logging and associated damages.
 
-## Logging
+## Felling
 
 ### Reality
 
@@ -92,31 +209,193 @@ Main issue around the logging will be treefall direction. Due to crown aspects t
 
 ![figure 1. Treefall orientations when logging](treefall.png)
 
-### Modelling
+### Model
 
-Whereas interessant to test, due to the fact it is not much applied in french guiana, I think we should not model oriented logging for the moment. We should consider logging treefall as random like current treefall implementation inside TROLL.
+Whereas interessant to test, due to the fact it is not much applied in french guiana, I think we should not model oriented logging for the moment. We should consider logging treefall as random like current treefall implementation inside TROLL (see code 5).
 
-## Roads and skidding
+```{rcpp felling, eval=FALSE, echo=TRUE}
+/* LOGGING */
+int individuals=0;
+volume=0.0;
+for(site=0;site<sites;site++){
+  if(status[site]==1){
+    row = floor(site/cols);
+    col = site-(row*cols);
+    output[36] << "L" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+    T[site].t_hurt += 10*T[site].t_Tree_Height;
+    individuals ++;
+    volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+  }
+}
+cout << individuals << " trees have been logged representing " << volume << "m3." << endl;
+```
+
+Code 5: Felling module.
+
+## Main track
 
 ### Reality
 
-Roads are split in three classes: truck roads, main tractor track, and secondary track ('cloisonement'). Main skidtrails are used by skidding engines and follow crest model ; a function can calculate in advance their volume of transit by summing all pixels they serve and assuming 20 $m^3.ha^{-1}$. Secondary track are computed once trees have been designated and the geolocation taken. Secondary track are all at a maximum distance of 30 meters from designated trees (because engine cables reach 50 meters but with an angle of 45°). Last thing taken into account is secondary track slope between track border ('devers') ; it need to be under 4%.
+Roads are split in three classes: truck roads, main tractor track, and secondary track ('cloisonement'). Main skidtrails are used by skidding engines and follow crest model ; a function can calculate in advance their volume of transit by summing all pixels they serve and assuming 20 $m^3.ha^{-1}$. 
+
+### Model
+
+One more time, one major assumption of TROLL is a flat environment. Consequently the main track can be considered as a way starting from the middle of one side of the simulated forest and reaching the center (see code 6).
+
+```{rcpp MT, eval=FALSE, echo=TRUE}
+/* MAIN TRACK */
+int MTindividuals=0;
+int MT[sites];
+for(site=0;site<sites;site++)
+  MT[site] = 0;
+for(row=0;row<(rows/2);row++){
+  for(col=(cols/2-7);col<(cols/2+8);col++){
+    site = col+row*cols;
+    MT[site] = 1;
+    if(T[site].t_age != 0) {
+      output[36] << "MT" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+      T[site].Death();
+      MTindividuals++;
+    }
+  }
+}
+cout << MTindividuals << " trees have been killed for the main track." << endl;
+```
+
+Code 6: Main track module.
+
+## Secondary tracks (cloisonnement)
+
+### Reality
+
+Secondary tracks are computed once trees have been designated and the geolocation taken. Secondary track are all at a maximum distance of 30 meters from designated trees (because engine cables reach 50 meters but with an angle of 45°). Last thing taken into account is secondary track slope between track border ('devers') ; it need to be under 4%. Secondary tracks draw is half automatic but currently user is drawing the final pattern.
+
+### Model
+
+To not over-complicate the model we decided to simulate secondary tracks with few simple rules for a full automatic integration. The secondary tracks module compute a loads map measuring every trees at a distance of 30 meters for each pixel. It then select the pixel with the highest load. It finds the closest existing track and join it. When tracing the secondary track the module his removing from list all felt trees in a radius of 30 meters from the track. Then it start again all the operation untill no felt trees are left (see code 7 and figure 2).
+
+```{rcpp ST, eval=FALSE, echo=TRUE}
+/* SECONDARY TRACK */
+int load[sites], ST[sites], STindividuals=0;
+int site0, row0, col0, siteMT, rowMT, colMT;
+float d, d0;
+for(site=0;site<sites;site++){
+  ST[site] = 0;
+}
+while(individuals > 0){
+  for(site0=0;site0<sites;site0++){ /*loadings*/
+load[site0]=0;
+    row0 = floor(site0/cols);
+    col0 = site0-(row0*cols);
+    for(site=0;site<sites;site++){
+      if(status[site]==1){
+        row = floor(site/cols);
+        col = site-(row*cols);
+        d = sqrt(pow((row - row0),2) + pow((col - col0),2));
+        if(d <= 30)
+          load[site0]++;
+      }
+    }
+  }
+  site0=0;
+  for(site=0;site<sites;site++)	/*best load*/
+if(load[site]>=load[site0])
+  site0=site;
+row0 = floor(site0/cols);
+col0 = site0-(row0*cols);
+d0 = pow(rows*cols,2); /* closest MT*/
+for(site=0;site<sites;site++){
+  if(MT[site]==1){
+    rowMT = floor(site/cols);
+    colMT = site-(rowMT*cols);
+    d = sqrt(pow(row0 - rowMT,2) + pow(col0 - colMT,2));
+    if(d<d0){
+      siteMT=site;
+      d0=d;
+    }
+  }
+}
+rowMT = floor(siteMT/cols);
+colMT = siteMT-(rowMT*cols);
+do{ /*trace ST*/
+do {
+  for(int i=-2;i<=2;i++){ /*flag ST*/
+for(int j=-2;j<=2;j++){
+  site = (col0+i)+(row0+j)*cols;
+  if(site>=0 && site<sites){
+    ST[site]=1; 
+    MT[site]=1;
+  }
+}
+  }
+  for(site=0;site<sites;site++){ /*unflag served trees*/
+if(status[site]==1){
+  row = floor(site/cols);
+  col = site-(row*cols);
+  d = sqrt(pow(row - row0,2) + pow(col - col0,2));
+  if(d <= 33){
+    status[site]=0;
+    individuals--;
+  }
+}
+  }
+  if(col0 > colMT)
+    col0--;
+  if(col0 < colMT)
+    col0++;
+  if(row0 > rowMT)
+    row0--;
+  if(row0 < rowMT)
+    row0++;
+} while(row0 != rowMT);
+} while(col0 != colMT);
+}
+for(site=0;site<sites;site++){ /*removing trees*/
+if(ST[site]==1 && T[site].t_age != 0){
+  row = (site/cols);
+  col = site-(row*cols);
+  output[36] << "ST" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+  T[site].Death();
+  STindividuals ++;
+}
+}
+cout << STindividuals << " trees have been killed for secondary tracks." << endl;
+```
+
+Code 7: Secondary tracks module.
+
+```{r tracks}
+test <- loadOutput('test', '~/Documents/ECOFOG/TROLL/inst/tools/test/')
+dist <- test@disturbance
+g <- ggplot(dist, aes(x = col, y = row, size = dbh, col = type, label = species)) + geom_point() + coord_fixed()
+g
+```
+
+Figure 2. Tracks design inside TROLL.
+
+## Skidding
+
+### Reality
+
+Last thing to take into account is skidding. When felt trees are removed from the plots they hurt and kill alive trees. One major thing is tree killed by rotation of the logs when tracted from the plot to the secondary track ("effet essuies glasses").
 
 *NB: A perspective in skidding is the logs length for skidding. For time purposes, currently logs are skidded in one piece. But because damages are proportionnal to the square of the length of the logs it could be questionned. Effectively long logs have increased damages in curves during skidding.*
 
-### Modelling
+### Model
 
-One more time, one major assumption of TROLL is a flat environment. Consequently the main track can be considered as a way starting from the middle of one side of the simulated forest and reaching the center. Thereafter secondary track can be modelled with `piste 2` software or algorithm using designated trees inside TROLL. Last thing is to model damages during skidding. We can imagine to explicitly kill trees in a radius around the secondary track depending on logs length (fitted with Paracou data on plot 9). The question of logs length for skidding is interesting and could be tested if we explicitly model damages around secondary track in that way. *Beside I don't think to integrate this issue in the context of my internships.*
+This part need to be implemented in sylviculture module.
 
 ## Other damages
 
 ### Reality
 
-The Office Nationale des Forêts is realizing diagnostic of disturbance from harvesting (DPE). The question of increased mortality is also studied with GUYAFOR and TmFO plots. First results suggests that the time for the ecosystem to come back to its original death rate depend on the original death rate intensity. But this time seems lower thant the 10 years often used in simulations [@Huth2004; @Khler2004; @Ruger2008].
+The Office Nationale des Forêts is realizing diagnostic of disturbance from harvesting (DPE). The question of increased mortality is also studied with GUYAFOR and TmFO plots. First results suggests that the time for the ecosystem to come back to its original death rate depend on the original death rate intensity. But this time seems lower thant the 10 years often used in simulations [@Huth2004; @Khler2004; @Ruger2008]. Last thing increased mortality seems localised around harvested areas (but even for not directly hurted trees).
 
 ### Modelling
 
-Nevertheless, in addition to trees killed or hurted by treefall, roads and skidding explicitly modelled, it seems that we need to take into account an implicit extra mortality. This increased mortality following harvesting is decreasing in time untill null. It could be fitted on Paracou and/or TmFO data.
+Nevertheless, in addition to trees killed or hurted by treefall, roads and skidding explicitly modelled, it seems that we need to take into account an implicit extra mortality. This increased mortality following harvesting is decreasing in time untill null. It could be fitted on Paracou and Guyafor data.
+
+This part need to be implemented in sylviculture module.
 
 # Conclusion
 
@@ -128,20 +407,18 @@ Paracou harvesting effectively represents more volume than current logging in fr
 
 We can summarize modelling of selective logging in few steps :
 
-- Designation
-    - Harvestable area: the whole simulated forest
-    - Tree designation
-        - Can be designated: all trees meeting species minimum and maximum harvestable diameters
-        - Designated: all trees meeting species minimum and maximum harvestable diameters under or equal to a total volume of 30 $m^3.ha^{-1}$
-        - Probed: first ranked trees according to harvesters reaching a total volume of 20 $m^3.ha^{-1}$
-        - Harvested: probed trees less 20-30% of randomly selected trees considered as rotten
+- Trees choice
+    - *Harvestable areas*: the whole simulated forest
+    - Designation: all trees meeting species minimum and maximum harvestable diameters under or equal to a total volume of 30 $m^3.ha^{-1}$
+    - Selection: first ranked trees according to harvesters reaching a total volume of 25 $m^3.ha^{-1}$
+    - Rotten: selected trees less 20-30% of selected trees considered as rotten
 - Harvesting
-    - Logging: hurted to death and treefall at random direction
-    - Roads and skidding
-        - Main track: from the middle of one side of the simulated forest to the center
-        - Secondary tracks: using `piste 3` or a similar algorithm plus damages around the track in a radius proportionnal to logs length (fitted with Paracou data)
-    - Other damages: increased mortality after harvesting decreasing until null (fitted with Paracou data)
-
+    - Felling: all selected trees
+    - Main track: from the middle of one side of the simulated forest to the center
+    - Secondary track (cloisonnement): following our own simplified algorithm
+    - Skidding: to be implemented
+    - Other damages: to be implemented
+    
 ## Perspectives
 
 Current slective logging in french guiana encompass different perspective to evolve. Some are summarized here:
@@ -154,6 +431,8 @@ Current slective logging in french guiana encompass different perspective to evo
 
 ## Internship question
 
-One major advantage of TROLL model compare to other simulators spatially-explicits and individual-based (e.g. FORMIND and SORTIE) is the use of species and not of plant functionnal types (PFT). In that way, TROLL outperform other simulators to simulates biodiversity and its related effects. This is the reason why I think I could use the implementation of the sylviculture module inside TROLL to study the perspective if diversification. *In which order reducing damages on global diversity by increasing harvesting diversity will affect forest ecosystem answer to the distruabnce brought by selective logging ?*
+One major advantage of TROLL model compare to other simulators spatially-explicits and individual-based (e.g. FORMIND and SORTIE) is the use of species and not of plant functionnal types (PFT). In that way, TROLL outperform other simulators to simulates biodiversity and its related effects. This is the reason why I think I could use the implementation of the sylviculture module inside TROLL to study the perspective of diversification. 
+
+*In which order reducing damages on global diversity by increasing harvesting diversity will affect forest ecosystem answer to the distruabnce brought by selective logging ?*
 
 # References
