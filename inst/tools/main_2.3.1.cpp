@@ -2610,7 +2610,7 @@ void SelectiveLogging() {
             	volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
         	}
         }
-        cout << individuals << " trees have been logged representing " << volume << "m3." << endl;
+        cout << individuals << " trees have been logged representing " << volume << " m3." << endl;
 
         /* MAIN TRACK */
         int MTindividuals=0;
@@ -2618,7 +2618,7 @@ void SelectiveLogging() {
         for(site=0;site<sites;site++)
         	MT[site] = 0;
         for(row=0;row<(rows/2);row++){
-        	for(col=(cols/2-7);col<(cols/2+8);col++){
+        	for(col=((cols/2)-7);col<((cols/2)+8);col++){
         		site = col+row*cols;
         		MT[site] = 1;
         		if(T[site].t_age != 0) {
@@ -2640,15 +2640,15 @@ void SelectiveLogging() {
         while(individuals > 0){
         	for(site0=0;site0<sites;site0++){ /*loadings and tracks distance*/
         		load[site0]=0;
-        		tracks[site0]=pow(rows*cols,2);
+        		tracks[site0]=rows*rows + cols*cols;
         		row0 = floor(site0/cols);
         		col0 = site0-(row0*cols);
         		for(site=0;site<sites;site++){
         			if(status[site]==1 || MT[site]==1){
         				row = floor(site/cols);
         				col = site-(row*cols);
-        				d = sqrt(pow((row - row0),2) + pow((col - col0),2));
-        				if(status[site]==1 && d <= 30)
+        				d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
+        				if(status[site]==1 && d <= (30*30))
         					load[site0]++;
         				if(MT[site]==1 && d < tracks[site0])
         					tracks[site0]=d;
@@ -2664,12 +2664,12 @@ void SelectiveLogging() {
         	}	
         	row0 = floor(site0/cols);
         	col0 = site0-(row0*cols);
-        	d0 = pow(rows*cols,2); /* closest MT*/
+        	d0 = rows*rows+cols*cols; /* closest MT*/
         	for(site=0;site<sites;site++){
         		if(MT[site]==1){
         			rowMT = floor(site/cols);
         			colMT = site-(rowMT*cols);
-        			d = sqrt(pow(row0 - rowMT,2) + pow(col0 - colMT,2));
+        			d = (row0 - rowMT)*(row0 - rowMT) + (col0 - colMT)*(col0 - colMT);
         			if(d<d0){
         				siteMT=site;
         				d0=d;
@@ -2693,7 +2693,7 @@ void SelectiveLogging() {
         				if(status[site]==1){
         					row = floor(site/cols);
         					col = site-(row*cols);
-        					d = sqrt(pow(row - row0,2) + pow(col - col0,2));
+        					d = sqrt((row - row0)*(row - row0) + (col - col0)*(col - col0));
         					if(d <= 33){
         						status[site]=0;
         						individuals--;
