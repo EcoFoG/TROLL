@@ -134,7 +134,7 @@ fitgraph <- function(fit){
 #                         S = length(levels(as.factor(data$species))),
 #                         plot = as.integer(as.factor(data$plot)),
 #                         species = as.integer(as.factor(data$species)),
-#                         dbh = data$dbhest/max(data$dbhtest),
+#                         dbh = data$dbhest/max(data$dbhest),
 #                         rotten = data$rotten),
 #             chains = 1)
 # save(fit, file = file.path(mpath, 'Ms.p0.Rdata'))

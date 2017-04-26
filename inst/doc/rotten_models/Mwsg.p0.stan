@@ -16,7 +16,8 @@ parameters {
 model {
    real theta[N] ;
    for(n in 1:N){
-     theta[n] = beta_0p[plot[n]] +
+     theta[n] = 
+     beta_0p[plot[n]] +
      beta_1 * wsg[n] +
      beta_2 * dbh[n]
      ;
