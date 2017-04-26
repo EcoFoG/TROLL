@@ -70,20 +70,16 @@ $$Rotten_n \sim \mathcal{B}(\theta_n), ~~n \in [1,N_{=3816}] ~~ p \in [1, P_{=8}
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  m = c(paste0('M', 1:7)),
+  m = c('$M_{s,p}0$', '$M_{wsg,p}0$', '$M_{sp}0$'),
   model = c(
-    "$logit(\\theta_n) = {\\beta_0} + {\\beta_1}_p + {\\beta_2}_s +{\\beta_3}*dbh_n, ~~ {\\beta_1}_p \\sim \\mathcal{N}(\\beta_1, \\sigma_p), ~~~~{\\beta_2}_s \\sim \\mathcal{N}(\\beta_2, \\sigma_2)$",
-    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_p*wsg_n +{\\beta_2}_p*dbh_n, ~~ {\\beta_k}_p \\sim \\mathcal{N}(\\beta_k, \\sigma_k)$",
-    "$logit(\\theta_n) = {\\beta_1}_p + {\\beta_2}_s +{\\beta_3}*dbh_n, ~~ {\\beta_1}_p \\sim \\mathcal{N}(\\beta_1, \\sigma_p), ~~~~{\\beta_2}_s \\sim \\mathcal{N}(\\beta_2, \\sigma_2)$",
-    "$logit(\\theta_n) = {\\beta_0}_{sp} + {\\beta_1}_{sp} +{\\beta_2}_{sp}*dbh_n, ~~ {\\beta_k}_{sp} \\sim \\mathcal{N}(\\beta_k, \\sigma_k)$",
-    "$logit(\\theta_n) = {\\beta_1}_{sp} +{\\beta_2}_{sp}*dbh_n, ~~ {\\beta_k}_{sp} \\sim \\mathcal{N}(\\beta_k, \\sigma_k)$",
-    "$logit(\\theta_n) = {\\beta_2}_{sp}*dbh_n, ~~ {\\beta_k}_{sp} \\sim \\mathcal{N}(\\beta_k, \\sigma_k)$",
-    "$logit(\\theta_n) = {\\beta_1}_p*wsg_n +{\\beta_2}_p*dbh_n, ~~ {\\beta_k}_p \\sim \\mathcal{N}(\\beta_k, \\sigma_k)$"
-    ),
-  code = c('$M_{s+p}$', '$M_{p+wsg}$', '$M_{s+p-\\beta_0}$', '$M_{sp}$', '$M_{sp-\\beta_0}$',
-           '$M_{sp-\\beta_0-\\beta_1}$', '$M_{p+wsg-\\beta_0}$'))
+    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + \\beta_2*dbh_n$",
+    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}*wsg_n + {\\beta_2}*dbh_n$",
+    "$logit(\\theta_n) = {\\beta_0}_{sp} + \\beta_2*dbh_n$"
+    )
+  )
 mtab <- apply(mtab, 2, as.character)
 kable(mtab)
+row.names(mtab) <- c('Ms.p0', 'Mwsg.p0', 'Msp0')
 ```
 
 We tested models M1 to MX detailed in following tabs to find the better trade-off between:
@@ -128,11 +124,11 @@ fitgraph <- function(fit){
 }
 ```
 
-`r paste(mtab[1,c(1,3)], collapse = ', ')`
+`r mtab['Ms.p0',1]`
 ==================
 
-```{r M1, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'M1.stan'),
+```{r Ms.p0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Ms.p0.stan'),
 #             data = list(N = dim(data)[1],
 #                         P = length(levels(as.factor(data$plot))),
 #                         S = length(levels(as.factor(data$species))),
@@ -141,18 +137,18 @@ fitgraph <- function(fit){
 #                         dbh = data$dbhest/max(data$dbhtest),
 #                         rotten = data$rotten),
 #             chains = 1)
-# save(fit, file = file.path(mpath, 'M1.Rdata'))
-load(file.path(mpath, 'M1.Rdata'))
+# save(fit, file = file.path(mpath, 'Ms.p0.Rdata'))
+load(file.path(mpath, 'Ms.p0.Rdata'))
 g <- fitgraph(fit) ; rm(fit)
 ```
 
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab[1,1:2], collapse = ': ')`
+> `r paste(mtab['Ms.p0',], collapse = ': ')`
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r r1}
+```{r Rs.p0}
 g$r
 ```
 
@@ -160,20 +156,20 @@ Convergence {data-width=300}
 -------------------------------------
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r c1}
+```{r Cs.p0}
 g$c
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r p1}
+```{r Ps.p0}
 g$p
 ```
 
-`r paste(mtab[2,c(1,3)], collapse = ', ')`
+`r mtab['Mwsg.p0',1]`
 ==================
 
-```{r M2, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'M2.stan'),
+```{r Mwsg.p0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Mwsg.p0.stan'),
 #             data = list(N = dim(data)[1],
 #                         P = length(levels(as.factor(data$plot))),
 #                         plot = as.integer(as.factor(data$plot)),
@@ -181,18 +177,18 @@ g$p
 #                         dbh = data$dbhest/max(data$dbhest),
 #                         rotten = data$rotten),
 #             chains = 1)
-# save(fit, file = file.path(mpath, 'M2.Rdata'))
-load(file.path(mpath, 'M2.Rdata'))
+# save(fit, file = file.path(mpath, 'Mwsg.p0.Rdata'))
+load(file.path(mpath, 'Mwsg.p0.Rdata'))
 g <- fitgraph(fit) ; rm(fit)
 ```
 
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab[2,1:2], collapse = ': ')`
+> `r paste(mtab['Mwsg.p0',], collapse = ': ')`
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r r2}
+```{r Rwsg.p0}
 g$r
 ```
 
@@ -200,79 +196,38 @@ Convergence {data-width=300}
 -------------------------------------
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r c2}
+```{r Cwsg.p0}
 g$c
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r p2}
+```{r Pwsg.p0}
 g$p
 ```
 
-`r paste(mtab[3,c(1,3)], collapse = ', ')`
+`r mtab['Msp0',1]`
 ==================
 
-```{r M3, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'M3.stan'),
-#             data = list(N = dim(data)[1],
-#                         P = length(levels(as.factor(data$plot))),
-#                         S = length(levels(as.factor(data$species))),
-#                         plot = as.integer(as.factor(data$plot)),
-#                         species = as.integer(as.factor(data$species)),
-#                         dbh = data$dbhest/max(data$dbhtest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'M3.Rdata'))
-load(file.path(mpath, 'M3.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab[3,1:2], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r r3}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r c3}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r p3}
-g$p
-```
-
-`r paste(mtab[4,c(1,3)], collapse = ', ')`
-==================
-
-```{r M4, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'M4.stan'),
+```{r Msp0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Msp0.stan'),
 #             data = list(N = dim(data)[1],
 #                         SP = length(levels(as.factor(data$sp))),
 #                         sp = as.integer(as.factor(data$sp)),
 #                         dbh = data$dbhest/max(data$dbhest),
 #                         rotten = data$rotten),
 #             chains = 1)
-# save(fit, file = file.path(mpath, 'M4.Rdata'))
-load(file.path(mpath, 'M4.Rdata'))
+# save(fit, file = file.path(mpath, 'Msp0.Rdata'))
+load(file.path(mpath, 'Msp0.Rdata'))
 g <- fitgraph(fit) ; rm(fit)
 ```
 
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab[4,1:2], collapse = ': ')`
+> `r paste(mtab['Msp0',], collapse = ': ')`
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r r4}
+```{r Rsp0}
 g$r
 ```
 
@@ -280,137 +235,19 @@ Convergence {data-width=300}
 -------------------------------------
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r c4}
+```{r Csp0}
 g$c
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r p4}
-g$p
-```
-
-`r paste(mtab[5,c(1,3)], collapse = ', ')`
-==================
-
-```{r M5, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'M5.stan'),
-#             data = list(N = dim(data)[1],
-#                         SP = length(levels(as.factor(data$sp))),
-#                         sp = as.integer(as.factor(data$sp)),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'M5.Rdata'))
-load(file.path(mpath, 'M5.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab[5,1:2], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r r5}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r c5}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r p5}
-g$p
-```
-
-`r paste(mtab[6,c(1,3)], collapse = ', ')`
-==================
-
-```{r M6, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'M6.stan'),
-#             data = list(N = dim(data)[1],
-#                         SP = length(levels(as.factor(data$sp))),
-#                         sp = as.integer(as.factor(data$sp)),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'M6.Rdata'))
-load(file.path(mpath, 'M6.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab[6,1:2], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r r6}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r c6}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r p6}
-g$p
-```
-
-`r paste(mtab[7,c(1,3)], collapse = ', ')`
-==================
-
-```{r M7, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'M7.stan'),
-#             data = list(N = dim(data)[1],
-#                         P = length(levels(as.factor(data$plot))),
-#                         plot = as.integer(as.factor(data$plot)),
-#                         wsg = data$wsg/max(data$wsg),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'M7.Rdata'))
-load(file.path(mpath, 'M7.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab[7,1:2], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r r7}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r c7}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r p7}
+```{r Psp0}
 g$p
 ```
 
 Conclusion
 ==================
 
-> Only few models converged (M2, M6, and M7). Among theim **M2** is the one with the highest maximum likelihood ($ML \sim -920$) and few parameters ($K = 3$). Moreover **M2** have the advantage to use wood specific gravity (wsg) to proxy species factors influence. So we can add any species to the model once we get its wsg.
+> Conclusion
 
 Column {data-width=200}
 -------------------------------------
