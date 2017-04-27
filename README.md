@@ -23,4 +23,7 @@ Documentation
     -   <https://sylvainschmitt.github.io/TROLL/LL2>
 -   Sylviculture:
     -   <https://sylvainschmitt.github.io/TROLL/sylviculture>
+-   Rotten :
     -   <https://sylvainschmitt.github.io/TROLL/rotten>
+    -   <https://sylvainschmitt.github.io/TROLL/rotten2>
+    -   <https://sylvainschmitt.github.io/TROLL/rotten3>

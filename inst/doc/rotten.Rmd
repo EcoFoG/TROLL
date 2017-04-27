@@ -1,21 +1,24 @@
 ---
 title: "Rotten"
-output: 
-  flexdashboard::flex_dashboard:
-    orientation: columns
-    vertical_layout: scroll
+author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
+date: '`r Sys.Date()`'
+output:
+  html_document: 
+    theme: journal
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+  pdf_document: default
+  word_document: default
 csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
 bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
 
-```{r setup, include=FALSE}
-rm(list = ls()) ; invisible(gc())
-library(flexdashboard)
+```{r config, message=FALSE, warning=FALSE, include=FALSE}
+rm(list = ls()) ; invisible(gc()) ; set.seed(42)
 library(knitr)
 library(parallel)
 library(TROLL)
-library(RconTroll)
-library(BIOMASS)
 library(reshape2)
 library(ggplot2)
 library(cowplot)
@@ -25,279 +28,120 @@ library(rstan)
 library(bayesplot)
 library(rstanarm)
 library(readr)
-library(GGally)
 library(dplyr)
+library(randomForest)
+library(GGally)
+library(BIOMASS)
+library(RconTroll)
 cores <- detectCores()
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
     cache = T, cache.lazy = F)
-mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/rotten_models"
-rstan_options(auto_write = TRUE)
-options(mc.cores = detectCores())
 ```
 
-Intro
-==================
-
-Issue {data-width=200}
--------------------------------------
+# Introduction
 
 In order to simulate sylviculture with TROLL we need to implement a new sylviculture module inside TROLL model code. A first litterature review was completed by an interview with Laurent Descroix of the Office Nationale des Forêts. We discovered that rotten trees were not random and seemed to depend both on tree species and diameter. This document presents modelling of relation between rotten trees and their species and diameter.
 
-```{r data, include=FALSE}
-data <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_data.csv")
-data <- data[c('num', 'Parcelle', 'up', 'ess', 'abattu', 'tout BE', 'sonde_creux', 'sonde_creux abatt', 'sonde_creux_refus', 'DBH_desi', 'V_Est', 'vol_BO')]
-names(data) <- c('id', 'plot', 'subplot', 'spCode', 'logged', 'rotten_full', 'probed_rotten', 'probed_rotten_logged', 'probed_rotten_refused', 'dbhest', 'Vest', 'Vbo')
-species <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_species.csv")[-1,]
-species <- species[c("Code \nEssence" , "Nom \nscientifique")]
-names(species) <- c('spCode', 'species')
-species$wsg <- apply(do.call('rbind', lapply(strsplit(species$species, ' ', fixed = T), function(x) x[1:2])),
-                   1, function(x) getWoodDensity(x[1], x[2], region = 'SouthAmericaTrop')$meanWD)
-data <- data.frame(left_join(data, species)) ; rm(species)
-data <- data[-which(is.nan(data$wsg)),]
-data$sp <- apply(data[c('plot', 'species')], 1 , paste, collapse = '.')
-```
-
 In fact we have two different questions:
 
-- Predict if a tree will be probed as rotten (models **M**)
-- Predict how much of tree volume is rotten (models **N**)
+- Predict if a tree will be probed as rotten (models **M**, see [rotten 2](rotten2.html)) 
+- Predict how much of tree volume is rotten (models **N**, see [rotten 3](rotten3.html))
 
 First all **M** model can be written as follow:
-
 $$Rotten_n \sim \mathcal{B}(\theta_n), ~~n \in [1,N_{=3816}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
+Secondly, all **N** models depend on a latent variable being the volume of rotten wood $V_r$. We can assume that all trees are growing depending on species $s$ and plot $p$ fertility and are supposed to have a full healthy volume $V_h$ for a given diameter $dbh$. Then the final volume of softwood $V_f$ product will be the difference between the theoritical full healthy volume $V_h$ and the actual volume of rotten wood $V_r$:
+$$ V_f = V_h - V_r = f(dbh, sp) - V_r$$
+$$ V_r = V_f - f(dbh, sp)$$
+$$V_r \sim \mathcal{N}(\mu, \sigma)$$
+$$n \in [1,N_{=3268}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
+
+We retained following models :
 
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  m = c('$M_{s,p}0$', '$M_{s,wsg,p}0$', '$M_{wsg,p}0$', '$M_{sp}0$'),
-  model = c(
+  M = c('$M_{s,p}$', 'N?'),
+  Model = c(
     "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + \\beta_3*dbh_n$",
-    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + {\\beta_2}*wsg_n + \\beta_3*dbh_n$",
-    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_2}*wsg_n + {\\beta_3}*dbh_n$",
-    "$logit(\\theta_n) = {\\beta_0}_{sp} + \\beta_3*dbh_n$"
+    "$\\mu = V_f - ?$"
     )
   )
 mtab <- apply(mtab, 2, as.character)
 kable(mtab)
-row.names(mtab) <- c('Ms.p0', 'Ms.wsg.p0', 'Mwsg.p0', 'Msp0')
+row.names(mtab) <- c('Ms.p', 'N?')
 ```
 
-We tested models M1 to MX detailed in following tabs to find the better trade-off between:
+# Probed rotten (M)
 
-1. Complexity (and number of parameters)
-2. Convergence
-3. Likelihood
-4. Prediction quality with Root Mean Square Error of Prediction (RMSEP)
+Based on complexity (number of parameters), convergence and likelihood we selected model $M_{s,p}$ (see see [rotten 2](rotten2.html)):
+$$Rotten_n \sim \mathcal{B}(\theta_n), ~~n \in [1,N_{=3816}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
+$$logit(\theta_n) = {\beta_0}_p + {\beta_1}_s + \beta_3*dbh_n$$
 
-RMSEP was computed by fitting a model without a plot and evaluating it with the same plot. RMSEP in results are mean RMSEP for each plot. Results are shown for each models in each model tabs and summarized in [Results](#results) tab.
+```{r M pred, fig.height=12, fig.width=12}
+# beta <- as.matrix(fits$fit11$full)[which.max(as.matrix(fits$fit11$full)[,'lp__']),c('beta_1', 'beta_2', 'beta_3')]
+# fit <- fits$fit10$full
+# LLpred <- function(LMA, Nmass, wsg, LMAmax, Nmax, wsgmax, beta1, beta2, beta3, sigma){
+#   mu <- beta1*(LMA/LMAmax) - beta2*(Nmass/Nmax) + beta3*(wsg/wsgmax)
+#   rlnorm(1, mu, sigma)
+# }
+# pred <- apply(as.matrix(fit), 1, function(x)
+#   sapply(seq_len(dim(data)[1]), function(i)
+#       LLpred(data$LMA[i], data$Nmass[i], data$wsg[i], LMAmax, Nmax, wsgmax, x['beta_1'], x['beta_2'], x['beta_3'], x['sigma'])
+#     ))
+# pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+# names(pred) <- c('5%', '95%')
+# pred$mean <- exp((beta[1]*(data$LMA/LMAmax) - beta[2]*(data$Nmass/Nmax) + beta[3]*(data$wsg/wsgmax)))
+# pred$LMA <- data$LMA
+# pred$Nmass <- data$Nmass
+# pred$wsg <- data$wsg
+# g <- ggplot(data, aes(x = LMA, y = LL)) +
+#   geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+#   geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
+#   geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
+#   geom_line(aes(x = pred$LMA, y = pred$mean, color = 'mean'), linetype = 2) +
+#   geom_point() +
+#   theme_bw() +
+#   xlab('Leaf mass per area (LMA in g/m2)') +
+#   ylab('Leaf lifespan (LL in months)') +
+#   scale_color_manual(name = 'Model',
+#                      values = c('5%' = 'black',
+#                                 '95%' = 'black',
+#                                 'mean' = 'red'))
+# h <- ggplot(data, aes(x = Nmass, y = LL)) +
+#   geom_ribbon(aes(x = pred$Nmass, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+#   geom_line(aes(x = pred$Nmass, y = pred$`5%`, color = '5%'), linetype = 2) +
+#   geom_line(aes(x = pred$Nmass, y = pred$`95%`, color = '95%'), linetype = 2) +
+#   geom_line(aes(x = pred$Nmass, y = pred$mean, color = 'mean'), linetype = 2) +
+#   geom_point() +
+#   theme_bw() +
+#   xlab('Leaf nitrogen content (Nmass in %)') +
+#   ylab('Leaf lifespan (LL in months)') +
+#   scale_color_manual(name = 'Model',
+#                      values = c('5%' = 'black',
+#                                 '95%' = 'black',
+#                                 'mean' = 'red'))
+# f <- ggplot(data, aes(x = wsg, y = LL)) +
+#   geom_ribbon(aes(x = pred$wsg, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+#   geom_line(aes(x = pred$wsg, y = pred$`5%`, color = '5%'), linetype = 2) +
+#   geom_line(aes(x = pred$wsg, y = pred$`95%`, color = '95%'), linetype = 2) +
+#   geom_line(aes(x = pred$wsg, y = pred$mean, color = 'mean'), linetype = 2) +
+#   geom_point() +
+#   theme_bw() +
+#   xlab('Leaf nitrogen content (Nmass in %)') +
+#   ylab('Leaf lifespan (LL in months)') +
+#   scale_color_manual(name = 'Model',
+#                      values = c('5%' = 'black',
+#                                 '95%' = 'black',
+#                                 'mean' = 'red'))
+# plot_grid(g, h, f, labels = c('LMA', 'Nmass', 'wsg'))
+# p <- subplot(ggplotly(g, width = 800, height = 400), ggplotly(h, width = 800, height = 400), shareY = T, shareX = F, titleX = T)
+# chart_link <- plotly_POST(p, filename = "LL1")
+# save(chart_link,
+     # file = '~/Documents/ECOFOG/TROLL/inst/doc/LL_models/LL1.Rdata')
+# load('~/Documents/ECOFOG/TROLL/inst/doc/LL_models/LL1.Rdata')
+# chart_link
 
-Graph {data-width=200}
--------------------------------------
+# Rotten volume (N)
 
-### Trees probbed rotten and estimated dbh.
-```{r data graph}
-group_by(data, dbhest) %>%
-  summarise_each(funs(mean)) %>%
-  ggplot(aes(x = dbhest, y = probed_rotten)) +
-  geom_point() +
-  xlab('Estimated dbh (cm)') +
-  ylab('Probed rotten (%)')
-```
-
-```{r functions}
-fitgraph <- function(fit){
-  pars <- fit@model_pars
-  beta <- pars[grep('beta', pars)]
-  if(length(grep('sp', beta)) > 0)
-    beta <- beta[-grep('sp', beta)]
-  if(length(grep('s', beta)) > 0)
-     beta <- beta[-grep('s', beta)]
-  if(length(grep('p', beta)) > 0)
-    beta <- beta[-grep('p', beta)]
-  sigma <- pars[grep('sigma', pars)]
-  posterior <- as.matrix(fit)
-  r <- mcmc_areas(posterior,  pars = c(beta, sigma), prob = 0.8)
-  c <- mcmc_trace(posterior,  pars = c(beta, sigma,  'lp__'),
-                   facet_args = list(nrow = 2, labeller = label_parsed))
-  p <- ggpairs(data.frame(posterior[,beta]))
-  return(list(r = r, c = c, p = p))
-}
-```
-
-`r mtab['Ms.p0',1]`
-==================
-
-```{r Ms.p0, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Ms.p0.stan'),
-#             data = list(N = dim(data)[1],
-#                         P = length(levels(as.factor(data$plot))),
-#                         S = length(levels(as.factor(data$species))),
-#                         plot = as.integer(as.factor(data$plot)),
-#                         species = as.integer(as.factor(data$species)),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'Ms.p0.Rdata'))
-load(file.path(mpath, 'Ms.p0.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab['Ms.p0',], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rs.p0}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cs.p0}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Ps.p0}
-g$p
-```
-
-`r mtab['Ms.wsg.p0',1]`
-==================
-
-```{r Ms.wsg.p0, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Ms.wsg.p0.stan'),
-#             data = list(N = dim(data)[1],
-#                         P = length(levels(as.factor(data$plot))),
-#                         S = length(levels(as.factor(data$species))),
-#                         plot = as.integer(as.factor(data$plot)),
-#                         species = as.integer(as.factor(data$species)),
-#                         wsg = data$wsg/max(data$wsg),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'Ms.wsg.p0.Rdata'))
-load(file.path(mpath, 'Ms.wsg.p0.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab['Ms.wsg.p0',], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rs.wsg.p0}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cs.wsg.p0}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Ps.wsg.p0}
-g$p
-```
-
-`r mtab['Mwsg.p0',1]`
-==================
-
-```{r Mwsg.p0, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Mwsg.p0.stan'),
-#             data = list(N = dim(data)[1],
-#                         P = length(levels(as.factor(data$plot))),
-#                         plot = as.integer(as.factor(data$plot)),
-#                         wsg = data$wsg/max(data$wsg),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'Mwsg.p0.Rdata'))
-load(file.path(mpath, 'Mwsg.p0.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab['Mwsg.p0',], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rwsg.p0}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cwsg.p0}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Pwsg.p0}
-g$p
-```
-
-`r mtab['Msp0',1]`
-==================
-
-```{r Msp0, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Msp0.stan'),
-#             data = list(N = dim(data)[1],
-#                         SP = length(levels(as.factor(data$sp))),
-#                         sp = as.integer(as.factor(data$sp)),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'Msp0.Rdata'))
-load(file.path(mpath, 'Msp0.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab['Msp0',], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rsp0}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Csp0}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Psp0}
-g$p
-```
-
-Conclusion
-==================
-
-> Conclusion
-
-Column {data-width=200}
--------------------------------------
-
-Column {data-width=600}
--------------------------------------
-
-References
-==================
-
+# References

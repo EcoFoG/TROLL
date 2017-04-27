@@ -1,0 +1,302 @@
+---
+title: "Probed rotten"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r setup, include=FALSE}
+rm(list = ls()) ; invisible(gc())
+library(flexdashboard)
+library(knitr)
+library(parallel)
+library(TROLL)
+library(RconTroll)
+library(BIOMASS)
+library(reshape2)
+library(ggplot2)
+library(cowplot)
+library(entropart)
+library(plotly)
+library(rstan)
+library(bayesplot)
+library(rstanarm)
+library(readr)
+library(GGally)
+library(dplyr)
+cores <- detectCores()
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
+    cache = T, cache.lazy = F)
+mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/rotten_models"
+rstan_options(auto_write = TRUE)
+options(mc.cores = detectCores())
+```
+
+Intro
+==================
+
+Issue {data-width=200}
+-------------------------------------
+
+In order to simulate sylviculture with TROLL we need to implement a new sylviculture module inside TROLL model code. A first litterature review was completed by an interview with Laurent Descroix of the Office Nationale des Forêts. We discovered that rotten trees were not random and seemed to depend both on tree species and diameter. This document presents modelling of relation between rotten trees and their species and diameter.
+
+```{r data, include=FALSE}
+data <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_data.csv")
+data <- data[c('num', 'Parcelle', 'up', 'ess', 'abattu', 'tout BE', 'sonde_creux', 'sonde_creux abatt', 'sonde_creux_refus', 'DBH_desi', 'V_Est', 'vol_BO')]
+names(data) <- c('id', 'plot', 'subplot', 'spCode', 'logged', 'rotten_full', 'probed_rotten', 'probed_rotten_logged', 'probed_rotten_refused', 'dbhest', 'Vest', 'Vbo')
+species <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_species.csv")[-1,]
+species <- species[c("Code \nEssence" , "Nom \nscientifique")]
+names(species) <- c('spCode', 'species')
+species$wsg <- apply(do.call('rbind', lapply(strsplit(species$species, ' ', fixed = T), function(x) x[1:2])),
+                   1, function(x) getWoodDensity(x[1], x[2], region = 'SouthAmericaTrop')$meanWD)
+data <- data.frame(left_join(data, species)) ; rm(species)
+data <- data[-which(is.nan(data$wsg)),]
+data$sp <- apply(data[c('plot', 'species')], 1 , paste, collapse = '.')
+```
+
+In fact we have two different questions:
+
+- Predict if a tree will be probed as rotten (models **M**, see [rotten 2](rotten2.html)) 
+- Predict how much of tree volume is rotten (models **N**, see [rotten 3](rotten3.html))
+
+First all **M** model can be written as follow:
+
+$$Rotten_n \sim \mathcal{B}(\theta_n), ~~n \in [1,N_{=3816}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
+
+Table 2: Models summary.
+```{r mtab}
+mtab <- data.frame(
+  m = c('$M_{s,p}0$', '$M_{s,wsg,p}0$', '$M_{wsg,p}0$', '$M_{sp}0$'),
+  model = c(
+    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + \\beta_3*dbh_n$",
+    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + {\\beta_2}*wsg_n + \\beta_3*dbh_n$",
+    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_2}*wsg_n + {\\beta_3}*dbh_n$",
+    "$logit(\\theta_n) = {\\beta_0}_{sp} + \\beta_3*dbh_n$"
+    )
+  )
+mtab <- apply(mtab, 2, as.character)
+kable(mtab)
+row.names(mtab) <- c('Ms.p0', 'Ms.wsg.p0', 'Mwsg.p0', 'Msp0')
+```
+
+We tested models M detailed in following tabs to find the better trade-off between:
+
+1. Complexity (and number of parameters)
+2. Convergence
+3. Likelihood
+
+Results are shown for each models in each model tabs and summarized in [Conclusion](#conclusion) tab.
+
+Graph {data-width=200}
+-------------------------------------
+
+### Trees probbed rotten and estimated dbh.
+```{r data graph}
+group_by(data, dbhest) %>%
+  summarise_each(funs(mean)) %>%
+  ggplot(aes(x = dbhest, y = probed_rotten)) +
+  geom_point() +
+  xlab('Estimated dbh (cm)') +
+  ylab('Probed rotten (%)')
+```
+
+```{r functions}
+fitgraph <- function(fit){
+  pars <- fit@model_pars
+  beta <- pars[grep('beta', pars)]
+  if(length(grep('sp', beta)) > 0)
+    beta <- beta[-grep('sp', beta)]
+  if(length(grep('s', beta)) > 0)
+     beta <- beta[-grep('s', beta)]
+  if(length(grep('p', beta)) > 0)
+    beta <- beta[-grep('p', beta)]
+  sigma <- pars[grep('sigma', pars)]
+  posterior <- as.matrix(fit)
+  r <- mcmc_areas(posterior,  pars = c(beta, sigma), prob = 0.8)
+  c <- mcmc_trace(posterior,  pars = c(beta, sigma,  'lp__'),
+                   facet_args = list(nrow = 2, labeller = label_parsed))
+  p <- ggpairs(data.frame(posterior[,beta]))
+  return(list(r = r, c = c, p = p))
+}
+```
+
+`r mtab['Ms.p0',1]`
+==================
+
+```{r Ms.p0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Ms.p0.stan'),
+#             data = list(N = dim(data)[1],
+#                         P = length(levels(as.factor(data$plot))),
+#                         S = length(levels(as.factor(data$species))),
+#                         plot = as.integer(as.factor(data$plot)),
+#                         species = as.integer(as.factor(data$species)),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         rotten = data$rotten),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Ms.p0.Rdata'))
+load(file.path(mpath, 'Ms.p0.Rdata'))
+g <- fitgraph(fit) ; rm(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Ms.p0',], collapse = ': ')`
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rs.p0}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cs.p0}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Ps.p0}
+g$p
+```
+
+`r mtab['Ms.wsg.p0',1]`
+==================
+
+```{r Ms.wsg.p0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Ms.wsg.p0.stan'),
+#             data = list(N = dim(data)[1],
+#                         P = length(levels(as.factor(data$plot))),
+#                         S = length(levels(as.factor(data$species))),
+#                         plot = as.integer(as.factor(data$plot)),
+#                         species = as.integer(as.factor(data$species)),
+#                         wsg = data$wsg/max(data$wsg),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         rotten = data$rotten),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Ms.wsg.p0.Rdata'))
+load(file.path(mpath, 'Ms.wsg.p0.Rdata'))
+g <- fitgraph(fit) ; rm(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Ms.wsg.p0',], collapse = ': ')`
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rs.wsg.p0}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cs.wsg.p0}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Ps.wsg.p0}
+g$p
+```
+
+`r mtab['Mwsg.p0',1]`
+==================
+
+```{r Mwsg.p0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Mwsg.p0.stan'),
+#             data = list(N = dim(data)[1],
+#                         P = length(levels(as.factor(data$plot))),
+#                         plot = as.integer(as.factor(data$plot)),
+#                         wsg = data$wsg/max(data$wsg),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         rotten = data$rotten),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Mwsg.p0.Rdata'))
+load(file.path(mpath, 'Mwsg.p0.Rdata'))
+g <- fitgraph(fit) ; rm(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Mwsg.p0',], collapse = ': ')`
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rwsg.p0}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cwsg.p0}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Pwsg.p0}
+g$p
+```
+
+`r mtab['Msp0',1]`
+==================
+
+```{r Msp0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Msp0.stan'),
+#             data = list(N = dim(data)[1],
+#                         SP = length(levels(as.factor(data$sp))),
+#                         sp = as.integer(as.factor(data$sp)),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         rotten = data$rotten),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Msp0.Rdata'))
+load(file.path(mpath, 'Msp0.Rdata'))
+g <- fitgraph(fit) ; rm(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Msp0',], collapse = ': ')`
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rsp0}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Csp0}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Psp0}
+g$p
+```
+
+Conclusion
+==================
+
+> Model [$M_{s,p}0$](#m_sp0) is the best one because it has the higher maximum likelihood. Moreover model [$M_{s,wsg,p}0$](#m_swsgp0) shows us that adding $\beta_2*wsg_n$ is not improving the model because $\beta_2$ is centered on 0 and maximum likelihood stays the same. Consequently [$M_{wsg,p}0$](#m_wsgp0)  is not better than [$M_{s,p}0$](#m_sp0).
+
+Column {data-width=200}
+-------------------------------------
+
+Column {data-width=600}
+-------------------------------------
+
+References
+==================
+
