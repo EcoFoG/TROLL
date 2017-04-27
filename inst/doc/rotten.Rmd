@@ -70,16 +70,17 @@ $$Rotten_n \sim \mathcal{B}(\theta_n), ~~n \in [1,N_{=3816}] ~~ p \in [1, P_{=8}
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  m = c('$M_{s,p}0$', '$M_{wsg,p}0$', '$M_{sp}0$'),
+  m = c('$M_{s,p}0$', '$M_{s,wsg,p}0$', '$M_{wsg,p}0$', '$M_{sp}0$'),
   model = c(
-    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + \\beta_2*dbh_n$",
-    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}*wsg_n + {\\beta_2}*dbh_n$",
-    "$logit(\\theta_n) = {\\beta_0}_{sp} + \\beta_2*dbh_n$"
+    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + \\beta_3*dbh_n$",
+    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + {\\beta_2}*wsg_n + \\beta_3*dbh_n$",
+    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_2}*wsg_n + {\\beta_3}*dbh_n$",
+    "$logit(\\theta_n) = {\\beta_0}_{sp} + \\beta_3*dbh_n$"
     )
   )
 mtab <- apply(mtab, 2, as.character)
 kable(mtab)
-row.names(mtab) <- c('Ms.p0', 'Mwsg.p0', 'Msp0')
+row.names(mtab) <- c('Ms.p0', 'Ms.wsg.p0', 'Mwsg.p0', 'Msp0')
 ```
 
 We tested models M1 to MX detailed in following tabs to find the better trade-off between:
@@ -162,6 +163,48 @@ g$c
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
 ```{r Ps.p0}
+g$p
+```
+
+`r mtab['Ms.wsg.p0',1]`
+==================
+
+```{r Ms.wsg.p0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Ms.wsg.p0.stan'),
+#             data = list(N = dim(data)[1],
+#                         P = length(levels(as.factor(data$plot))),
+#                         S = length(levels(as.factor(data$species))),
+#                         plot = as.integer(as.factor(data$plot)),
+#                         species = as.integer(as.factor(data$species)),
+#                         wsg = data$wsg/max(data$wsg),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         rotten = data$rotten),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Ms.wsg.p0.Rdata'))
+load(file.path(mpath, 'Ms.wsg.p0.Rdata'))
+g <- fitgraph(fit) ; rm(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Ms.wsg.p0',], collapse = ': ')`
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rs.wsg.p0}
+g$r
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cs.wsg.p0}
+g$c
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Ps.wsg.p0}
 g$p
 ```
 

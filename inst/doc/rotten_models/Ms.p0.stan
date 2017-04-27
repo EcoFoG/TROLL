@@ -11,7 +11,7 @@ parameters {
   real beta_0 ;
   real beta_0p[P] ;
   real beta_1s[S] ;
-  real beta_2 ;
+  real beta_3 ;
   real sigma_p ;
   real sigma_s ;
 }
@@ -21,7 +21,7 @@ model {
      theta[n] =
      beta_0p[plot[n]] +
      beta_1s[species[n]] +
-     beta_2 * dbh[n]
+     beta_3 * dbh[n]
      ;
    }
    beta_0p ~ normal(beta_0, sigma_p) ;
