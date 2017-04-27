@@ -48,9 +48,9 @@ In order to simulate sylviculture with TROLL we need to implement a new sylvicul
 data <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_data.csv")
 data <- data[c('num', 'Parcelle', 'up', 'ess', 'abattu', 'tout BE', 'sonde_creux', 'sonde_creux abatt', 'sonde_creux_refus', 'DBH_desi', 'V_Est', 'vol_BO')]
 names(data) <- c('id', 'plot', 'subplot', 'spCode', 'logged', 'rotten_full', 'probed_rotten', 'probed_rotten_logged', 'probed_rotten_refused', 'dbhest', 'Vest', 'Vbo')
-data <- subset(data, rotten_full ==0)
+# data <- subset(data, rotten_full ==0)
 data <- subset(data, !is.na(Vbo))
-data <- data[c('id', 'plot', 'spCode', 'Vest', 'Vbo', 'dbhest')]
+data <- data[c('id', 'plot', 'spCode', 'probed_rotten', 'Vbo', 'dbhest')]
 species <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_species.csv")[-1,]
 species <- species[c("Code \nEssence" , "Nom \nscientifique")]
 names(species) <- c('spCode', 'species')
@@ -62,25 +62,22 @@ In fact we have two different questions:
 - Predict if a tree will be probed as rotten (models **M**, see [rotten 2](rotten2.html)) 
 - Predict how much of tree volume is rotten (models **N**, see [rotten 3](rotten3.html))
 
-Secondly, all **N** models depend on a latent variable being the volume of rotten wood $V_r$. We can assume that all trees are growing depending on species $s$ and plot $p$ fertility and are supposed to have a full healthy volume $V_h$ for a given diameter $dbh$. Then the final volume of softwood $V_f$ product will be the difference between the theoritical full healthy volume $V_h$ and the actual volume of rotten wood $V_r$:
-$$ V_f = V_h - V_r = f(dbh, sp) - V_r$$
-$$ V_r = f(dbh, sp)- V_f$$
-$$V_r \sim \mathcal{N}(\mu, \sigma)$$
-$$n \in [1,N_{=3268}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
+Secondly, all **N** models depend on a latent variable being the volume of rotten wood $V_r$. We can assume that all trees are growing depending on species $s$ and plot $p$ fertility and are supposed to have a full healthy volume $V_h$ for a given diameter $dbh$. Then the final volume of softwood $V_f$ product will be the difference between the theoritical full healthy volume $V_h$ and the volume of rotten wood $V_r$ if probed rotten:
+$$ V_f = V_h - V_r*P_r = f(dbh, sp) - V_r*P_r$$
+
 
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  N = c('$N_{p+s}$', '$N_{p*s}$'),
+  N = c('$N_{p+s}$'),
   Model = c(
-    "$\\mu = {\\beta_0}_p + {\\beta_1}_s + \\beta_2*dbh - V_f$",
-    "$\\mu = {\\beta_0}_p*{\\beta_1}_s*\\beta_2*dbh - V_f$"
+    "$V_f \\sim \\mathcal{N} ({\\beta_0}_p + {\\beta_1}_s + \\beta_2*dbh - V_r*P_r, \\sigma)$"
     )
   )
 mtab$N <- as.character(mtab$N)
 mtab$Model <- as.character(mtab$Model)
 kable(mtab)
-row.names(mtab) <- c('Np+s', 'Np*s')
+row.names(mtab) <- c('Np+s')
 ```
 
 We tested models N detailed in following tabs to find the better trade-off between:
@@ -96,10 +93,13 @@ Graph {data-width=200}
 
 ### Trees estimated dbh and final softwood product.
 ```{r data graph}
-  ggplot(data, aes(x = dbhest, y = Vbo)) + 
-  geom_point() +
+  ggplot(data, aes(x = dbhest, y = Vbo, color = as.factor(probed_rotten), alpha = as.factor(probed_rotten))) + 
+  geom_point() + geom_jitter() +
   xlab('Estimated dbh (cm)') +
-  ylab('Final softwood product (m3)')
+  ylab('Final softwood product (m3)') +
+  scale_alpha_discrete(guide = "none") +
+  scale_color_discrete('Probed rotten',
+                       labels = c('False', 'True'))
 ```
 
 ```{r functions}
@@ -133,10 +133,11 @@ fitgraph <- function(fit){
 #                         plot = as.integer(as.factor(data$plot)),
 #                         species = as.integer(as.factor(data$species)),
 #                         dbh = data$dbhest/max(data$dbhest),
-#                         V_f = data$Vbo),
+#                         V_f = data$Vbo,
+#                         P_r = data$probed_rotten),
 #             chains = 1)
 # save(fit, file = file.path(mpath, 'Np+s.Rdata'))
-load(file.path(mpath, 'Np+s.Rdata'))
+load(file.path(mpath, 'Ms.p0.Rdata'))
 g <- fitgraph(fit) ; rm(fit)
 ```
 
@@ -160,47 +161,6 @@ g$c
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
 ```{r Pp+s}
-g$p
-```
-
-`r mtab['Np*s',1]`
-==================
-
-```{r Np*s, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Np*s.stan'),
-#             data = list(N = dim(data)[1],
-#                         P = length(levels(as.factor(data$plot))),
-#                         S = length(levels(as.factor(data$species))),
-#                         plot = as.integer(as.factor(data$plot)),
-#                         species = as.integer(as.factor(data$species)),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         V_f = data$Vbo),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'Np*s.Rdata'))
-load(file.path(mpath, 'Np*s.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab['Np*s',], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rp*s}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cp*s}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Pp*s}
 g$p
 ```
 

@@ -37,6 +37,7 @@ cores <- detectCores()
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
     cache = T, cache.lazy = F)
+mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/rotten_models"
 ```
 
 # Introduction
@@ -78,69 +79,54 @@ Based on complexity (number of parameters), convergence and likelihood we select
 $$Rotten_n \sim \mathcal{B}(\theta_n), ~~n \in [1,N_{=3816}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
 $$logit(\theta_n) = {\beta_0}_p + {\beta_1}_s + \beta_3*dbh_n$$
 
+```{r M model, include=FALSE}
+data <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_data.csv")
+data <- data[c('num', 'Parcelle', 'up', 'ess', 'abattu', 'tout BE', 'sonde_creux', 'sonde_creux abatt', 'sonde_creux_refus', 'DBH_desi', 'V_Est', 'vol_BO')]
+names(data) <- c('id', 'plot', 'subplot', 'spCode', 'logged', 'rotten_full', 'probed_rotten', 'probed_rotten_logged', 'probed_rotten_refused', 'dbhest', 'Vest', 'Vbo')
+species <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_species.csv")[-1,]
+species <- species[c("Code \nEssence" , "Nom \nscientifique")]
+names(species) <- c('spCode', 'species')
+species$wsg <- apply(do.call('rbind', lapply(strsplit(species$species, ' ', fixed = T), function(x) x[1:2])),
+                   1, function(x) getWoodDensity(x[1], x[2], region = 'SouthAmericaTrop')$meanWD)
+data <- data.frame(left_join(data, species)) ; rm(species)
+data <- data[-which(is.nan(data$wsg)),]
+data$sp <- apply(data[c('plot', 'species')], 1 , paste, collapse = '.')
+dbhmax <- max(data$dbhest)
+load(file.path(mpath, 'Ms.p0.Rdata'))
+```
+
 ```{r M pred, fig.height=12, fig.width=12}
-# beta <- as.matrix(fits$fit11$full)[which.max(as.matrix(fits$fit11$full)[,'lp__']),c('beta_1', 'beta_2', 'beta_3')]
-# fit <- fits$fit10$full
-# LLpred <- function(LMA, Nmass, wsg, LMAmax, Nmax, wsgmax, beta1, beta2, beta3, sigma){
-#   mu <- beta1*(LMA/LMAmax) - beta2*(Nmass/Nmax) + beta3*(wsg/wsgmax)
-#   rlnorm(1, mu, sigma)
-# }
-# pred <- apply(as.matrix(fit), 1, function(x)
-#   sapply(seq_len(dim(data)[1]), function(i)
-#       LLpred(data$LMA[i], data$Nmass[i], data$wsg[i], LMAmax, Nmax, wsgmax, x['beta_1'], x['beta_2'], x['beta_3'], x['sigma'])
-#     ))
-# pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
-# names(pred) <- c('5%', '95%')
-# pred$mean <- exp((beta[1]*(data$LMA/LMAmax) - beta[2]*(data$Nmass/Nmax) + beta[3]*(data$wsg/wsgmax)))
-# pred$LMA <- data$LMA
-# pred$Nmass <- data$Nmass
-# pred$wsg <- data$wsg
-# g <- ggplot(data, aes(x = LMA, y = LL)) +
-#   geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
-#   geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
-#   geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
-#   geom_line(aes(x = pred$LMA, y = pred$mean, color = 'mean'), linetype = 2) +
-#   geom_point() +
-#   theme_bw() +
-#   xlab('Leaf mass per area (LMA in g/m2)') +
-#   ylab('Leaf lifespan (LL in months)') +
-#   scale_color_manual(name = 'Model',
-#                      values = c('5%' = 'black',
-#                                 '95%' = 'black',
-#                                 'mean' = 'red'))
-# h <- ggplot(data, aes(x = Nmass, y = LL)) +
-#   geom_ribbon(aes(x = pred$Nmass, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
-#   geom_line(aes(x = pred$Nmass, y = pred$`5%`, color = '5%'), linetype = 2) +
-#   geom_line(aes(x = pred$Nmass, y = pred$`95%`, color = '95%'), linetype = 2) +
-#   geom_line(aes(x = pred$Nmass, y = pred$mean, color = 'mean'), linetype = 2) +
-#   geom_point() +
-#   theme_bw() +
-#   xlab('Leaf nitrogen content (Nmass in %)') +
-#   ylab('Leaf lifespan (LL in months)') +
-#   scale_color_manual(name = 'Model',
-#                      values = c('5%' = 'black',
-#                                 '95%' = 'black',
-#                                 'mean' = 'red'))
-# f <- ggplot(data, aes(x = wsg, y = LL)) +
-#   geom_ribbon(aes(x = pred$wsg, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
-#   geom_line(aes(x = pred$wsg, y = pred$`5%`, color = '5%'), linetype = 2) +
-#   geom_line(aes(x = pred$wsg, y = pred$`95%`, color = '95%'), linetype = 2) +
-#   geom_line(aes(x = pred$wsg, y = pred$mean, color = 'mean'), linetype = 2) +
-#   geom_point() +
-#   theme_bw() +
-#   xlab('Leaf nitrogen content (Nmass in %)') +
-#   ylab('Leaf lifespan (LL in months)') +
-#   scale_color_manual(name = 'Model',
-#                      values = c('5%' = 'black',
-#                                 '95%' = 'black',
-#                                 'mean' = 'red'))
-# plot_grid(g, h, f, labels = c('LMA', 'Nmass', 'wsg'))
-# p <- subplot(ggplotly(g, width = 800, height = 400), ggplotly(h, width = 800, height = 400), shareY = T, shareX = F, titleX = T)
-# chart_link <- plotly_POST(p, filename = "LL1")
-# save(chart_link,
-     # file = '~/Documents/ECOFOG/TROLL/inst/doc/LL_models/LL1.Rdata')
-# load('~/Documents/ECOFOG/TROLL/inst/doc/LL_models/LL1.Rdata')
-# chart_link
+beta <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta_0', 'beta_3')]
+data <- group_by(data, dbhest) %>%
+  summarise_each(funs(mean))
+Pr <- function(dbh, dbhmax, beta0, beta3){
+  theta <- beta0 + (beta3/dbhmax)*dbh
+  gtools::inv.logit(theta)
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data)[1]), function(i)
+    Pr(data$dbhest[i], dbhmax, x['beta_0'], x['beta_3'])
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- gtools::inv.logit(beta[1] + (beta[2]/dbhmax)*data$dbhest)
+pred$dbh <- data$dbhest
+(g <- ggplot(data, aes(x = dbhest, y = probed_rotten)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() +
+  theme_bw() +
+  xlab('Diameter at breast height (cm)') +
+  ylab('Probability to be probed as rotten') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red')))
+```
+
+$$P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2]/dbhmax,3)`*dbh)$$
 
 # Rotten volume (N)
 
