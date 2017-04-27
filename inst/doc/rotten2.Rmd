@@ -69,7 +69,7 @@ First all **M** model can be written as follow:
 Table 1: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  m = c('$M$', '$M_{p}$', '$M_{s,p}$', '$M_{s,wsg,p}$', '$M_{wsg,p}$'),
+  m = c('$M$', '$M_{p}$', '$M_{p,s}$', '$M_{s,wsg,p}$', '$M_{wsg,p}$'),
   model = c(
     "$Rotten_n \\sim \\mathcal{B}(inv_{logit}(\\beta_0 + \\beta_1*dbh_n))$",
     "$Rotten_n \\sim \\mathcal{B}(inv_{logit}(\\beta_0 + \\beta_1*dbh_n + {\\beta_2}_p))$",
@@ -80,7 +80,7 @@ mtab <- data.frame(
   )
 mtab <- apply(mtab, 2, as.character)
 kable(mtab)
-row.names(mtab) <- c('M', 'Mp', 'Ms.p', 'Ms.wsg.p', 'Mwsg.p')
+row.names(mtab) <- c('M', 'Mp', 'Mps', 'Ms.wsg.p', 'Mwsg.p')
 ```
 
 We tested models M detailed in following tabs to find the better trade-off between:
@@ -191,7 +191,7 @@ g$c
 Convergence {data-width=300} 
 -------------------------------------
 
-> $P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2]/dbhmax,3)`*dbh)$
+> $P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2],3)`*dbh)$
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r R}
@@ -201,6 +201,31 @@ g$r
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
 ```{r P}
 g$p
+```
+
+`r mtab['M',1]` glm
+==================
+
+Model {data-width=300}
+-------------------------------------
+```{r glm M, echo=TRUE}
+data$dbh <- data$dbhest/dbhmax
+m <- glm(probed_rotten ~ dbh, family = 'binomial', data)
+print(m)
+```
+
+Plots {data-width=300}
+-------------------------------------
+
+### Plot 1
+```{r glm M plot1}
+par(mfrow = c(2,2)) ; plot(m) ; par(mfrow = c(1,1))
+```
+
+### Plot 2
+```{r glm M plot2, echo=TRUE}
+summary(predict(m))
+summary(data$probed_rotten)
 ```
 
 `r mtab['Mp',1]`
@@ -274,10 +299,10 @@ g$r
 g$p
 ```
 
-`r mtab['Ms.p',1]`
+`r mtab['Mps',1]`
 ==================
 
-```{r Ms.p, include=FALSE}
+```{r Mps, include=FALSE}
 # fit <- stan(file = file.path(mpath, 'Mps.stan'),
 #             data = list(N = dim(data)[1],
 #                         P = length(levels(as.factor(data$plot))),
@@ -295,10 +320,10 @@ g <- fitgraph(fit)
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab['Ms.p',], collapse = ': ')`
+> `r paste(mtab['Mps',], collapse = ': ')`
 
 ### Model Predictions.
-```{r Ms.p pred}
+```{r Mps pred}
 beta <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta_0', 'beta_1')]
 Pr <- function(dbh, dbhmax, beta0, beta1){
   theta <- beta0 + beta1*(dbh/dbhmax)
@@ -328,7 +353,7 @@ ggplot(data2, aes(x = dbhest, y = probed_rotten)) +
 ```
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cs.p}
+```{r Cps}
 g$c
 ```
 
@@ -338,12 +363,12 @@ Convergence {data-width=300}
 > $P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2]/dbhmax,3)`*dbh)$
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rs.p}
+```{r Rps}
 g$r
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Ps.p}
+```{r Pps}
 g$p
 ```
 
