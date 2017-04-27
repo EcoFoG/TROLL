@@ -103,6 +103,10 @@ group_by(data, dbhest) %>%
   xlab('Estimated dbh (cm)') +
   ylab('Probed rotten (%)') +
   scale_size_continuous('n=')
+ggplot(data, aes(x = dbhest, color = as.factor(probed_rotten), fill  = as.factor(probed_rotten))) + 
+  geom_density(alpha = 0.3) +
+  scale_alpha_manual(guide = 'none') +
+  scale_color_discrete('Probed rotten', labels = c('False', 'True'))
 ```
 
 ```{r functions}
