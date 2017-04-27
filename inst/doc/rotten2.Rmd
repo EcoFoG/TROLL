@@ -56,6 +56,7 @@ species$wsg <- apply(do.call('rbind', lapply(strsplit(species$species, ' ', fixe
 data <- data.frame(left_join(data, species)) ; rm(species)
 data <- data[-which(is.nan(data$wsg)),]
 data$sp <- apply(data[c('plot', 'species')], 1 , paste, collapse = '.')
+dbhmax <- max(data$dbhest)
 ```
 
 In fact we have two different questions:
@@ -65,22 +66,21 @@ In fact we have two different questions:
 
 First all **M** model can be written as follow:
 
-$$Rotten_n \sim \mathcal{B}(\theta_n), ~~n \in [1,N_{=3816}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
-
-Table 2: Models summary.
+Table 1: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  m = c('$M_{s,p}0$', '$M_{s,wsg,p}0$', '$M_{wsg,p}0$', '$M_{sp}0$'),
+  m = c('$M$', '$M_{p}$', '$M_{s,p}$', '$M_{s,wsg,p}$', '$M_{wsg,p}$'),
   model = c(
-    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + \\beta_3*dbh_n$",
-    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_1}_s + {\\beta_2}*wsg_n + \\beta_3*dbh_n$",
-    "$logit(\\theta_n) = {\\beta_0}_p + {\\beta_2}*wsg_n + {\\beta_3}*dbh_n$",
-    "$logit(\\theta_n) = {\\beta_0}_{sp} + \\beta_3*dbh_n$"
+    "$Rotten_n \\sim \\mathcal{B}(inv_{logit}(\\beta_3*dbh_n))$",
+    "$Rotten_n \\sim \\mathcal{B}(inv_{logit}({\\beta_0}_p + \\beta_3*dbh_n))$",
+    "$Rotten_n \\sim \\mathcal{B}(inv_{logit}({\\beta_0}_p + {\\beta_1}_s + \\beta_3*dbh_n))$",
+    "$Rotten_n \\sim \\mathcal{B}(inv_{logit}({\\beta_0}_p + {\\beta_1}_s + {\\beta_2}*wsg_n + \\beta_3*dbh_n))$",
+    "$Rotten_n \\sim \\mathcal{B}(inv_{logit}({\\beta_0}_p + {\\beta_2}*wsg_n + {\\beta_3}*dbh_n$))"
     )
   )
 mtab <- apply(mtab, 2, as.character)
 kable(mtab)
-row.names(mtab) <- c('Ms.p0', 'Ms.wsg.p0', 'Mwsg.p0', 'Msp0')
+row.names(mtab) <- c('M', 'Mp', 'Ms.p', 'Ms.wsg.p', 'Mwsg.p')
 ```
 
 We tested models M detailed in following tabs to find the better trade-off between:
@@ -97,11 +97,12 @@ Graph {data-width=200}
 ### Trees probbed rotten and estimated dbh.
 ```{r data graph}
 group_by(data, dbhest) %>%
-  summarise_each(funs(mean)) %>%
-  ggplot(aes(x = dbhest, y = probed_rotten)) +
+  summarise_each(funs(mean, n())) %>%
+  ggplot(aes(x = dbhest, y = probed_rotten_mean, size = probed_rotten_logged_n)) +
   geom_point() +
   xlab('Estimated dbh (cm)') +
-  ylab('Probed rotten (%)')
+  ylab('Probed rotten (%)') +
+  scale_size_continuous('n=')
 ```
 
 ```{r functions}
@@ -122,13 +123,87 @@ fitgraph <- function(fit){
   p <- ggpairs(data.frame(posterior[,beta]))
   return(list(r = r, c = c, p = p))
 }
+inv_logit <- function(u) {
+  return(1 / (1 + exp(-u)));
+}
+data2 <- group_by(data, dbhest) %>%
+  summarise_each(funs(mean))
 ```
 
-`r mtab['Ms.p0',1]`
+`r mtab['M',1]`
 ==================
 
-```{r Ms.p0, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Ms.p0.stan'),
+```{r M, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'M.stan'),
+#             data = list(N = dim(data)[1],
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         rotten = data$rotten),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'M.Rdata'))
+load(file.path(mpath, 'M.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['M',], collapse = ': ')`
+
+### Model Predictions.
+```{r M pred}
+beta <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta_3')]
+Pr <- function(dbh, dbhmax, beta3){
+  theta <- beta3*(dbh/dbhmax)
+  inv_logit(theta)
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Pr(data2$dbhest[i], dbhmax, x['beta_3'])
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- inv_logit((beta[1]/dbhmax)*data2$dbhest)
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = probed_rotten)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() +
+  theme_bw() +
+  xlab('Diameter at breast height (cm)') +
+  ylab('Probability to be probed as rotten') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red')) ; rm(fit)
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r C}
+g$c
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+> $P_{rotten} = inv_{logit}(`r round(beta[1]/dbhmax,3)`*dbh)$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r R}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r P}
+g$p
+```
+
+`r mtab['Mp',1]`
+==================
+
+```{r Mp, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Mp.stan'),
 #             data = list(N = dim(data)[1],
 #                         P = length(levels(as.factor(data$plot))),
 #                         S = length(levels(as.factor(data$species))),
@@ -137,39 +212,144 @@ fitgraph <- function(fit){
 #                         dbh = data$dbhest/max(data$dbhest),
 #                         rotten = data$rotten),
 #             chains = 1)
-# save(fit, file = file.path(mpath, 'Ms.p0.Rdata'))
-load(file.path(mpath, 'Ms.p0.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
+# save(fit, file = file.path(mpath, 'Mp.Rdata'))
+load(file.path(mpath, 'Mp.Rdata'))
+g <- fitgraph(fit)
 ```
 
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab['Ms.p0',], collapse = ': ')`
+> `r paste(mtab['Mp',], collapse = ': ')`
 
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rs.p0}
-g$r
+### Model Predictions.
+```{r Mp pred}
+beta <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta_0', 'beta_3')]
+Pr <- function(dbh, dbhmax, beta0, beta3){
+  theta <- beta0 + beta3*(dbh/dbhmax)
+  inv_logit(theta)
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Pr(data2$dbhest[i], dbhmax, x['beta_0'], x['beta_3'])
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- inv_logit(beta[1] + (beta[2]/dbhmax)*data2$dbhest)
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = probed_rotten)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() +
+  theme_bw() +
+  xlab('Diameter at breast height (cm)') +
+  ylab('Probability to be probed as rotten') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red')) ; rm(fit)
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cp}
+g$c
 ```
 
 Convergence {data-width=300} 
 -------------------------------------
 
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cs.p0}
-g$c
+> $P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2]/dbhmax,3)`*dbh)$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rp}
+g$r
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Ps.p0}
+```{r Pp}
 g$p
 ```
 
-`r mtab['Ms.wsg.p0',1]`
+`r mtab['Ms.p',1]`
 ==================
 
-```{r Ms.wsg.p0, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Ms.wsg.p0.stan'),
+```{r Ms.p, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Ms.p.stan'),
+#             data = list(N = dim(data)[1],
+#                         P = length(levels(as.factor(data$plot))),
+#                         S = length(levels(as.factor(data$species))),
+#                         plot = as.integer(as.factor(data$plot)),
+#                         species = as.integer(as.factor(data$species)),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         rotten = data$rotten),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Ms.p.Rdata'))
+load(file.path(mpath, 'Ms.p.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Ms.p',], collapse = ': ')`
+
+### Model Predictions.
+```{r Ms.p pred}
+beta <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta_0', 'beta_3')]
+Pr <- function(dbh, dbhmax, beta0, beta3){
+  theta <- beta0 + beta3*(dbh/dbhmax)
+  inv_logit(theta)
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Pr(data2$dbhest[i], dbhmax, x['beta_0'], x['beta_3'])
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- inv_logit(beta[1] + (beta[2]/dbhmax)*data2$dbhest)
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = probed_rotten)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() +
+  theme_bw() +
+  xlab('Diameter at breast height (cm)') +
+  ylab('Probability to be probed as rotten') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red')) ; rm(fit)
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cs.p}
+g$c
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+> $P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2]/dbhmax,3)`*dbh)$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rs.p}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Ps.p}
+g$p
+```
+
+`r mtab['Ms.wsg.p',1]`
+==================
+
+```{r Ms.wsg.p, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Ms.wsg.p.stan'),
 #             data = list(N = dim(data)[1],
 #                         P = length(levels(as.factor(data$plot))),
 #                         S = length(levels(as.factor(data$species))),
@@ -179,18 +359,18 @@ g$p
 #                         dbh = data$dbhest/max(data$dbhest),
 #                         rotten = data$rotten),
 #             chains = 1)
-# save(fit, file = file.path(mpath, 'Ms.wsg.p0.Rdata'))
-load(file.path(mpath, 'Ms.wsg.p0.Rdata'))
+# save(fit, file = file.path(mpath, 'Ms.wsg.p.Rdata'))
+load(file.path(mpath, 'Ms.wsg.p.Rdata'))
 g <- fitgraph(fit) ; rm(fit)
 ```
 
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab['Ms.wsg.p0',], collapse = ': ')`
+> `r paste(mtab['Ms.wsg.p',], collapse = ': ')`
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rs.wsg.p0}
+```{r Rs.wsg.p}
 g$r
 ```
 
@@ -198,19 +378,19 @@ Convergence {data-width=300}
 -------------------------------------
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cs.wsg.p0}
+```{r Cs.wsg.p}
 g$c
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Ps.wsg.p0}
+```{r Ps.wsg.p}
 g$p
 ```
 
-`r mtab['Mwsg.p0',1]`
+`r mtab['Mwsg.p',1]`
 ==================
 
-```{r Mwsg.p0, include=FALSE}
+```{r Mwsg.p, include=FALSE}
 # fit <- stan(file = file.path(mpath, 'Mwsg.p0.stan'),
 #             data = list(N = dim(data)[1],
 #                         P = length(levels(as.factor(data$plot))),
@@ -220,17 +400,17 @@ g$p
 #                         rotten = data$rotten),
 #             chains = 1)
 # save(fit, file = file.path(mpath, 'Mwsg.p0.Rdata'))
-load(file.path(mpath, 'Mwsg.p0.Rdata'))
+load(file.path(mpath, 'Mwsg.p.Rdata'))
 g <- fitgraph(fit) ; rm(fit)
 ```
 
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab['Mwsg.p0',], collapse = ': ')`
+> `r paste(mtab['Mwsg.p',], collapse = ': ')`
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rwsg.p0}
+```{r Rwsg.p}
 g$r
 ```
 
@@ -238,51 +418,12 @@ Convergence {data-width=300}
 -------------------------------------
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cwsg.p0}
+```{r Cwsg.p}
 g$c
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Pwsg.p0}
-g$p
-```
-
-`r mtab['Msp0',1]`
-==================
-
-```{r Msp0, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Msp0.stan'),
-#             data = list(N = dim(data)[1],
-#                         SP = length(levels(as.factor(data$sp))),
-#                         sp = as.integer(as.factor(data$sp)),
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         rotten = data$rotten),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'Msp0.Rdata'))
-load(file.path(mpath, 'Msp0.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab['Msp0',], collapse = ': ')`
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rsp0}
-g$r
-```
-
-Convergence {data-width=300} 
--------------------------------------
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Csp0}
-g$c
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Psp0}
+```{r Pwsg.p}
 g$p
 ```
 

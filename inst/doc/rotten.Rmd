@@ -95,23 +95,26 @@ dbhmax <- max(data$dbhest)
 load(file.path(mpath, 'Ms.p0.Rdata'))
 ```
 
-```{r M pred, fig.height=12, fig.width=12}
+```{r M pred}
 beta <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta_0', 'beta_3')]
-data <- group_by(data, dbhest) %>%
+inv_logit <- function(u) {
+  return(1 / (1 + exp(-u)));
+}
+data2 <- group_by(data, dbhest) %>%
   summarise_each(funs(mean))
 Pr <- function(dbh, dbhmax, beta0, beta3){
-  theta <- beta0 + (beta3/dbhmax)*dbh
-  gtools::inv.logit(theta)
+  theta <- beta0 + beta3*(dbh/dbhmax)
+  inv_logit(theta)
 }
 pred <- apply(as.matrix(fit), 1, function(x)
-  sapply(seq_len(dim(data)[1]), function(i)
-    Pr(data$dbhest[i], dbhmax, x['beta_0'], x['beta_3'])
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Pr(data2$dbhest[i], dbhmax, x['beta_0'], x['beta_3'])
   ))
 pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
 names(pred) <- c('5%', '95%')
-pred$mean <- gtools::inv.logit(beta[1] + (beta[2]/dbhmax)*data$dbhest)
-pred$dbh <- data$dbhest
-(g <- ggplot(data, aes(x = dbhest, y = probed_rotten)) +
+pred$mean <- inv_logit(beta[1] + (beta[2]/dbhmax)*data2$dbhest)
+pred$dbh <- data2$dbhest
+(g <- ggplot(data2, aes(x = dbhest, y = probed_rotten)) +
   geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
   geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
   geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
@@ -123,7 +126,7 @@ pred$dbh <- data$dbhest
   scale_color_manual(name = 'Model',
                      values = c('5%' = 'black',
                                 '95%' = 'black',
-                                'mean' = 'red')))
+                                'mean' = 'red'))) 
 ```
 
 $$P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2]/dbhmax,3)`*dbh)$$
