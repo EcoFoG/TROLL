@@ -1,17 +1,12 @@
 data {
-  int N ;
-  real dbh[N] ;
-  int rotten[N] ;
+  int<lower=0> N ; // number of obs (trees)
+  vector[N] dbh ; // trees dbh
+  int<lower=0, upper=1> rotten[N] ; // outcome (rotten)
 }
 parameters {
-  real beta_3 ;
+  real beta_0 ;
+  real beta_1 ;
 }
 model {
-   real theta[N] ;
-   for(n in 1:N){
-     theta[n] =
-     beta_3 * dbh[n]
-     ;
-   }
-   rotten ~ bernoulli(inv_logit(theta)) ;
+  rotten ~ bernoulli_logit(beta_0 + beta_1 * dbh) ;
 }
