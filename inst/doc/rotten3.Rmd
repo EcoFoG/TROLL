@@ -65,15 +65,20 @@ In fact we have two different questions:
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  N = c('$N_{0}$'),
+  N = c('$N_{0}$', '$N$', '$N_d$', '$N_{d,p}$', '$N_{d,s}$', '$N_{d,p,s}$'),
   Model = c(
-    "$V_f \\sim \\mathcal{N} (\\beta_0 + \\beta_1*dbh^2, \\sigma*dbh)$"
+    "$V_f \\sim \\mathcal{N} (\\beta_1 + \\beta_2*dbh^2, \\sigma*dbh)$",
+    "$V_f \\sim \\mathcal{N} (\\beta_1 + \\beta_2*dbh^2)*[1 - Pr*\\theta_1], \\sigma*dbh)$",
+    "$V_f \\sim \\mathcal{N} (\\beta_1 + \\beta_2*dbh^2)*[1 - Pr*(\\theta_1 + \\theta_2*dbh^2)], \\sigma*dbh)$",
+    "$V_f \\sim \\mathcal{N} (\\beta_1 + \\beta_2*dbh^2)*[1 - Pr*(\\theta_1 + \\theta_2*dbh^2 + \\theta_p)], \\sigma*dbh)$",
+    "$V_f \\sim \\mathcal{N} (\\beta_1 + \\beta_2*dbh^2)*[1 - Pr*(\\theta_1 + \\theta_2*dbh^2 + \\theta_s], \\sigma*dbh)$",
+    "$V_f \\sim \\mathcal{N} (\\beta_1 + \\beta_2*dbh^2)*[1 - Pr*(\\theta_1 + \\theta_2*dbh^2 + \\theta_p + \\theta_s], \\sigma*dbh)$"
     )
   )
 mtab$N <- as.character(mtab$N)
 mtab$Model <- as.character(mtab$Model)
-kable(mtab)
-row.names(mtab) <- c('N0')
+row.names(mtab) <- c('N0', 'N', 'Nd', 'Ndp', 'Nds', 'Ndps')
+kable(mtab, row.names = F)
 ```
 
 We tested models N detailed in following tabs to find the better trade-off between:
@@ -103,18 +108,21 @@ fitgraph <- function(fit){
   # pars <- fit@model_pars
   pars <- colnames(as.matrix(fit))
   beta <- pars[grep('beta', pars)]
-  if(length(grep('sp', beta)) > 0)
-    beta <- beta[-grep('sp', beta)]
   if(length(grep('s', beta)) > 0)
      beta <- beta[-grep('s', beta)]
   if(length(grep('p', beta)) > 0)
     beta <- beta[-grep('p', beta)]
+  theta <- pars[grep('theta', pars)]
+  if(length(grep('s', theta)) > 0)
+     theta <- theta[-grep('s', theta)]
+  if(length(grep('p', theta)) > 0)
+    theta <- theta[-grep('p', theta)]
   sigma <- pars[grep('sigma', pars)]
   posterior <- as.matrix(fit)
-  r <- mcmc_areas(posterior,  pars = c(beta, sigma), prob = 0.8)
-  c <- mcmc_trace(posterior,  pars = c(beta, sigma,  'lp__'),
+  r <- mcmc_areas(posterior,  pars = c(beta, theta, sigma), prob = 0.8)
+  c <- mcmc_trace(posterior,  pars = c(beta, theta, sigma,  'lp__'),
                    facet_args = list(nrow = 2, labeller = label_parsed))
-  p <- ggpairs(data.frame(posterior[,beta]))
+  p <- ggpairs(data.frame(posterior[,c(beta, theta)]))
   return(list(r = r, c = c, p = p))
 }
 ```
@@ -139,7 +147,7 @@ Model {data-width=300}
 > `r paste(mtab['N0',], collapse = ': ')`
 
 ### Model Predictions.
-```{r M pred}
+```{r N0 pred}
 data2 <- data[sample.int(dim(data)[1], 500, replace = F),]
 pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta[1]', 'beta[2]', 'sigma')]
 Vf <- function(dbh, dbhmax, pars){
@@ -170,7 +178,7 @@ ggplot(data2, aes(x = dbhest, y = Vbo)) +
 ```
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r C}
+```{r C0}
 g$c
 ```
 
@@ -180,12 +188,377 @@ Convergence {data-width=300}
 > $P_{rotten} = (`r round(pars[1],3)` + `r round(pars[2]/(dbhmax^2),3)`*dbh^2$
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r R0}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r P0}
+g$p
+```
+
+`r mtab['N',1]`
+==================
+
+```{r N, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'N.stan'),
+#             data = list(N = dim(data)[1],
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         Pr = data$probed_rotten,
+#                         Vf = data$Vbo),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'N.Rdata'))
+load(file.path(mpath, 'N.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['N',], collapse = ': ')`
+
+### Model Predictions.
+```{r N pred}
+data2 <- data[sample.int(dim(data)[1], 500, replace = F),]
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta[1]', 'beta[2]', 'sigma', 'theta[1]')]
+Vf <- function(dbh, dbhmax, Pr, pars){
+  mu <- (pars[1] + pars[2]*(dbh/dbhmax)*(dbh/dbhmax))*(1-Pr*pars[4])
+  rnorm(1, mu, pars[3])
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Vf(data2$dbhest[i], dbhmax, data2$probed_rotten[i], c(x['beta[1]'], x['beta[2]'], x['sigma'], x['theta[1]']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- (pars[1] + pars[2]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax))*(1-data2$probed_rotten*pars[4])
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = Vbo)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() + geom_jitter() +
+  theme_bw() +
+  xlab('Estimated dbh (cm)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r C}
+g$c
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+> $P_{rotten} = (`r round(pars[1],3)` + `r round(pars[2]/(dbhmax^2),3)`*dbh^2)*[1-Pr*`r round(pars[4],3)`]$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r R}
 g$r
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
 ```{r P}
+g$p
+```
+
+`r mtab['Nd',1]`
+==================
+
+```{r Nd, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Nd.stan'),
+#             data = list(N = dim(data)[1],
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         Pr = data$probed_rotten,
+#                         Vf = data$Vbo),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Nd.Rdata'))
+load(file.path(mpath, 'Nd.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Nd',], collapse = ': ')`
+
+### Model Predictions.
+```{r Nd pred}
+data2 <- data[sample.int(dim(data)[1], 500, replace = F),]
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta[1]', 'beta[2]', 'sigma', 'theta[1]', 'theta[2]')]
+Vf <- function(dbh, dbhmax, Pr, pars){
+  mu <- (pars[1] + pars[2]*(dbh/dbhmax)*(dbh/dbhmax))*(1-Pr*(pars[4]+pars[5]*(dbh/dbhmax)*(dbh/dbhmax)))
+  rnorm(1, mu, pars[3])
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Vf(data2$dbhest[i], dbhmax, data2$probed_rotten[i], c(x['beta[1]'], x['beta[2]'], x['sigma'], x['theta[1]'], x['theta[2]']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- (pars[1] + pars[2]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax))*(1-data2$probed_rotten*(pars[4]+pars[5]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax)))
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = Vbo)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() + geom_jitter() +
+  theme_bw() +
+  xlab('Estimated dbh (cm)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cd}
+g$c
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+> $P_{rotten} = (`r round(pars[1],3)` + `r round(pars[2]/(dbhmax^2),3)`*dbh^2)*[1-Pr*(`r round(pars[4],3)` + `r round(pars[5]/(dbhmax^2),3)`*dbh^2)]$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rd}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Pd}
+g$p
+```
+
+`r mtab['Ndp',1]`
+==================
+
+```{r Ndp, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Ndp.stan'),
+#             data = list(N = dim(data)[1],
+#                         P = length(levels(as.factor(data$plot))),
+#                         plot = as.integer(as.factor(data$plot)),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         Pr = data$probed_rotten,
+#                         Vf = data$Vbo),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Ndp.Rdata'))
+load(file.path(mpath, 'Ndp.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Ndp',], collapse = ': ')`
+
+### Model Predictions.
+```{r Ndp pred}
+data2 <- data[sample.int(dim(data)[1], 500, replace = F),]
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta[1]', 'beta[2]', 'sigma', 'theta[1]', 'theta[2]')]
+Vf <- function(dbh, dbhmax, Pr, pars){
+  mu <- (pars[1] + pars[2]*(dbh/dbhmax)*(dbh/dbhmax))*(1-Pr*(pars[4]+pars[5]*(dbh/dbhmax)*(dbh/dbhmax)))
+  rnorm(1, mu, pars[3])
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Vf(data2$dbhest[i], dbhmax, data2$probed_rotten[i], c(x['beta[1]'], x['beta[2]'], x['sigma'], x['theta[1]'], x['theta[2]']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- (pars[1] + pars[2]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax))*(1-data2$probed_rotten*(pars[4]+pars[5]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax)))
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = Vbo)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() + geom_jitter() +
+  theme_bw() +
+  xlab('Estimated dbh (cm)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cdp}
+g$c
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+> $P_{rotten} = (`r round(pars[1],3)` + `r round(pars[2]/(dbhmax^2),3)`*dbh^2)*[1-Pr*(`r round(pars[4],3)` + `r round(pars[5]/(dbhmax^2),3)`*dbh^2)]$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rdp}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Pdp}
+g$p
+```
+
+`r mtab['Nds',1]`
+==================
+
+```{r Nds, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Nds.stan'),
+#             data = list(N = dim(data)[1],
+#                         P = length(levels(as.factor(data$plot))),
+#                         plot = as.integer(as.factor(data$plot)),
+#                         S = length(levels(as.factor(data$species))),
+#                         species = as.integer(as.factor(data$species)),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         Pr = data$probed_rotten,
+#                         Vf = data$Vbo),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Nds.Rdata'))
+load(file.path(mpath, 'Nds.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Ndps',], collapse = ': ')`
+
+### Model Predictions.
+```{r Nds pred}
+data2 <- data[sample.int(dim(data)[1], 500, replace = F),]
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta[1]', 'beta[2]', 'sigma', 'theta[1]', 'theta[2]')]
+Vf <- function(dbh, dbhmax, Pr, pars){
+  mu <- (pars[1] + pars[2]*(dbh/dbhmax)*(dbh/dbhmax))*(1-Pr*(pars[4]+pars[5]*(dbh/dbhmax)*(dbh/dbhmax)))
+  rnorm(1, mu, pars[3])
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Vf(data2$dbhest[i], dbhmax, data2$probed_rotten[i], c(x['beta[1]'], x['beta[2]'], x['sigma'], x['theta[1]'], x['theta[2]']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- (pars[1] + pars[2]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax))*(1-data2$probed_rotten*(pars[4]+pars[5]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax)))
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = Vbo)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() + geom_jitter() +
+  theme_bw() +
+  xlab('Estimated dbh (cm)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cds}
+g$c
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+> $P_{rotten} = (`r round(pars[1],3)` + `r round(pars[2]/(dbhmax^2),3)`*dbh^2)*[1-Pr*(`r round(pars[4],3)` + `r round(pars[5]/(dbhmax^2),3)`*dbh^2)]$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rds}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Pds}
+g$p
+```
+
+`r mtab['Ndps',1]`
+==================
+
+```{r Ndps, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Ndps.stan'),
+#             data = list(N = dim(data)[1],
+#                         P = length(levels(as.factor(data$plot))),
+#                         plot = as.integer(as.factor(data$plot)),
+#                         S = length(levels(as.factor(data$species))),
+#                         species = as.integer(as.factor(data$species)),
+#                         dbh = data$dbhest/max(data$dbhest),
+#                         Pr = data$probed_rotten,
+#                         Vf = data$Vbo),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Ndps.Rdata'))
+load(file.path(mpath, 'Ndps.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Ndps',], collapse = ': ')`
+
+### Model Predictions.
+```{r Ndps pred}
+data2 <- data[sample.int(dim(data)[1], 500, replace = F),]
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta[1]', 'beta[2]', 'sigma', 'theta[1]', 'theta[2]')]
+Vf <- function(dbh, dbhmax, Pr, pars){
+  mu <- (pars[1] + pars[2]*(dbh/dbhmax)*(dbh/dbhmax))*(1-Pr*(pars[4]+pars[5]*(dbh/dbhmax)*(dbh/dbhmax)))
+  rnorm(1, mu, pars[3])
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Vf(data2$dbhest[i], dbhmax, data2$probed_rotten[i], c(x['beta[1]'], x['beta[2]'], x['sigma'], x['theta[1]'], x['theta[2]']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- (pars[1] + pars[2]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax))*(1-data2$probed_rotten*(pars[4]+pars[5]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax)))
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = Vbo)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() + geom_jitter() +
+  theme_bw() +
+  xlab('Estimated dbh (cm)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cdps}
+g$c
+```
+
+Convergence {data-width=300} 
+-------------------------------------
+
+> $P_{rotten} = (`r round(pars[1],3)` + `r round(pars[2]/(dbhmax^2),3)`*dbh^2)*[1-Pr*(`r round(pars[4],3)` + `r round(pars[5]/(dbhmax^2),3)`*dbh^2)]$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rdps}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Pdps}
 g$p
 ```
 
