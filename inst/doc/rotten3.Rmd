@@ -48,13 +48,13 @@ In order to simulate sylviculture with TROLL we need to implement a new sylvicul
 data <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_data.csv")
 data <- data[c('num', 'Parcelle', 'up', 'ess', 'abattu', 'tout BE', 'sonde_creux', 'sonde_creux abatt', 'sonde_creux_refus', 'DBH_desi', 'V_Est', 'vol_BO')]
 names(data) <- c('id', 'plot', 'subplot', 'spCode', 'logged', 'rotten_full', 'probed_rotten', 'probed_rotten_logged', 'probed_rotten_refused', 'dbhest', 'Vest', 'Vbo')
-# data <- subset(data, rotten_full ==0)
 data <- subset(data, !is.na(Vbo))
 data <- data[c('id', 'plot', 'spCode', 'probed_rotten', 'Vbo', 'dbhest')]
 species <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_species.csv")[-1,]
 species <- species[c("Code \nEssence" , "Nom \nscientifique")]
 names(species) <- c('spCode', 'species')
 data <- data.frame(left_join(data, species)) ; rm(species)
+dbhmax <- max(data$dbhest)
 ```
 
 In fact we have two different questions:
@@ -62,22 +62,18 @@ In fact we have two different questions:
 - Predict if a tree will be probed as rotten (models **M**, see [rotten 2](rotten2.html)) 
 - Predict how much of tree volume is rotten (models **N**, see [rotten 3](rotten3.html))
 
-Secondly, all **N** models depend on a latent variable being the volume of rotten wood $V_r$. We can assume that all trees are growing depending on species $s$ and plot $p$ fertility and are supposed to have a full healthy volume $V_h$ for a given diameter $dbh$. Then the final volume of softwood $V_f$ product will be the difference between the theoritical full healthy volume $V_h$ and the volume of rotten wood $V_r$ if probed rotten:
-$$ V_f = V_h - V_r*P_r = f(dbh, sp) - V_r*P_r$$
-
-
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  N = c('$N_{p+s}$'),
+  N = c('$N_{0}$'),
   Model = c(
-    "$V_f \\sim \\mathcal{N} ({\\beta_0}_p + {\\beta_1}_s + \\beta_2*dbh - V_r*P_r, \\sigma)$"
+    "$V_f \\sim \\mathcal{N} (\\beta_0 + \\beta_1*dbh^2, \\sigma*dbh)$"
     )
   )
 mtab$N <- as.character(mtab$N)
 mtab$Model <- as.character(mtab$Model)
 kable(mtab)
-row.names(mtab) <- c('Np+s')
+row.names(mtab) <- c('N0')
 ```
 
 We tested models N detailed in following tabs to find the better trade-off between:
@@ -104,7 +100,8 @@ Graph {data-width=200}
 
 ```{r functions}
 fitgraph <- function(fit){
-  pars <- fit@model_pars
+  # pars <- fit@model_pars
+  pars <- colnames(as.matrix(fit))
   beta <- pars[grep('beta', pars)]
   if(length(grep('sp', beta)) > 0)
     beta <- beta[-grep('sp', beta)]
@@ -122,45 +119,73 @@ fitgraph <- function(fit){
 }
 ```
 
-`r mtab['Np+s',1]`
+`r mtab['N0',1]`
 ==================
 
-```{r Np+s, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Np+s.stan'),
+```{r N0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'N0.stan'),
 #             data = list(N = dim(data)[1],
-#                         P = length(levels(as.factor(data$plot))),
-#                         S = length(levels(as.factor(data$species))),
-#                         plot = as.integer(as.factor(data$plot)),
-#                         species = as.integer(as.factor(data$species)),
 #                         dbh = data$dbhest/max(data$dbhest),
-#                         V_f = data$Vbo,
-#                         P_r = data$probed_rotten),
+#                         Vf = data$Vbo),
 #             chains = 1)
-# save(fit, file = file.path(mpath, 'Np+s.Rdata'))
-load(file.path(mpath, 'Ms.p0.Rdata'))
-g <- fitgraph(fit) ; rm(fit)
+# save(fit, file = file.path(mpath, 'N0.Rdata'))
+load(file.path(mpath, 'N0.Rdata'))
+g <- fitgraph(fit)
 ```
 
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab['Np+s',], collapse = ': ')`
+> `r paste(mtab['N0',], collapse = ': ')`
 
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r Rp+s}
-g$r
+### Model Predictions.
+```{r M pred}
+data2 <- data[sample.int(dim(data)[1], 500, replace = F),]
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta[1]', 'beta[2]', 'sigma')]
+Vf <- function(dbh, dbhmax, pars){
+  mu <- pars[1] + pars[2]*(dbh/dbhmax)*(dbh/dbhmax)
+  rnorm(1, mu, pars[3])
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Vf(data2$dbhest[i], dbhmax, c(x['beta[1]'], x['beta[2]'], x['sigma']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- pars[1] + pars[2]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax)
+pred$dbh <- data2$dbhest
+ggplot(data2, aes(x = dbhest, y = Vbo)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() + geom_jitter() +
+  theme_bw() +
+  xlab('Estimated dbh (cm)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r C}
+g$c
 ```
 
 Convergence {data-width=300} 
 -------------------------------------
 
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r Cp+s}
-g$c
+> $P_{rotten} = (`r round(pars[1],3)` + `r round(pars[2]/(dbhmax^2),3)`*dbh^2$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r R}
+g$r
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r Pp+s}
+```{r P}
 g$p
 ```
 
