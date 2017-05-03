@@ -15,14 +15,17 @@ parameters {
   real<lower=0> sigma_p ;
   real<lower=-beta-min(beta_p)> beta_s[S] ;
   real<lower=0> sigma_s ;
+  real<lower=0,upper=1> theta ;
+  real<lower=-theta,upper=1-theta> theta_d ;
+}
+transformed parameters{
   real<lower=0, upper=1> rho[N] ;
-  real<lower=0, upper=1> sigma_r ;
+  for(n in 1:N)
+    rho[n] = theta + theta_d*dbh[n]*dbh[n] ;
 }
 model {
   beta_p ~ normal(0, sigma_p) ;
   beta_s ~ normal(0, sigma_s) ;
-  for(n in 1:N){
-    rho[n] ~ lognormal(log(0.25), sigma_r) ;
+  for(n in 1:N)
     Vf[n] ~ lognormal(log(((beta + beta_p[plot[n]] + beta_s[species[n]])*dbh[n]*dbh[n])*(1-Pr[n]*rho[n])), sigma) ; 
-  }
 }
