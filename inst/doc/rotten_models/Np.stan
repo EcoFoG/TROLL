@@ -8,7 +8,7 @@ data {
 }
 parameters {
   real<lower=0, upper=1> rho ;
-  real<lower=0> beta_p[P] ;
+  real beta_p[P] ;
   real<lower=0> sigma_p ;
   real<lower=-min(beta_p)> beta ;
   real<lower=0> sigma ;

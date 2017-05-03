@@ -9,12 +9,12 @@ data {
   int<lower=0> species[N] ;
 }
 parameters {
-  real<lower=0, upper=1> theta_p[P] ;
+  real theta ;
+  real<lower=-theta, upper=1-theta> theta_p[P] ;
   real<lower=0> sigma_rp ;
-  real<lower=-min(theta_p), upper=1-max(theta_p)> theta ;
-  real<lower=0> beta_p[P] ;
+  real beta_p[P] ;
   real<lower=0> sigma_p ;
-  real<lower=0> beta_s[S] ;
+  real beta_s[S] ;
   real<lower=0> sigma_s ;
   real<lower=-min(beta_p)-min(beta_s)> beta ;
   real<lower=0> sigma ;

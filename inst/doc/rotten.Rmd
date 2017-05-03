@@ -57,7 +57,7 @@ $$V_f \sim \mathcal{logN}(V_h*Pt_r, \sigma), ~~n \in [1,N_{=3268}] ~~ p \in [1, 
 
 We retained following models :
 
-Table 2: Models summary.
+Table 1: Models summary.
 ```{r mtab}
 mtab <- data.frame(
   M = c('$M_{s,p}$', '$N_{s,p} + L_{s,p}$'),
@@ -127,8 +127,17 @@ ggplot(data2, aes(x = dbhest, y = probed_rotten)) +
                                 '95%' = 'black',
                                 'mean' = 'red'))
 ```
+Figure 1: Models prediction. *Probability to be probed as rotten P for a given dbh (cm).*
 
 $P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2]/dbhmax,3)`*dbh)$
+
+Table 2: Models prediction. *Probability to be probed as rotten (P in %) for a given dbh (cm).*
+```{r M pred}
+table <- data.frame(row.names = seq(45, 125, 5),
+           `P` = round(sapply(seq(45, 125, 5), function(dbh) 100*inv_logit(beta[1]+beta[2]*dbh/dbhmax))))
+kable(t(table))
+```
+
 
 # Rotten volume (N)
 
@@ -180,7 +189,16 @@ ggplot(data2, aes(x = dbhest, y = Vbo)) +
                                 '95%' = 'black',
                                 'mean' = 'red'))
 ```
+Figure 2: Models prediction. *Final volume of wood for a given dbh (cm).*
 
 > $Volume_{of~wood} = (`r round(pars[1]/dbhmax^2,5)`*dbh^2)*[1-Pr*(`r round(pars[3]/dbhmax^2,5)`*dbh^2)]$
+
+Table 3: Models prediction. *Final volume of wood ($V_f$ in $m^3$) and percent of rotten wood ($V_p$ in %) for a given dbh (cm) if the tree was probed rotten.*
+```{r N pred}
+table <- data.frame(row.names = seq(45, 125, 5),
+           Vf = round(sapply(seq(45, 125, 5), function(dbh) (pars[1]*(dbh/dbhmax)^2)*(1-pars[3]*(dbh/dbhmax)^2)),2),
+           Vp = round(sapply(seq(45, 125, 5), function(dbh) 100*pars[3]*(dbh/dbhmax)^2)))
+kable(t(table))
+```
 
 # References
