@@ -167,7 +167,6 @@ float disturb_intensity;	/* intensity of disturbance in percent of BA */
 int numespharvestable,		/* number of harvestable species */
 designated_volume,			/* volume designated for harvesting in m3/ha */
 harvested_volume;       	/* volume harvested in m3/ha */
-float rotten;      			/* percentage of rotten tree in probed trees */
 
 /*********************************************/
 /* Environmental variables of the simulation */
@@ -2113,7 +2112,6 @@ void Initialise() {
         	designated_volume *= cols*NV*rows*NH/10000;
         	In >> harvested_volume; In.getline(buffer,128,'\n');
         	harvested_volume *= cols*NV*rows*NH/10000;
-        	In >> rotten; In.getline(buffer,128,'\n');
         	In >> numespharvestable; In.getline(buffer,128,'\n');
         	/* species parameters */
         	for(ligne=0;ligne<3;ligne++) In.getline(buffer,128,'\n');                           /* Read species parameters (ifstream In) */
@@ -2567,38 +2565,45 @@ void SelectiveLogging() {
         sp=1;
         while(!S[sp].s_harvestable)
         	sp++;
-        cout << S[sp].s_name << " dbh min is now " << S[sp].s_dbhmin << endl;
+        cout << "dbh min is now " << S[sp].s_dbhmin << endl;
 
         /* SELECTION */
+        int rank=0, individuals=0;
         if(volume <= harvested_volume)
         	cout << "All designated trees will be harvested." << endl;
         if(volume >= harvested_volume){
-			int rank=0, individuals=0;
         	for(site=0;site<sites;site++)
         		if(status[site]==1 && S[T[site].t_sp_lab].s_interest > rank)
         			rank = S[T[site].t_sp_lab].s_interest;
-        	for(site=1;site<=sites;site++)
-        		if(status[site]==1 && S[T[site].t_sp_lab].s_interest==rank)
+        	while(volume >= harvested_volume){
+        		site=floor(genrand2()*sites);
+        		if(status[site]==1 && S[T[site].t_sp_lab].s_interest==rank){
+        			status[site]=0;
         			individuals++;
-        	cout << individuals << " trees have the maximum rank of " << rank << "." << endl;
+        			volume -= -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+        		}
+        	}
+        	cout << individuals << " trees have been unselected, volume is now of " << volume << " m3." << endl;
         }
 
         /* ROTTEN */
+        float protten;
         volume=0.0;
-        rotten=floor(rotten*designated);
-        cout << rotten << " trees are rotten, representing ";
-        while(rotten > 0){
-        	site=floor(genrand2()*sites);
+        individuals=0;
+        for(site=0;site<sites;site++){
         	if(status[site]==1){
-        		volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
-        		status[site]=0;
-        		rotten--;
+        		protten = 1 / (1 + exp(-(-5.151 + 0.042*T[site].t_dbh*100))); /*Probability to be rotten*/
+        		if(genrand2() < protten){
+        			status[site]=0;
+        			individuals++;
+            		volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+        		}
         	}
         }
-        cout << volume << " m3." << endl;
+        cout << individuals << " trees are rotten, representing " << volume << " m3." << endl;
 
         /* LOGGING */
-        int individuals=0;
+        individuals=0;
         volume=0.0;
         for(site=0;site<sites;site++){
         	if(status[site]==1){
@@ -2693,8 +2698,8 @@ void SelectiveLogging() {
         				if(status[site]==1){
         					row = floor(site/cols);
         					col = site-(row*cols);
-        					d = sqrt((row - row0)*(row - row0) + (col - col0)*(col - col0));
-        					if(d <= 33){
+        					d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
+        					if(d <= (33*33)){
         						status[site]=0;
         						individuals--;
         					}

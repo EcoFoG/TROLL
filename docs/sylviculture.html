@@ -11,7 +11,7 @@
 
 <meta name="author" content="Sylvain Schmitt sylvain.schmitt@agroparistech.fr" />
 
-<meta name="date" content="2017-04-25" />
+<meta name="date" content="2017-05-03" />
 
 <title>Sylviculture modelling</title>
 
@@ -217,7 +217,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Sylviculture modelling</h1>
 <h4 class="author"><em>Sylvain Schmitt <a href="mailto:sylvain.schmitt@agroparistech.fr">sylvain.schmitt@agroparistech.fr</a></em></h4>
-<h4 class="date"><em>2017-04-25</em></h4>
+<h4 class="date"><em>2017-05-03</em></h4>
 
 </div>
 
@@ -282,24 +282,41 @@ div.tocify {
 ###  Sylviculture parameter file for the TROLL program ###  
 ##########################################################
 ### GENERAL PARAMETERS
-1   /* disturb_iter # iteration step when the disturbance occure */
+1   /* disturb_iter # iteration step where the disturbation occure */
 ### disturbance
 0.4 /* disturb_intensity # intensity of disturbance in percent of BA */
 ### logging
 30  /* designated_volume # volume designated for harvesting in m3/ha */
 25  /* harvested_volume # volume harvested in m3/ha */
-0.25    /* rotten # percentage of rotten tree in probed trees */
-7   /* numespharvestable # number of harvestable species */ 
+25  /* numespharvestable # number of harvestable species */ 
 
 ### Species
 ****    spnum   dbhmin  dbhmax  interest
+Brosimum_guianense  7   0.55    2.0 1
+Brosimum_rubescens  8   0.55    2.0 1
+Caryocar_glabrum    12  0.55    2.0 1
 Dicorynia_guianensis    35  0.55    2.0 1
+Goupia_glabra   53  0.55    2.0 1
+Manilkara_bidentata 81  0.55    2.0 1
+Manilkara_huberi    82  0.55    2.0 1
+Ocotea_argyrophylla 94  0.55    2.0 1
 Qualea_rosea    130 0.55    2.0 1
 Ruizterania_albiflora   134 0.55    2.0 1
-Vouacapoua_americana    161 0.55    0.70    2
-Brosimum_rubescens  8   0.55    2.0 3
-Moronobea_coccinea  90  0.55    2.0 3
-Bocoa_prouacensis   6   0.55    2.0 3</code></pre>
+Vouacapoua_americana    161 0.55    0.70    1
+Couma_guianensis    29  0.55    2.0 2
+Eperua_grandiflora  42  0.55    2.0 2
+Lecythis_zabucajo   71  0.55    2.0 2
+Moronobea_coccinea  90  0.55    2.0 2
+Rhodostemonodaphne_grandis  133 0.55    2.0 2
+Sterculia_pruriens  140 0.55    2.0 2
+Sterculia_speciosa  141 0.55    2.0 2
+Sterculia_villifera 142 0.55    2.0 2
+Virola_michelii 159 0.55    2.0 2
+Vochysia_guianensis 160 0.55    2.0 2
+Bocoa_prouacensis   6   0.55    2.0 3
+Couratari_multiflora    30  0.55    2.0 3
+Eperua_falcata  41  0.55    2.0 3
+Eperua_rubiginosa   43  0.55    2.0 3</code></pre>
 <p>Code 1: Example of Sylviculture parameter file for the TROLL program.</p>
 <p>Following those data the model can calculate the total harvestable volume <span class="math inline">\({V_h}_{tot}\)</span> and retains all trees id as <strong>can be designated</strong>. If <span class="math inline">\({V_h}_{tot} &lt; 30*n_{ha}\)</span>, then all <strong>can be designated</strong> tree are considered as <strong>designated</strong>. If <span class="math inline">\({V_h}_{tot} &gt; 30*n_{ha}\)</span>, then minimum harvestable diameter <span class="math inline">\(dbh_{min}\)</span> is increased untill <span class="math inline">\({V_h}_{tot} &lt; 30*n_{ha}\)</span>, and finally all <strong>can be designated</strong> tree are considered as <strong>designated</strong> (see code 2).</p>
 <pre class="rcpp"><code>/* DESIGNATION */
@@ -342,12 +359,24 @@ cout &lt;&lt; S[sp].s_name &lt;&lt; &quot; dbh min is now &quot; &lt;&lt; S[sp].
 </div>
 <div id="model-2" class="section level3">
 <h3>Model</h3>
-<p>Thereafter we need to split <strong>designated</strong> trees between <strong>selected</strong> and <strong>designated but not selected</strong>. <strong>Designated</strong> trees kept by the harvester could be linked to an additional data representing the species interest in external file (see code 1). Each harvestable species could be ranked on its economic value. Then the model will kept only 25 <span class="math inline">\(m^3.ha^{-1}\)</span> inside designated trees by keeping only higher rank species. The selection module is still to be written (see code 3).</p>
+<p>Thereafter we need to split <strong>designated</strong> trees between <strong>selected</strong> and <strong>designated but not selected</strong>. <strong>Designated</strong> trees kept by the harvester are linked to an additional data representing the species interest in external file (see code 1). Each harvestable species is ranked on its economic value. Then the model will kept only 25 <span class="math inline">\(m^3.ha^{-1}\)</span> inside designated trees by keeping only higher rank species.</p>
 <pre class="rcpp"><code>/* SELECTION */
+int rank=0, individuals=0;
 if(volume &lt;= harvested_volume)
   cout &lt;&lt; &quot;All designated trees will be harvested.&quot; &lt;&lt; endl;
 if(volume &gt;= harvested_volume){
-  /*Not implemented yet*/
+  for(site=0;site&lt;sites;site++)
+    if(status[site]==1 &amp;&amp; S[T[site].t_sp_lab].s_interest &gt; rank)
+      rank = S[T[site].t_sp_lab].s_interest;
+    while(volume &gt;= harvested_volume){
+      site=floor(genrand2()*sites);
+      if(status[site]==1 &amp;&amp; S[T[site].t_sp_lab].s_interest==rank){
+        status[site]=0;
+        individuals++;
+        volume -= -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+      }
+    }
+    cout &lt;&lt; individuals &lt;&lt; &quot; trees have been unselected, volume is now of &quot; &lt;&lt; volume &lt;&lt; &quot; m3.&quot; &lt;&lt; endl;
 }</code></pre>
 <p>Code 3: Selection module.</p>
 </div>
@@ -361,21 +390,23 @@ if(volume &gt;= harvested_volume){
 </div>
 <div id="model-3" class="section level3">
 <h3>Model</h3>
-<p>We can simply randomly remove 10-20 percent of <strong>Selected</strong> trees considering theim as rotten (see code 4). But in fact rotten trees are not random, we will use rotten inventories from ONF to realize a model predictiong rotten trees volume from their species and diameter (some species seems more touched by rotten trees and trees seems more rotten when dbh is increasing).</p>
+<p>Actually rotten trees are not random. We used rotten inventories from ONF to realize a model predictiong rotten trees volume from their species and diameter. First we seeked a model M to predict tree probability to be probed as rotten (see <a href="rotten2.html">probability to be rotten</a>). Secondly we seeked a model N to predict final volume of wood in tree probed as rotten (see <a href="rotten3.html">final volume of wood</a>). All results are summarised in <a href="rotten.html">rotten document</a>. Finally we implemented the model M: <span class="math display">\[P_{rotten} = inv_{logit}(-5.151 + 0.042*dbh_{(cm)})\]</span> inside the <code>SelectiveLogging</code> module of TROLL model.</p>
 <pre class="rcpp"><code>/* ROTTEN */
+float protten;
 volume=0.0;
-rotten=floor(rotten*designated);
-cout &lt;&lt; rotten &lt;&lt; &quot; trees are rotten, representing &quot;;
-while(rotten &gt; 0){
-  site=floor(genrand2()*sites);
+individuals=0;
+for(site=0;site&lt;sites;site++){
   if(status[site]==1){
-    volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
-status[site]=0;
-rotten--;
+    protten = 1 / (1 + exp(-(-5.151 + 0.042*T[site].t_dbh*100))); /*Probability to be rotten*/
+if(genrand2() &lt; protten){
+  status[site]=0;
+  individuals++;
+  volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+}
   }
 }
-cout &lt;&lt; volume &lt;&lt; &quot; m3.&quot; &lt;&lt; endl;</code></pre>
-<p>Code 4: Rotten module. <em>It will be changed in next implementation because rotten trees are not random.</em></p>
+cout &lt;&lt; individuals &lt;&lt; &quot; trees are rotten, representing &quot; &lt;&lt; volume &lt;&lt; &quot; m3.&quot; &lt;&lt; endl;</code></pre>
+<p>Code 4: Rotten module.</p>
 </div>
 </div>
 </div>
@@ -427,7 +458,7 @@ int MT[sites];
 for(site=0;site&lt;sites;site++)
   MT[site] = 0;
 for(row=0;row&lt;(rows/2);row++){
-  for(col=(cols/2-7);col&lt;(cols/2+8);col++){
+  for(col=((cols/2)-7);col&lt;((cols/2)+8);col++){
     site = col+row*cols;
     MT[site] = 1;
     if(T[site].t_age != 0) {
@@ -468,15 +499,15 @@ for(site=0;site&lt;sites;site++){
 while(individuals &gt; 0){
   for(site0=0;site0&lt;sites;site0++){ /*loadings and tracks distance*/
 load[site0]=0;
-    tracks[site0]=pow(rows*cols,2);
+    tracks[site0]=rows*cols*rows*cols;
     row0 = floor(site0/cols);
     col0 = site0-(row0*cols);
     for(site=0;site&lt;sites;site++){
       if(status[site]==1 || MT[site]==1){
         row = floor(site/cols);
         col = site-(row*cols);
-        d = sqrt(pow((row - row0),2) + pow((col - col0),2));
-        if(status[site]==1 &amp;&amp; d &lt;= 30)
+        d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
+        if(status[site]==1 &amp;&amp; d &lt;= 30*30)
           load[site0]++;
         if(MT[site]==1 &amp;&amp; d &lt; tracks[site0])
           tracks[site0]=d;
@@ -492,12 +523,12 @@ if(load[site]==load[site0] &amp;&amp; tracks[site]&lt;tracks[site0])
   } 
   row0 = floor(site0/cols);
   col0 = site0-(row0*cols);
-  d0 = pow(rows*cols,2); /* closest MT*/
+  d0 = rows*cols*rows*cols; /* closest MT*/
 for(site=0;site&lt;sites;site++){
   if(MT[site]==1){
     rowMT = floor(site/cols);
     colMT = site-(rowMT*cols);
-    d = sqrt(pow(row0 - rowMT,2) + pow(col0 - colMT,2));
+    d = (row0 - rowMT)*(row0 - rowMT) + (col0 - colMT)*(col0 - colMT);
     if(d&lt;d0){
       siteMT=site;
       d0=d;
@@ -521,8 +552,8 @@ for(int j=-2;j&lt;=2;j++){
 if(status[site]==1){
   row = floor(site/cols);
   col = site-(row*cols);
-  d = sqrt(pow(row - row0,2) + pow(col - col0,2));
-  if(d &lt;= 33){
+  d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
+  if(d &lt;= 33*33){
     status[site]=0;
     individuals--;
   }

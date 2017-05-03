@@ -201,4 +201,6 @@ table <- data.frame(row.names = seq(45, 125, 5),
 kable(t(table))
 ```
 
-# References
+# Conclusion
+
+We will use model M of probability to probed as rotten inside TROLL model in order to get a selective logging closer to reality.

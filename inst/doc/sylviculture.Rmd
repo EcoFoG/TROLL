@@ -88,24 +88,41 @@ The harvestable area is the whole simulated forest. We needed to integrate an ex
 ###  Sylviculture parameter file for the TROLL program ###	
 ##########################################################
 ###	GENERAL PARAMETERS
-1	/* disturb_iter # iteration step when the disturbance occure */
+1	/* disturb_iter # iteration step where the disturbation occure */
 ###	disturbance
 0.4	/* disturb_intensity # intensity of disturbance in percent of BA */
 ###	logging
 30	/* designated_volume # volume designated for harvesting in m3/ha */
 25	/* harvested_volume # volume harvested in m3/ha */
-0.25	/* rotten # percentage of rotten tree in probed trees */
-7	/* numespharvestable # number of harvestable species */	
+25	/* numespharvestable # number of harvestable species */	
 
 ###	Species
 ****	spnum	dbhmin	dbhmax	interest
+Brosimum_guianense	7	0.55	2.0	1
+Brosimum_rubescens	8	0.55	2.0	1
+Caryocar_glabrum	12	0.55	2.0	1
 Dicorynia_guianensis	35	0.55	2.0	1
+Goupia_glabra	53	0.55	2.0	1
+Manilkara_bidentata	81	0.55	2.0	1
+Manilkara_huberi	82	0.55	2.0	1
+Ocotea_argyrophylla	94	0.55	2.0	1
 Qualea_rosea	130	0.55	2.0	1
 Ruizterania_albiflora	134	0.55	2.0	1
-Vouacapoua_americana	161	0.55	0.70	2
-Brosimum_rubescens	8	0.55	2.0	3
-Moronobea_coccinea	90	0.55	2.0	3
+Vouacapoua_americana	161	0.55	0.70	1
+Couma_guianensis	29	0.55	2.0	2
+Eperua_grandiflora	42	0.55	2.0	2
+Lecythis_zabucajo	71	0.55	2.0	2
+Moronobea_coccinea	90	0.55	2.0	2
+Rhodostemonodaphne_grandis	133	0.55	2.0	2
+Sterculia_pruriens	140	0.55	2.0	2
+Sterculia_speciosa	141	0.55	2.0	2
+Sterculia_villifera	142	0.55	2.0	2
+Virola_michelii	159	0.55	2.0	2
+Vochysia_guianensis	160	0.55	2.0	2
 Bocoa_prouacensis	6	0.55	2.0	3
+Couratari_multiflora	30	0.55	2.0	3
+Eperua_falcata	41	0.55	2.0	3
+Eperua_rubiginosa	43	0.55	2.0	3
 ```
 
 Code 1: Example of Sylviculture parameter file for the TROLL program.
@@ -154,14 +171,26 @@ Because the harvesters are focusing on few species with easier marketable wood f
 
 ### Model
 
-Thereafter we need to split **designated** trees between **selected** and **designated but not selected**. **Designated** trees kept by the harvester could be linked to an additional data representing the species interest in external file (see code 1). Each harvestable species could be ranked on its economic value. Then the model will kept only 25 $m^3.ha^{-1}$ inside designated trees by keeping only higher rank species. The selection module is still to be written (see code 3).
+Thereafter we need to split **designated** trees between **selected** and **designated but not selected**. **Designated** trees kept by the harvester are linked to an additional data representing the species interest in external file (see code 1). Each harvestable species is ranked on its economic value. Then the model will kept only 25 $m^3.ha^{-1}$ inside designated trees by keeping only higher rank species.
 
 ```{rcpp selection, eval=FALSE, echo=TRUE}
 /* SELECTION */
+int rank=0, individuals=0;
 if(volume <= harvested_volume)
   cout << "All designated trees will be harvested." << endl;
 if(volume >= harvested_volume){
-  /*Not implemented yet*/
+  for(site=0;site<sites;site++)
+    if(status[site]==1 && S[T[site].t_sp_lab].s_interest > rank)
+      rank = S[T[site].t_sp_lab].s_interest;
+    while(volume >= harvested_volume){
+      site=floor(genrand2()*sites);
+      if(status[site]==1 && S[T[site].t_sp_lab].s_interest==rank){
+        status[site]=0;
+        individuals++;
+        volume -= -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+      }
+    }
+    cout << individuals << " trees have been unselected, volume is now of " << volume << " m3." << endl;
 }
 ```
 
@@ -177,25 +206,29 @@ Code 3: Selection module.
 
 ### Model
 
-We can simply randomly remove 10-20 percent of **Selected** trees considering theim as rotten (see code 4). But in fact rotten trees are not random, we will use rotten inventories from ONF to realize a model predictiong rotten trees volume from their species and diameter (some species seems more touched by rotten trees and trees seems more rotten when dbh is increasing).
+Actually rotten trees are not random. We used rotten inventories from ONF to realize a model predictiong rotten trees volume from their species and diameter. First we seeked a model M to predict tree probability to be probed as rotten (see [probability to be rotten](rotten2.html)). Secondly we seeked a model N to predict final volume of wood in tree probed as rotten (see [final volume of wood](rotten3.html)). All results are summarised in [rotten document](rotten.html). Finally we implemented the model M: 
+$$P_{rotten} = inv_{logit}(-5.151 + 0.042*dbh_{(cm)})$$
+inside the `SelectiveLogging` module of TROLL model.
 
 ```{rcpp rotten, eval=FALSE, echo=TRUE}
 /* ROTTEN */
+float protten;
 volume=0.0;
-rotten=floor(rotten*designated);
-cout << rotten << " trees are rotten, representing ";
-while(rotten > 0){
-  site=floor(genrand2()*sites);
+individuals=0;
+for(site=0;site<sites;site++){
   if(status[site]==1){
-    volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
-status[site]=0;
-rotten--;
+    protten = 1 / (1 + exp(-(-5.151 + 0.042*T[site].t_dbh*100))); /*Probability to be rotten*/
+if(genrand2() < protten){
+  status[site]=0;
+  individuals++;
+  volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+}
   }
 }
-cout << volume << " m3." << endl;
+cout << individuals << " trees are rotten, representing " << volume << " m3." << endl;
 ```
 
-Code 4: Rotten module. *It will be changed in next implementation because rotten trees are not random.*
+Code 4: Rotten module.
 
 # Harvesting
 
