@@ -22,7 +22,7 @@ parameters {
 transformed parameters{
   real<lower=0, upper=1> rho[N] ;
   for(n in 1:N)
-    rho[n] = theta*dbh[n]*dbh[n] + theta_p[plot[n]] ;
+    rho[n] = (theta + theta_p[plot[n]])*dbh[n]*dbh[n] ;
 }
 model {
   theta_p ~ normal(0, sigma_rp) ;

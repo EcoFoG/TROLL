@@ -22,7 +22,7 @@ parameters {
 transformed parameters{
   real<lower=0, upper=1> rho[N] ;
   for(n in 1:N)
-    rho[n] = theta*dbh[n]*dbh[n] + theta_s[species[n]] ;
+    rho[n] = (theta + theta_s[species[n]])*dbh[n]*dbh[n] ;
 }
 model {
   theta_s ~ normal(0, sigma_rs) ;

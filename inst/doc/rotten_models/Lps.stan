@@ -16,15 +16,15 @@ parameters {
   real<lower=-beta-min(beta_p)> beta_s[S] ;
   real<lower=0> sigma_s ;
   real<lower=0,upper=1> theta ;
-  real<lower=-0.25*theta, upper=1-0.25*theta> theta_p[P] ;
+  real<lower=-theta, upper=1-theta> theta_p[P] ;
   real<lower=0> sigma_rp ;
-  real<lower=-0.25*theta, upper=1-0.25*theta> theta_s[S] ;
+  real<lower=-theta-min(theta_p), upper=1-theta-max(theta_p)> theta_s[S] ;
   real<lower=0> sigma_rs ;
 }
 transformed parameters{
   real<lower=0, upper=1> rho[N] ;
   for(n in 1:N)
-    rho[n] = theta*dbh[n]*dbh[n] + theta_p[plot[n]] + theta_s[species[n]] ;
+    rho[n] = (theta+ theta_p[plot[n]] + theta_s[species[n]])*dbh[n]*dbh[n]  ;
 }
 model {
   theta_p ~ normal(0, sigma_rp) ;
