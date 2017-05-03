@@ -430,7 +430,7 @@ Table 3: Models summary.
 mtab2 <- data.frame(
   L = c('$L$', '$L_{p}$', '$L_{s}$', '$L_{p,s}$'),
   Model = c(
-    "$\\rho \\sim \\mathcal{logN} (log[\\theta_1 + \\theta2*dbh^2], \\sigma_2)$",
+    "$\\rho \\sim \\mathcal{logN} (log[0.25], \\sigma_r)$",
     "$\\rho \\sim \\mathcal{logN} (log[\\theta_1 + \\theta_p + \\theta2*dbh^2], \\sigma_2)$",
     "$\\rho \\sim \\mathcal{logN} (log[\\theta_1 + \\theta_s + \\theta2*dbh^2], \\sigma_2)$",
     "$\\rho \\sim \\mathcal{logN} (log[\\theta_1 +  \\theta_p + \\theta_s + \\theta2*dbh^2], \\sigma_2)$"
@@ -464,7 +464,7 @@ g <- fitgraph(fit, rho = F)
 Model {data-width=300}
 -------------------------------------
 
-> `r paste(mtab['L',], collapse = ': ')`
+> `r paste(mtab2['L',], collapse = ': ')`
 
 ### Model Predictions.
 ```{r L pred}
@@ -505,7 +505,7 @@ g$c
 Convergence {data-width=300}
 -------------------------------------
 
-> $P_{rotten} = (`r round(pars[1],3)`*dbh^2)*[1-Pr*`r round(pars[2],3)`]$
+> $P_{rotten} = (`r round(pars[1],3)`*dbh^2)*[1-Pr*0.25]$
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r RL}
