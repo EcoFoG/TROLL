@@ -51,26 +51,24 @@ In fact we have two different questions:
 
 First all **M** model can be written as follow:
 $$Rotten_n \sim \mathcal{B}(\theta_n), ~~n \in [1,N_{=3816}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
-Secondly, all **N** models depend on a latent variable being the volume of rotten wood $V_r$. We can assume that all trees are growing depending on species $s$ and plot $p$ fertility and are supposed to have a full healthy volume $V_h$ for a given diameter $dbh$. Then the final volume of softwood $V_f$ product will be the difference between the theoritical full healthy volume $V_h$ and the actual volume of rotten wood $V_r$:
-$$ V_f = V_h - V_r = f(dbh, sp) - V_r$$
-$$ V_r = V_f - f(dbh, sp)$$
-$$V_r \sim \mathcal{N}(\mu, \sigma)$$
-$$n \in [1,N_{=3268}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
+Secondly, all **N** models depend on a latent variable being the percentage of rotten wood $Pt_r$. We can assume that all trees are growing depending on species $s$ and plot $p$ fertility and are supposed to have a full healthy volume $V_h$ for a given diameter $dbh$. We obtain following model:
+
+$$V_f \sim \mathcal{logN}(V_h*Pt_r, \sigma), ~~n \in [1,N_{=3268}] ~~ p \in [1, P_{=8}], ~~ s \in [1, S_{=43}]$$
 
 We retained following models :
 
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  M = c('$M_{s,p}$', 'N?'),
+  M = c('$M_{s,p}$', '$N_{s,p} + L_{s,p}$'),
   Model = c(
-    "$Rotten_n \\sim \\mathcal{B}(inv_{logit}(\\beta_0 + \\beta_1*dbh_n + {\\beta_2}_p + {\\beta_3}_s))$",
-    "$\\mu = V_f - ?$"
+    "${P_{rotten}}_n \\sim \\mathcal{B}(inv_{logit}(\\beta_0 + \\beta_1*dbh_n + {\\beta_2}_p + {\\beta_3}_s))$",
+    "$Volume_{of~wood} \\sim \\mathcal{logN} (log[((\\beta + \\beta_p + \\beta_s)*dbh^2)*(1 - Pr*((\\theta + \\theta_p + \\theta_s) *dbh^2))], \\sigma)$"
     )
   )
 mtab <- apply(mtab, 2, as.character)
 kable(mtab)
-row.names(mtab) <- c('Mps', 'N?')
+row.names(mtab) <- c('Mps', 'Nps')
 ```
 
 # Probed rotten (M)
@@ -133,5 +131,56 @@ ggplot(data2, aes(x = dbhest, y = probed_rotten)) +
 $P_{rotten} = inv_{logit}(`r round(beta[1],3)` + `r round(beta[2]/dbhmax,3)`*dbh)$
 
 # Rotten volume (N)
+
+Based on complexity (number of parameters), convergence and likelihood we selected model $N_{p,s}$ associated to hyperparameter $\rho$ with model $L_{p,s}$ (see see [rotten 3](rotten3.html)):
+
+`r paste(mtab['Nps',], collapse = ': ')`
+
+```{r N model, include=FALSE}
+data <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_data.csv")
+data <- data[c('num', 'Parcelle', 'up', 'ess', 'abattu', 'tout BE', 'sonde_creux', 'sonde_creux abatt', 'sonde_creux_refus', 'DBH_desi', 'V_Est', 'vol_BO')]
+names(data) <- c('id', 'plot', 'subplot', 'spCode', 'logged', 'rotten_full', 'probed_rotten', 'probed_rotten_logged', 'probed_rotten_refused', 'dbhest', 'Vest', 'Vbo')
+data <- subset(data, !is.na(Vbo))
+data <- subset(data, Vbo!=0)
+data <- data[c('id', 'plot', 'spCode', 'probed_rotten', 'Vbo', 'dbhest')]
+species <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Rotten/rotten_species.csv")[-1,]
+species <- species[c("Code \nEssence" , "Nom \nscientifique")]
+names(species) <- c('spCode', 'species')
+data <- data.frame(left_join(data, species)) ; rm(species)
+dbhmax <- max(data$dbhest)
+data2 <- data[sample.int(dim(data)[1], 500, replace = F),]
+load(file.path(mpath, 'Lps.Rdata'))
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta', 'sigma', 'theta')]
+Vf <- function(dbh, dbhmax, Pr, pars){
+  rho <- pars[3]*(dbh/dbhmax)*(dbh/dbhmax)
+  mu <- (pars[1]*(dbh/dbhmax)*(dbh/dbhmax))*(1-Pr*rho)
+  rlnorm(1, log(mu), pars[2])
+}
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    Vf(data2$dbhest[i], dbhmax, data2$probed_rotten[i], c(x['beta'], x['sigma'], x['theta']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95), na.rm = T))))
+names(pred) <- c('5%', '95%')
+pred$mean <- (pars[1]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax))*(1-data2$probed_rotten*(pars[3]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax)))
+pred$dbh <- data2$dbhest
+```
+```{r N plot}
+ggplot(data2, aes(x = dbhest, y = Vbo)) +
+  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_point() + geom_jitter() +
+  theme_bw() +
+  xlab('Estimated dbh (cm)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+```
+
+> $Volume_{of~wood} = (`r round(pars[1]/dbhmax^2,5)`*dbh^2)*[1-Pr*(`r round(pars[3]/dbhmax^2,5)`*dbh^2)]$
 
 # References

@@ -7,11 +7,11 @@ data {
   int<lower=0, upper=P> plot[N] ;
 }
 parameters {
-  real<lower=0> beta ;
-  real<lower=0> sigma ;
   real<lower=0, upper=1> rho ;
-  real<lower=-beta> beta_p[P] ;
+  real<lower=0> beta_p[P] ;
   real<lower=0> sigma_p ;
+  real<lower=-min(beta_p)> beta ;
+  real<lower=0> sigma ;
 }
 model {
   beta_p ~ normal(0, sigma_p) ;

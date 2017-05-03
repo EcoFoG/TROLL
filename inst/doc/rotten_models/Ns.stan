@@ -7,11 +7,11 @@ data {
   int<lower=0> species[N] ;
 }
 parameters {
-  real<lower=0> beta ;
   real<lower=0, upper=1> rho ;
-  real<lower=0> sigma ;
-  real<lower=-beta> beta_s[S] ;
+  real<lower=0> beta_s[S] ;
   real<lower=0> sigma_s ;
+  real<lower=-min(beta_s)> beta ;
+  real<lower=0> sigma ;
 }
 model {
   beta_s ~ normal(0, sigma_s) ;

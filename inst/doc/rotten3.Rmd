@@ -428,9 +428,8 @@ Conclusion 1
 Table 3: Models summary.
 ```{r mtab2}
 mtab2 <- data.frame(
-  L = c('$L$', '$L_d$', '$L_{p}$', '$L_{s}$', '$L_{p,s}$'),
+  L = c('$L$', '$L_{p}$', '$L_{s}$', '$L_{p,s}$'),
   Model = c(
-    "$\\rho = \\theta + \\theta_d*dbh^2$",
     "$\\rho = \\theta *dbh^2$",
     "$\\rho = (\\theta + \\theta_p) *dbh^2$",
     "$\\rho = (\\theta + \\theta_s) *dbh^2$",
@@ -439,7 +438,7 @@ mtab2 <- data.frame(
   )
 mtab2$L <- as.character(mtab2$L)
 mtab2$Model <- as.character(mtab2$Model)
-row.names(mtab2) <- c('L', 'Ld', 'Lp', 'Ls', 'Lps')
+row.names(mtab2) <- c('L', 'Lp', 'Ls', 'Lps')
 kable(mtab2, row.names = F)
 ```
 
@@ -469,81 +468,6 @@ Model {data-width=300}
 
 ### Model Predictions.
 ```{r L pred}
-pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta', 'sigma', 'theta', 'theta_d')]
-Vf <- function(dbh, dbhmax, Pr, pars){
-  rho <- pars[3] + pars[4]*(dbh/dbhmax)*(dbh/dbhmax)
-  mu <- (pars[1]*(dbh/dbhmax)*(dbh/dbhmax))*(1-Pr*rho)
-  rlnorm(1, log(mu), pars[2])
-}
-pred <- apply(as.matrix(fit), 1, function(x)
-  sapply(seq_len(dim(data2)[1]), function(i)
-    Vf(data2$dbhest[i], dbhmax, data2$probed_rotten[i], c(x['beta'], x['sigma'], x['theta'], x['theta_d']))
-  ))
-pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95), na.rm = T))))
-names(pred) <- c('5%', '95%')
-pred$mean <- (pars[1]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax))*(1-data2$probed_rotten*(pars[3] + pars[4]*(data2$dbhest/dbhmax)*(data2$dbhest/dbhmax)))
-pred$dbh <- data2$dbhest
-ggplot(data2, aes(x = dbhest, y = Vbo)) +
-  geom_ribbon(aes(x = pred$dbh, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
-  geom_line(aes(x = pred$dbh, y = pred$`5%`, color = '5%'), linetype = 2) +
-  geom_line(aes(x = pred$dbh, y = pred$`95%`, color = '95%'), linetype = 2) +
-  geom_line(aes(x = pred$dbh, y = pred$mean, color = 'mean'), linetype = 2) +
-  geom_point() + geom_jitter() +
-  theme_bw() +
-  xlab('Estimated dbh (cm)') +
-  ylab('Final softwood product (m3)') +
-  scale_color_manual(name = 'Model',
-                     values = c('5%' = 'black',
-                                '95%' = 'black',
-                                'mean' = 'red')) ; rm(fit, pred)
-```
-
-### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r CL}
-g$c
-```
-
-Convergence {data-width=300}
--------------------------------------
-
-> $P_{rotten} = (`r round(pars[1],3)`*dbh^2)*[1-Pr*(`r round(pars[3],3)` + `r round(pars[4],3)`*dbh^2)]$
-
-### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r RL}
-g$r
-```
-
-### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r PL}
-g$p
-```
-
-`r mtab2['Ld',1]`
-==================
-
-```{r Ld, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Ld.stan'),
-#             data = list(N = dim(data)[1],
-#                         dbh = data$dbhest/max(data$dbhest),
-#                         Pr = data$probed_rotten,
-#                         Vf = data$Vbo,
-#                         P = length(levels(as.factor(data$plot))),
-#                         plot = as.integer(as.factor(data$plot)),
-#                         S = length(levels(as.factor(data$species))),
-#                         species = as.integer(as.factor(data$species))),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'Ld.Rdata'))
-load(file.path(mpath, 'Ld.Rdata'))
-g <- fitgraph(fit, rho = F)
-```
-
-Model {data-width=300}
--------------------------------------
-
-> `r paste(mtab2['Ld',], collapse = ': ')`
-
-### Model Predictions.
-```{r Ld pred}
 pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('beta', 'sigma', 'theta')]
 Vf <- function(dbh, dbhmax, Pr, pars){
   rho <- pars[3]*(dbh/dbhmax)*(dbh/dbhmax)
@@ -574,7 +498,7 @@ ggplot(data2, aes(x = dbhest, y = Vbo)) +
 ```
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
-```{r CLd}
+```{r CL}
 g$c
 ```
 
@@ -584,12 +508,12 @@ Convergence {data-width=300}
 > $P_{rotten} = (`r round(pars[1],3)`*dbh^2)*[1-Pr*(`r round(pars[3],3)`*dbh^2)]$
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
-```{r RLd}
+```{r RL}
 g$r
 ```
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
-```{r PLd}
+```{r PL}
 g$p
 ```
 
@@ -821,7 +745,7 @@ g$p
 Conclusion 2
 ==================
 
-> Adding random effect for plot and/or species ($\theta_p$, $\theta_s$) increased likelihood and decreased model variance ($\sigma$). Consequently best model is $N_{p,s}$ associated to $L_{p,s}$: $$V_f \sim \mathcal{logN} (log[((\beta + \beta_p + \beta_s)*dbh^2)*(1 - Pr*\rho)], \sigma)$$ $$\rho = (\theta +  \theta_p + \theta_s) *dbh^2$$
+> Adding random effect for plot and/or species ($\theta_p$, $\theta_s$) increased likelihood and decreased model variance ($\sigma$). Consequently best model is $N_{p,s}$ associated to $L_{p,s}$: $V_f \sim \mathcal{logN} (log[((\beta + \beta_p + \beta_s)*dbh^2)*(1 - Pr*((\theta +  \theta_p + \theta_s) *dbh^2))], \sigma)$
 
 References
 ==================
