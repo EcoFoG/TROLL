@@ -37,3 +37,6 @@ Function and code to manage and use forest model indivdual-based and spatially-e
     - https://sylvainschmitt.github.io/TROLL/rotten
     - https://sylvainschmitt.github.io/TROLL/rotten2
     - https://sylvainschmitt.github.io/TROLL/rotten3
+* Hurt :
+    - https://sylvainschmitt.github.io/TROLL/hurt
+    

@@ -1,0 +1,290 @@
+---
+title: "Hurted trees"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r setup, include=FALSE}
+rm(list = ls()) ; invisible(gc())
+library(flexdashboard)
+library(knitr)
+library(parallel)
+library(TROLL)
+library(RconTroll)
+library(BIOMASS)
+library(reshape2)
+library(ggplot2)
+library(cowplot)
+library(entropart)
+library(plotly)
+library(rstan)
+library(bayesplot)
+library(rstanarm)
+library(readr)
+library(GGally)
+library(dplyr)
+library(rgdal)
+library(rgeos)
+library(raster)
+cores <- detectCores()
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
+    cache = T, cache.lazy = F)
+mpath <- "~/Documents/ECOFOG/TROLL/inst/doc/hurt_models"
+rstan_options(auto_write = TRUE)
+options(mc.cores = detectCores())
+```
+
+Intro
+==================
+
+Issue {data-width=200}
+-------------------------------------
+
+In order to simulate sylviculture with TROLL we need to implement a new sylviculture module inside TROLL model code. A first litterature review was completed by an interview with Laurent Descroix of the Office Nationale des Forêts. Last part of the module is the simulation of hurted tree by selective logging (not the harvested trees, not the trees hurted by harvested treefall, and not the trees removed for tracks). 
+
+```{r status}
+# statusDet <- function(i, data, period = 4){
+#   data_i <- subset(data, id == i)
+#   if(dim(data_i)[1] < period)
+#     return('recruit')
+#   else{
+#     if(length(unique(data_i$statusID)) == 1)
+#       status <- unique(data_i$statusID)
+#     if(length(unique(data_i$statusID)) > 1)
+#       status <- min(as.numeric(data_i$statusID))
+#     if(status %in% c(10:14))
+#       return('alive')
+#     if(status == 17)
+#       return('damaged alive')
+#     if(status == '19')
+#       return('poisoned alive')
+#     if(status == 0)
+#       return('dead standing')
+#     if(status %in% c(4,5,8,9))
+#       return('dead logging')
+#     if(status == 6)
+#       return('primary windfall')
+#     if(status == 7)
+#       return('secondary windfall')
+#   }
+# }
+```
+
+```{r data, include=FALSE}
+# data <- read_delim("~/Documents/ECOFOG/TROLL/inst/extdata/Paracou/R_Paracou_1988-2016.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+# data <- data[c('idArbre', 'campagne', 'n_parcelle', 'Xutm', 'Yutm', 'code_vivant', 'code_mesure', 'idTaxon')]
+# names(data) <- c('id', 'census', 'plot', 'x', 'y', 'alive', 'statusID', 'speciesID')
+# data <- subset(data, census %in% c(1988:1992))
+# data <- subset(data, plot %in% c(2, 3, 4, 5, 7, 8, 9, 10, 12))
+# data$alive <- c(0,1)[as.factor(data$alive)]
+# data$statusID <- data$alive*10+data$statusID
+# status <- sapply(unique(data$id), function(id) statusDet(id, data))
+# data <- data[!duplicated(data$id),]
+# data$status2 <- status ; rm(status)
+# code <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Paracou/Paracou_code.csv")
+# code$MesuMort <- c(0, 1)[as.factor(code$MesuMort)]
+# names(code) <- c('alive', 'statusID', 'status')
+# code$statusID <- code$alive*10+code$statusID
+# data <- left_join(data, code) ; rm(code)
+# species <- read_csv("~/Documents/ECOFOG/TROLL/inst/extdata/Paracou/Paracou_species.csv")
+# species <- species[!duplicated(species$idTaxon),]
+# species$species <- apply(species, 1, function(x) paste(x[3], x[4]))
+# names(species) <- c('speciesID', 'family', 'genus', 'sp', 'species')
+# data <- left_join(data, species) ; rm(species)
+# data <- data[c('id', 'census', 'plot', 'x', 'y', 'alive', 'statusID', 'status', 'status2', 'speciesID', 'species')]
+# data <- subset(data, status2 != 'recruit')
+# data <- data.frame(data)
+# save(data, file = file.path(mpath, 'data.Rdata'))
+```
+
+```{r distances, include=FALSE}
+# data$gaps <- NA
+# data$skids <- NA
+# data$dist <- NA
+# data$roads <- NA
+# plots <- unique(data$plot)
+# gaps <- readOGR('/home/sylvain/Documents/ECOFOG/TROLL/inst/extdata/Paracou/sig', layer = 'Gaps')
+# gaps <- subset(gaps, Plots %in% plots)
+# skids <- readOGR('/home/sylvain/Documents/ECOFOG/TROLL/inst/extdata/Paracou/sig', layer = 'SkidTrails')
+# skids <- subset(skids, Plots %in% plots)
+# roads <- readOGR('/home/sylvain/Documents/ECOFOG/TROLL/inst/extdata/Paracou/sig', layer = 'RoadsPaths')
+# roads <- subset(roads, Type == 'Plot path')
+# roads <- subset(roads, Plot %in% plots)
+# trees <- data[c('x', 'y', 'plot')]
+# coordinates(trees) <- ~x+y
+# trees@proj4string <- gaps@proj4string
+# gaps <- sapply(plots, function(p) subset(gaps, Plots == p))
+# names(gaps) <- paste0('P', plots)
+# skids <- sapply(plots, function(p) subset(skids, Plots == p))
+# names(skids) <- paste0('P', plots)
+# roads <- sapply(plots, function(p) subset(roads, Plot == p))
+# names(roads) <- paste0('P', plots)
+# trees <- sapply(plots, function(p) subset(trees, plot == p))
+# names(trees) <- paste0('P', plots)
+# for(i in plots){
+#   layers <- list(gaps = gaps[[paste0('P', i)]],
+#                  skids = skids[[paste0('P', i)]],
+#                  dist = gUnion(gaps[[paste0('P', i)]], skids[[paste0('P', i)]]),
+#                  roads = roads[[paste0('P', i)]])
+#   d <- raster(extent(trees[[paste0('P', i)]]), resolution = 1, crs = layers$gaps@proj4string)
+#   d <- setValues(d, 0)
+#   d <- lapply(layers, function(l) mask(d, l))
+#   d <- stack(lapply(d, function(l) distance(l)))
+#   data[which(data$plot == i),c('gaps', 'skids', 'dist', 'roads')] <- extract(d, data[which(data$plot == i),c('x', 'y')])
+# }
+# rm(gaps, skids, roads, layers, trees, d, i)
+# data <- data[-which(is.na(data$gaps)),]
+# save(data, file = file.path(mpath, 'data.Rdata'))
+load(file.path(mpath, 'data.Rdata'))
+dgmax <- max(data$gaps)
+dsmax <- max(data$skids)
+ddmax <- max(data$dist)
+```
+
+We gathered data from Paracou dataset in cenususes between 1988 and 1992 on Paracou harvested plots. Individuals were categorized between alive, dead, or recruited during the period. Individuals categorized as damaged tree (17), poisoned tree alive (19), death during logging standing (1), logged tree (4), poisoned tree (9), recruited alive or recruited and dead were removed from the dataset. Dead trees still in the dataset were then categorized in natural death standing (0), primary windfall (6), and secondary windfall (7).
+
+We started with the model of disturbance from **Cite Herault**:
+$$Idisturbance_i = \sum_1 ^J e^{-\alpha * Distance_{i,j}} * Surface_j ^\beta $$
+We can simplify indices in:
+$$I_i = \sum_1 ^J e^{-\alpha * D_{i,j}} * S_j ^\beta $$
+$$I_i = \sum_1 ^J e^{-\alpha_g * {D_g}_{i,j}} + \sum_1 ^K e^{-\alpha_s * {D_s}_{i,k}}$$
+
+with $I_i$ individual $i$ disturbance index, $D_{i,j}$ distance from individual $i$ to gaps $j$, and $S_j$ surface from gaps $j$.
+
+We integrated disturbance index $I$ wrapped by a function $f$ to determine into a logit function in order to get probability of mortality:
+$$p(M_i) = inv_{logit}(f(I_i)) = \frac{e^{f(I_i)}}{1 + e^{f(I_i)}}$$
+
+Table 2: Models summary.
+```{r mtab}
+mtab <- data.frame(
+  M = c('$M_g$', '$M_{g,s}$', '$M_d$'),
+  Model = c(
+    '$M \\sim \\mathcal{B}(e^{-[\\theta + \\alpha*d_{gaps}]})$',
+    '$M \\sim \\mathcal{B}(e^{-[\\theta + \\alpha*d_{gaps} + \\beta*d_{gaps}]}))$',
+    '$M \\sim \\mathcal{B}(e^{-[\\theta + \\alpha*d_{disturbed area}]})$'
+    )
+)
+mtab$M <- as.character(mtab$M)
+mtab$Model <- as.character(mtab$Model)
+row.names(mtab) <- c('Mg', 'Mgs', 'Md')
+kable(mtab, row.names = F)
+```
+
+We tested models M detailed in following tabs to find the better trade-off between:
+
+1. Complexity (and number of parameters)
+2. Convergence
+3. Likelihood
+
+Results are shown for each models in each model tabs and summarized in [Conclusion](#conclusion) tab.
+
+Graph {data-width=200}
+-------------------------------------
+
+### Trees estimated dbh and final softwood product.
+```{r data graph}
+data2 <- data[which(data$status2 != 'alive'),]
+data2[,c('gaps', 'skids', 'roads', 'dist')] %>%
+ melt() %>%
+ggplot(aes(x = value, color = variable, fill = variable)) +
+  geom_density(alpha = 0.3) +
+  xlab('distance (m)') +
+  ylab('Dead trees density') +
+  scale_fill_discrete(guide = 'none')
+```
+
+```{r functions}
+fitgraph <- function(fit){
+  pars <- colnames(as.matrix(fit))
+  theta <- pars[grep('theta', pars)]
+  alpha <- pars[grep('alpha', pars)]
+  sigma <- pars[grep('sigma', pars)]
+  posterior <- as.matrix(fit)
+  r <- mcmc_areas(posterior,  pars = c(theta, alpha, sigma), prob = 0.8)
+  c <- mcmc_trace(posterior,  pars = c(theta, alpha, sigma,  'lp__'),
+                   facet_args = list(nrow = 2, labeller = label_parsed))
+  p <- ggpairs(data.frame(posterior[,c(theta, alpha)]))
+  return(list(r = r, c = c, p = p))
+}
+inv_logit <- function(x) exp(x) / (1 + exp(x))
+```
+
+`r mtab['Mg',1]`
+==================
+
+```{r Mg, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'Mg.stan'),
+#             data = list(N = dim(data)[1],
+#                         M = as.integer(data$status2 != 'alive'),
+#                         d_gaps = data$gaps/dgmax),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Mg.Rdata'))
+load(file.path(mpath, 'Mg.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Mg',], collapse = ': ')`
+
+### Model Predictions.
+```{r Mg pred}
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta', 'alpha')]
+P <- function(dgaps, dgmax, pars) exp(-(pars[1] + pars[2]*(dgaps/dgmax)))
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    P(data2$gaps[i], dgmax, c(x['theta'], x['alpha']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- exp(-(pars[1] + pars[2]*(data2$gaps/dgmax)))
+pred$gaps <- data2$gaps
+ggplot(data2, aes(x = gaps)) +
+  geom_ribbon(aes(x = pred$gaps, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$gaps, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$gaps, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$gaps, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_density(alpha = 0.3) +
+  theme_bw() +
+  xlab('Distance to a gaps (m)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red')) ; rm(fit, pred)
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cg}
+g$c
+```
+
+Convergence {data-width=300}
+-------------------------------------
+
+> $P_{M} = e^{-(`r round(pars[1],3)`* +  `r round(pars[2],3)`*d_{gaps})}$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rg}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Pg}
+g$p
+```
+
+Conclusion 
+==================
+
+> Conclusion
+
+References
+==================
+

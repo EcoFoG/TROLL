@@ -27,3 +27,5 @@ Documentation
     -   <https://sylvainschmitt.github.io/TROLL/rotten>
     -   <https://sylvainschmitt.github.io/TROLL/rotten2>
     -   <https://sylvainschmitt.github.io/TROLL/rotten3>
+-   Hurt :
+    -   <https://sylvainschmitt.github.io/TROLL/hurt>
