@@ -162,16 +162,16 @@ $$p(M_i) = inv_{logit}(f(I_i)) = \frac{e^{f(I_i)}}{1 + e^{f(I_i)}}$$
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  M = c('$M_g$', '$M_{g,s}$', '$M_d$'),
+  M = c('$M_0$', '$M_g$', '$M_d$'),
   Model = c(
-    '$M \\sim \\mathcal{B}(e^{-[\\theta + \\alpha*d_{gaps}]})$',
-    '$M \\sim \\mathcal{B}(e^{-[\\theta + \\alpha*d_{gaps} + \\beta*d_{gaps}]}))$',
-    '$M \\sim \\mathcal{B}(e^{-[\\theta + \\alpha*d_{disturbed area}]})$'
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta])$',
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + e^{-\\alpha*d_{gaps}}])$',
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + e^{-\\alpha*d_{disturbed~area}}])$'
     )
 )
 mtab$M <- as.character(mtab$M)
 mtab$Model <- as.character(mtab$Model)
-row.names(mtab) <- c('Mg', 'Mgs', 'Md')
+row.names(mtab) <- c('M0', 'Mg', 'Md')
 kable(mtab, row.names = F)
 ```
 
@@ -203,25 +203,92 @@ fitgraph <- function(fit){
   pars <- colnames(as.matrix(fit))
   theta <- pars[grep('theta', pars)]
   alpha <- pars[grep('alpha', pars)]
+  beta <- pars[grep('beta', pars)]
+  greek <- c(theta, alpha, beta)
   sigma <- pars[grep('sigma', pars)]
   posterior <- as.matrix(fit)
-  r <- mcmc_areas(posterior,  pars = c(theta, alpha, sigma), prob = 0.8)
-  c <- mcmc_trace(posterior,  pars = c(theta, alpha, sigma,  'lp__'),
+  r <- try(mcmc_areas(posterior,  pars = c(greek, sigma), prob = 0.8))
+  c <- mcmc_trace(posterior,  pars = c(greek, sigma,  'lp__'),
                    facet_args = list(nrow = 2, labeller = label_parsed))
-  p <- ggpairs(data.frame(posterior[,c(theta, alpha)]))
+  p <- ggpairs(data.frame(posterior[,c(greek)]))
   return(list(r = r, c = c, p = p))
 }
 inv_logit <- function(x) exp(x) / (1 + exp(x))
+```
+
+
+`r mtab['M0',1]`
+==================
+
+```{r M0, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'M0.stan'),
+#             data = list(N = dim(data)[1],
+#                         M = as.integer(data$status2 != 'alive')),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'M0.Rdata'))
+load(file.path(mpath, 'M0.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['M0',], collapse = ': ')`
+
+### Model Predictions.
+```{r M0 pred}
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta')]
+P <- function(dgaps, dgmax, pars) inv_logit(pars[1])
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    P(data2$gaps[i], dgmax, c(x['theta']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- inv_logit(pars[1])
+pred$gaps <- data2$gaps
+ggplot(data2, aes(x = gaps)) +
+  geom_ribbon(aes(x = pred$gaps, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$gaps, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$gaps, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$gaps, y = pred$mean, color = 'mean'), linetype = 2) +
+  theme_bw() +
+  xlab('Distance to a gaps (m)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red')) ; rm(fit, pred)
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r C0}
+g$c
+```
+
+Convergence {data-width=300}
+-------------------------------------
+
+> $P_{M} = inv_{logit}(`r round(pars[1],3)`)$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r R0}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r P0}
+g$p
 ```
 
 `r mtab['Mg',1]`
 ==================
 
 ```{r Mg, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'Mg.stan'),
+# fit <- stan(file = file.path(mpath, 'M.stan'),
 #             data = list(N = dim(data)[1],
 #                         M = as.integer(data$status2 != 'alive'),
-#                         d_gaps = data$gaps/dgmax),
+#                         d = data$gaps),
 #             chains = 1)
 # save(fit, file = file.path(mpath, 'Mg.Rdata'))
 load(file.path(mpath, 'Mg.Rdata'))
@@ -235,29 +302,28 @@ Model {data-width=300}
 
 ### Model Predictions.
 ```{r Mg pred}
-pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta', 'alpha')]
-P <- function(dgaps, dgmax, pars) exp(-(pars[1] + pars[2]*(dgaps/dgmax)))
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta', 'beta')]
+P <- function(dgaps, dgmax, pars) inv_logit(pars[1] + pars[2]*exp(-(dgaps/dgmax)))
 pred <- apply(as.matrix(fit), 1, function(x)
   sapply(seq_len(dim(data2)[1]), function(i)
-    P(data2$gaps[i], dgmax, c(x['theta'], x['alpha']))
+    P(data2$gaps[i], dgmax, c(x['theta'], x['beta']))
   ))
 pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
 names(pred) <- c('5%', '95%')
-pred$mean <- exp(-(pars[1] + pars[2]*(data2$gaps/dgmax)))
+pred$mean <- inv_logit(pars[1] + pars[2]*exp(-(data2$gaps/dgmax)))
 pred$gaps <- data2$gaps
 ggplot(data2, aes(x = gaps)) +
   geom_ribbon(aes(x = pred$gaps, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
   geom_line(aes(x = pred$gaps, y = pred$`5%`, color = '5%'), linetype = 2) +
   geom_line(aes(x = pred$gaps, y = pred$`95%`, color = '95%'), linetype = 2) +
   geom_line(aes(x = pred$gaps, y = pred$mean, color = 'mean'), linetype = 2) +
-  geom_density(alpha = 0.3) +
   theme_bw() +
   xlab('Distance to a gaps (m)') +
   ylab('Final softwood product (m3)') +
   scale_color_manual(name = 'Model',
                      values = c('5%' = 'black',
                                 '95%' = 'black',
-                                'mean' = 'red')) ; rm(fit, pred)
+                                'mean' = 'red')) #; rm(fit, pred)
 ```
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
@@ -268,7 +334,7 @@ g$c
 Convergence {data-width=300}
 -------------------------------------
 
-> $P_{M} = e^{-(`r round(pars[1],3)`* +  `r round(pars[2],3)`*d_{gaps})}$
+> $P_{M} = inv_{logit}(`r round(pars[1],3)` + `r round(pars[2],3)`*e^{-d_{gaps}})$
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r Rg}
@@ -279,6 +345,7 @@ g$r
 ```{r Pg}
 g$p
 ```
+
 
 Conclusion 
 ==================
