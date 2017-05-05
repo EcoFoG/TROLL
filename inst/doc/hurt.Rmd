@@ -80,7 +80,6 @@ In order to simulate sylviculture with TROLL we need to implement a new sylvicul
 # data <- data[c('idArbre', 'campagne', 'n_parcelle', 'Xutm', 'Yutm', 'code_vivant', 'code_mesure', 'idTaxon')]
 # names(data) <- c('id', 'census', 'plot', 'x', 'y', 'alive', 'statusID', 'speciesID')
 # data <- subset(data, census %in% c(1988:1992))
-# data <- subset(data, plot %in% c(2, 3, 4, 5, 7, 8, 9, 10, 12))
 # data$alive <- c(0,1)[as.factor(data$alive)]
 # data$statusID <- data$alive*10+data$statusID
 # status <- sapply(unique(data$id), function(id) statusDet(id, data))
@@ -99,14 +98,16 @@ In order to simulate sylviculture with TROLL we need to implement a new sylvicul
 # data <- data[c('id', 'census', 'plot', 'x', 'y', 'alive', 'statusID', 'status', 'status2', 'speciesID', 'species')]
 # data <- subset(data, status2 != 'recruit')
 # data <- data.frame(data)
-# save(data, file = file.path(mpath, 'data.Rdata'))
+# dataT0 <- subset(data, plot %in% c(1, 6, 11))
+# data <- subset(data, plot %in% c(2, 3, 4, 5, 7, 8, 9, 10, 12))
+# save(data, dataT0, file = file.path(mpath, 'data.Rdata'))
 ```
 
 ```{r distances, include=FALSE}
-# data$gaps <- NA
-# data$skids <- NA
-# data$dist <- NA
-# data$roads <- NA
+# data$gaps <- NA ; dataT0$gaps <- 250
+# data$skids <- NA ; dataT0$skids <- 250
+# data$dist <- NA ; dataT0$dist <- 250
+# data$roads <- NA ; dataT0$roads <- 250
 # plots <- unique(data$plot)
 # gaps <- readOGR('/home/sylvain/Documents/ECOFOG/TROLL/inst/extdata/Paracou/sig', layer = 'Gaps')
 # gaps <- subset(gaps, Plots %in% plots)
@@ -139,6 +140,7 @@ In order to simulate sylviculture with TROLL we need to implement a new sylvicul
 # }
 # rm(gaps, skids, roads, layers, trees, d, i)
 # data <- data[-which(is.na(data$gaps)),]
+# data <- rbind(data, dataT0) ; rm(dataT0)
 # save(data, file = file.path(mpath, 'data.Rdata'))
 load(file.path(mpath, 'data.Rdata'))
 dgmax <- max(data$gaps)
@@ -150,28 +152,23 @@ We gathered data from Paracou dataset in cenususes between 1988 and 1992 on Para
 
 We started with the model of disturbance from **Cite Herault**:
 $$Idisturbance_i = \sum_1 ^J e^{-\alpha * Distance_{i,j}} * Surface_j ^\beta $$
-We can simplify indices in:
-$$I_i = \sum_1 ^J e^{-\alpha * D_{i,j}} * S_j ^\beta $$
-$$I_i = \sum_1 ^J e^{-\alpha_g * {D_g}_{i,j}} + \sum_1 ^K e^{-\alpha_s * {D_s}_{i,k}}$$
-
-with $I_i$ individual $i$ disturbance index, $D_{i,j}$ distance from individual $i$ to gaps $j$, and $S_j$ surface from gaps $j$.
-
-We integrated disturbance index $I$ wrapped by a function $f$ to determine into a logit function in order to get probability of mortality:
+Disturbance index $I$ was wrapped in a function $f$ and integrated into a logit function in order to get probability of mortality:
 $$p(M_i) = inv_{logit}(f(I_i)) = \frac{e^{f(I_i)}}{1 + e^{f(I_i)}}$$
 
 Table 2: Models summary.
 ```{r mtab}
 mtab <- data.frame(
-  M = c('$M_0$', '$M_g$', '$M_d$'),
+  M = c('$M_0$', '$M_g$', '$M_g2$', '$M_d$'),
   Model = c(
     '$M \\sim \\mathcal{B}(inv_{logit}[\\theta])$',
-    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + e^{-\\alpha*d_{gaps}}])$',
-    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + e^{-\\alpha*d_{disturbed~area}}])$'
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + \\beta*e^{-d_{gaps}}])$',
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + S*\\beta*e^{-d_{gaps}}])$',
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + \\beta*e^{-d_{disturbed~area}}])$'
     )
 )
 mtab$M <- as.character(mtab$M)
 mtab$Model <- as.character(mtab$Model)
-row.names(mtab) <- c('M0', 'Mg', 'Md')
+row.names(mtab) <- c('M0', 'Mg', 'Mg2', 'Md')
 kable(mtab, row.names = F)
 ```
 
@@ -252,6 +249,7 @@ ggplot(data2, aes(x = gaps)) +
   geom_line(aes(x = pred$gaps, y = pred$`5%`, color = '5%'), linetype = 2) +
   geom_line(aes(x = pred$gaps, y = pred$`95%`, color = '95%'), linetype = 2) +
   geom_line(aes(x = pred$gaps, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_density() +
   theme_bw() +
   xlab('Distance to a gaps (m)') +
   ylab('Final softwood product (m3)') +
@@ -288,7 +286,7 @@ g$p
 # fit <- stan(file = file.path(mpath, 'M.stan'),
 #             data = list(N = dim(data)[1],
 #                         M = as.integer(data$status2 != 'alive'),
-#                         d = data$gaps),
+#                         d = data$gaps/dgmax),
 #             chains = 1)
 # save(fit, file = file.path(mpath, 'Mg.Rdata'))
 load(file.path(mpath, 'Mg.Rdata'))
@@ -317,13 +315,14 @@ ggplot(data2, aes(x = gaps)) +
   geom_line(aes(x = pred$gaps, y = pred$`5%`, color = '5%'), linetype = 2) +
   geom_line(aes(x = pred$gaps, y = pred$`95%`, color = '95%'), linetype = 2) +
   geom_line(aes(x = pred$gaps, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_density() +
   theme_bw() +
   xlab('Distance to a gaps (m)') +
   ylab('Final softwood product (m3)') +
   scale_color_manual(name = 'Model',
                      values = c('5%' = 'black',
                                 '95%' = 'black',
-                                'mean' = 'red')) #; rm(fit, pred)
+                                'mean' = 'red')) ; rm(fit, pred)
 ```
 
 ### Parameters markov chains. *Light grey area represents warmup iterations.*
@@ -343,6 +342,74 @@ g$r
 
 ### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
 ```{r Pg}
+g$p
+```
+
+`r mtab['Mg2',1]`
+==================
+
+```{r Mg2, include=FALSE}
+# fit <- stan(file = file.path(mpath, 'M2.stan'),
+#             data = list(N = dim(data)[1],
+#                         M = as.integer(data$status2 != 'alive'),
+#                         d = data$gaps/dgmax,
+#                         S = as.integer(data$plot %in% c(2, 3, 4, 5, 7, 8, 9, 10, 12))),
+#             chains = 1)
+# save(fit, file = file.path(mpath, 'Mg2.Rdata'))
+load(file.path(mpath, 'Mg2.Rdata'))
+g <- fitgraph(fit)
+```
+
+Model {data-width=300}
+-------------------------------------
+
+> `r paste(mtab['Mg2',], collapse = ': ')`
+
+### Model Predictions.
+```{r Mg2 pred}
+data2$S <- as.integer(data2$plot %in% c(2, 3, 4, 5, 7, 8, 9, 10, 12))
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta', 'beta')]
+P <- function(dgaps, dgmax, S, pars) inv_logit(pars[1] + S*pars[2]*exp(-(dgaps/dgmax)))
+pred <- apply(as.matrix(fit), 1, function(x)
+  sapply(seq_len(dim(data2)[1]), function(i)
+    P(data2$gaps[i], dgmax, data2$S[i], c(x['theta'], x['beta']))
+  ))
+pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
+names(pred) <- c('5%', '95%')
+pred$mean <- inv_logit(pars[1] + data2$S*pars[2]*exp(-(data2$gaps/dgmax)))
+pred$gaps <- data2$gaps
+ggplot(data2, aes(x = gaps)) +
+  geom_ribbon(aes(x = pred$gaps, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(x = pred$gaps, y = pred$`5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(x = pred$gaps, y = pred$`95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(x = pred$gaps, y = pred$mean, color = 'mean'), linetype = 2) +
+  geom_density() +
+  theme_bw() +
+  xlab('Distance to a gaps (m)') +
+  ylab('Final softwood product (m3)') +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red')) ; rm(fit, pred)
+```
+
+### Parameters markov chains. *Light grey area represents warmup iterations.*
+```{r Cg2}
+g$c
+```
+
+Convergence {data-width=300}
+-------------------------------------
+
+> $P_{M} = inv_{logit}(`r round(pars[1],3)``*e^{-d_{gaps}})$
+
+### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
+```{r Rg2}
+g$r
+```
+
+### Parameters pairs plot. *Parameters density distribution, pairs plot and Pearson's coefficient of correlation.*
+```{r Pg2}
 g$p
 ```
 
