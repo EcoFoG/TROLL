@@ -7,8 +7,9 @@ data {
 parameters {
   real theta ;
   real beta ;
+  real alpha ;
 }
 model {
   for(n in 1:N)
-    M[n] ~ bernoulli_logit(theta + S[n]*beta*exp(-(0.001 + d[n]))) ;
+    M[n] ~ bernoulli_logit(theta + S[n]*beta*exp(-alpha*d[n])) ;
 }

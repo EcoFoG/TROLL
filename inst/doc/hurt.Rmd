@@ -143,6 +143,7 @@ In order to simulate sylviculture with TROLL we need to implement a new sylvicul
 # data <- rbind(data, dataT0) ; rm(dataT0)
 # save(data, file = file.path(mpath, 'data.Rdata'))
 load(file.path(mpath, 'data.Rdata'))
+data$alive <- as.integer(data$status2 == 'alive')
 dgmax <- max(data$gaps)
 dsmax <- max(data$skids)
 ddmax <- max(data$dist)
@@ -161,9 +162,9 @@ mtab <- data.frame(
   M = c('$M_0$', '$M_g$', '$M_g2$', '$M_d$'),
   Model = c(
     '$M \\sim \\mathcal{B}(inv_{logit}[\\theta])$',
-    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + \\beta*e^{-d_{gaps}}])$',
-    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + S*\\beta*e^{-d_{gaps}}])$',
-    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + \\beta*e^{-d_{disturbed~area}}])$'
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + \\beta*e^{-\\alpha*d_{gaps}}])$',
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + S*\\beta*e^{-\\alpha*d_{gaps}}])$',
+    '$M \\sim \\mathcal{B}(inv_{logit}[\\theta + \\beta*e^{-\\alpha*d_{disturbed~area}}])$'
     )
 )
 mtab$M <- as.character(mtab$M)
@@ -186,11 +187,11 @@ Graph {data-width=200}
 ### Trees estimated dbh and final softwood product.
 ```{r data graph}
 data2 <- data[which(data$status2 != 'alive'),]
-data2[,c('gaps', 'skids', 'roads', 'dist')] %>%
+data2[,c('gaps', 'skids', 'dist')] %>%
  melt() %>%
 ggplot(aes(x = value, color = variable, fill = variable)) +
   geom_density(alpha = 0.3) +
-  xlab('distance (m)') +
+  xlab('Log distance (m)') +
   ylab('Dead trees density') +
   scale_fill_discrete(guide = 'none')
 ```
@@ -220,7 +221,7 @@ inv_logit <- function(x) exp(x) / (1 + exp(x))
 ```{r M0, include=FALSE}
 # fit <- stan(file = file.path(mpath, 'M0.stan'),
 #             data = list(N = dim(data)[1],
-#                         M = as.integer(data$status2 != 'alive')),
+#                         M = as.numeric(!data$alive),
 #             chains = 1)
 # save(fit, file = file.path(mpath, 'M0.Rdata'))
 load(file.path(mpath, 'M0.Rdata'))
@@ -285,8 +286,8 @@ g$p
 ```{r Mg, include=FALSE}
 # fit <- stan(file = file.path(mpath, 'M.stan'),
 #             data = list(N = dim(data)[1],
-#                         M = as.integer(data$status2 != 'alive'),
-#                         d = data$gaps/dgmax),
+#                         M = as.numeric(!data$alive),
+#                         d = data$gaps),
 #             chains = 1)
 # save(fit, file = file.path(mpath, 'Mg.Rdata'))
 load(file.path(mpath, 'Mg.Rdata'))
@@ -300,15 +301,15 @@ Model {data-width=300}
 
 ### Model Predictions.
 ```{r Mg pred}
-pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta', 'beta')]
-P <- function(dgaps, dgmax, pars) inv_logit(pars[1] + pars[2]*exp(-(dgaps/dgmax)))
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta', 'beta', 'alpha')]
+P <- function(dgaps, dgmax, pars) inv_logit(pars[1] + pars[2]*exp(-pars[3]*dgaps))
 pred <- apply(as.matrix(fit), 1, function(x)
   sapply(seq_len(dim(data2)[1]), function(i)
-    P(data2$gaps[i], dgmax, c(x['theta'], x['beta']))
+    P(data2$gaps[i], dgmax, c(x['theta'], x['beta'], x['alpha']))
   ))
 pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
 names(pred) <- c('5%', '95%')
-pred$mean <- inv_logit(pars[1] + pars[2]*exp(-(data2$gaps/dgmax)))
+pred$mean <- inv_logit(pars[1] + pars[2]*exp(-pars[3]*data2$gaps))
 pred$gaps <- data2$gaps
 ggplot(data2, aes(x = gaps)) +
   geom_ribbon(aes(x = pred$gaps, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
@@ -333,7 +334,7 @@ g$c
 Convergence {data-width=300}
 -------------------------------------
 
-> $P_{M} = inv_{logit}(`r round(pars[1],3)` + `r round(pars[2],3)`*e^{-d_{gaps}})$
+> $P_{M} = inv_{logit}(`r round(pars[1],3)` + `r round(pars[2],3)`*e^{-`r round(pars[3],3)`*d_{gaps}})$
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r Rg}
@@ -351,8 +352,8 @@ g$p
 ```{r Mg2, include=FALSE}
 # fit <- stan(file = file.path(mpath, 'M2.stan'),
 #             data = list(N = dim(data)[1],
-#                         M = as.integer(data$status2 != 'alive'),
-#                         d = data$gaps/dgmax,
+#                         M = as.numeric(!data$alive),
+#                         d = data$gaps,
 #                         S = as.integer(data$plot %in% c(2, 3, 4, 5, 7, 8, 9, 10, 12))),
 #             chains = 1)
 # save(fit, file = file.path(mpath, 'Mg2.Rdata'))
@@ -368,15 +369,15 @@ Model {data-width=300}
 ### Model Predictions.
 ```{r Mg2 pred}
 data2$S <- as.integer(data2$plot %in% c(2, 3, 4, 5, 7, 8, 9, 10, 12))
-pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta', 'beta')]
-P <- function(dgaps, dgmax, S, pars) inv_logit(pars[1] + S*pars[2]*exp(-(dgaps/dgmax)))
+pars <- as.matrix(fit)[which.max(as.matrix(fit)[,'lp__']),c('theta', 'beta', 'alpha')]
+P <- function(dgaps, dgmax, S, pars) inv_logit(pars[1] + S*pars[2]*exp(-pars[3]*dgaps))
 pred <- apply(as.matrix(fit), 1, function(x)
   sapply(seq_len(dim(data2)[1]), function(i)
-    P(data2$gaps[i], dgmax, data2$S[i], c(x['theta'], x['beta']))
+    P(data2$gaps[i], dgmax, data2$S[i], c(x['theta'], x['beta'], x['alpha']))
   ))
 pred <- data.frame(t(apply(pred, 1, function(x) quantile(x, probs = c(0.05, 0.95)))))
 names(pred) <- c('5%', '95%')
-pred$mean <- inv_logit(pars[1] + data2$S*pars[2]*exp(-(data2$gaps/dgmax)))
+pred$mean <- inv_logit(pars[1] + data2$S*pars[2]*exp(-pars[3]*data2$gaps))
 pred$gaps <- data2$gaps
 ggplot(data2, aes(x = gaps)) +
   geom_ribbon(aes(x = pred$gaps, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
@@ -401,7 +402,7 @@ g$c
 Convergence {data-width=300}
 -------------------------------------
 
-> $P_{M} = inv_{logit}(`r round(pars[1],3)``*e^{-d_{gaps}})$
+> $P_{M} = inv_{logit}(`r round(pars[1],3)` + `r round(pars[2],3)`*e^{-`r round(pars[3],3)`*d_{gaps}})$
 
 ### Parameters posterior ditribution. *Light blue area represents 80% confidence interval, and vertical blue line the mean.*
 ```{r Rg2}

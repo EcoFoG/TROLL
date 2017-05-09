@@ -6,7 +6,8 @@ data {
 parameters {
   real theta ;
   real beta ;
+  real alpha ;
 }
 model {
-  M ~ bernoulli_logit(theta + beta*exp(-(0.001 + d))) ;
+  M ~ bernoulli_logit(theta + beta*exp(-alpha*d)) ;
 }
