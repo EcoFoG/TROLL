@@ -284,12 +284,12 @@ g$p
 ==================
 
 ```{r Mg, include=FALSE}
-# fit <- stan(file = file.path(mpath, 'M.stan'),
-#             data = list(N = dim(data)[1],
-#                         M = as.numeric(!data$alive),
-#                         d = data$gaps),
-#             chains = 1)
-# save(fit, file = file.path(mpath, 'Mg.Rdata'))
+fit <- stan(file = file.path(mpath, 'M.stan'),
+            data = list(N = dim(data)[1],
+                        M = as.numeric(!data$alive),
+                        d = data$gaps),
+            chains = 1)
+save(fit, file = file.path(mpath, 'Mg.Rdata'))
 load(file.path(mpath, 'Mg.Rdata'))
 g <- fitgraph(fit)
 ```
