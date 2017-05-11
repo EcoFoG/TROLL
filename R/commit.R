@@ -1,7 +1,8 @@
 #' @export
 commit <- function(m,
                   HTML = TRUE,
-                  check = TRUE){
+                  check = TRUE,
+                  push = FALSE){
   if(HTML)
     updateHTML()
   system('git add *')
@@ -11,5 +12,6 @@ commit <- function(m,
   if(check)
     cat(command) ; invisible(readline(prompt="Press [enter] to continue"))
   system(command)
-  system('git push origin master')
+  if(push)
+    system('git push origin master')
 }

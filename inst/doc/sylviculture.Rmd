@@ -420,18 +420,6 @@ g
 
 Figure 2. Tracks design inside TROLL.
 
-## Skidding
-
-### Reality
-
-Last thing to take into account is skidding. When felt trees are removed from the plots they hurt and kill alive trees. One major thing is tree killed by rotation of the logs when tracted from the plot to the secondary track ("effet essuies glasses").
-
-*NB: A perspective in skidding is the logs length for skidding. For time purposes, currently logs are skidded in one piece. But because damages are proportionnal to the square of the length of the logs it could be questionned. Effectively long logs have increased damages in curves during skidding.*
-
-### Model
-
-This part need to be implemented in sylviculture module.
-
 ## Other damages
 
 ### Reality
@@ -440,15 +428,20 @@ The Office Nationale des Forêts is realizing diagnostic of disturbance from har
 
 ### Modelling
 
-Nevertheless, in addition to trees killed or hurted by treefall, roads and skidding explicitly modelled, it seems that we need to take into account an implicit extra mortality. This increased mortality following harvesting is decreasing in time untill null. It could be fitted on Paracou and Guyafor data.
+We gathered data from Paracou dataset in cenususes between 1988 and 1992 on Paracou harvested plots. Individuals were categorized between alive, dead, or recruited during the period. Individuals categorized as damaged tree (17), poisoned tree alive (19), death during logging standing (1), logged tree (4), poisoned tree (9), recruited alive or recruited and dead were removed from the dataset. Dead trees still in the dataset were then categorized in natural death standing (0), primary windfall (6), and secondary windfall (7). We adapted the model from **Cite Herault** based on a disturbance index into:
+$$Death_i \sim \mathcal{B}(P(Death_i))$$
+$$with ~~ P(Death_i) = logit^{-1}(\theta + \beta*e^{\alpha*d_{gaps}}) = \frac{e^{\theta + \beta*e^{\alpha*d_{gaps}}}}{1 + e^{\theta + \beta*e^{\alpha*d_{gaps}}}}$$
+$Death$ of a tree $i$ follows a $\mathcal{Bernoulli}$ law of probability $P(Death_i)$. The odds for a tree $i$ to die $O(Death_i)$ is calculated by the sum of the natural tree death odd $\theta$ and a perturbation index $\beta*e^{\alpha*d_{gaps}}$. The perturbation index depend on the distance $d_{gaps}$ of the tree $i$ to the closest logging gap. The probability for a tree $i$ to die $P(Death_i)$ is finally calculated by taking the inverse logit of the odd $logit^{-1}[O(Death_i)]$ (see [hurt models](hurt.html) document).
 
-This part need to be implemented in sylviculture module.
+We need now to transfer this allometry into TROLL to simulate disturbed trees that will die because of the selective logging gaps. A tree will die and fall if he randomly get under the probability to die because of the logging gap:
+$$P(Death_i) < rand ~~with~~ rand \in [0,1]$$
+On the other in current implementation a tree die and fall because he has been injured. This process is simulated by the variable $hurt$. The probability to die follows formula:
+$$Height < 2*hurt*rand ~~with~~ rand \in [0,1]$$
+So we can increase the variable $hurt$ to increase probability to die for trees close to logging gaps with:
+$$P(Death_i) = \frac{Height}{2*hurt} ~~ or ~~ hurt = \frac{Height}{2*P(Death_i)}=\frac{Height}{2*logit^{-1}(\theta + \beta*e^{\alpha*d_{gaps}})}$$
+$$hurt = \frac{Height}{2*logit^{-1}(-4.441 + 0.762*e^{0.064*d_{gaps}})}$$
 
 # Conclusion
-
-## Paracou
-
-Paracou harvesting effectively represents more volume than current logging in french guiana. Still damages are similar to what we can have now. Consequently it appears as a correct site to fit different parameters for the model.
 
 ## Model
 
@@ -458,13 +451,12 @@ We can summarize modelling of selective logging in few steps :
     - *Harvestable areas*: the whole simulated forest
     - Designation: all trees meeting species minimum and maximum harvestable diameters under or equal to a total volume of 30 $m^3.ha^{-1}$
     - Selection: first ranked trees according to harvesters reaching a total volume of 25 $m^3.ha^{-1}$
-    - Rotten: selected trees less 20-30% of selected trees considered as rotten
+    - Rotten: tree are considered as rotten depending on their diameter following our allometry
 - Harvesting
     - Felling: all selected trees
     - Main track: from the middle of one side of the simulated forest to the center
     - Secondary track (cloisonnement): following our own simplified algorithm
-    - Skidding: to be implemented
-    - Other damages: to be implemented
+    - Other damages: tree are hurted depending on their distance to a logging gap following our allometry
     
 ## Perspectives
 

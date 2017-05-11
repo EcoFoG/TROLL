@@ -372,15 +372,15 @@ Figure 7: Leaflifespan predictions for model different allometries with leaf mas
 Simulations are validating that this new allometry resolve the issue of unrealistically low aboveground biomass for low LMA species due to an early edath of individuals inside simulations. For instance with this allometry Symphonia sp 1 (a low LMA species) is now reaching a realistic aboveground biomass above 3.5 tonnes of C/ha and realistic diameter and age distribution inside the final population (see figure 8).
 
 ```{r sim, fig.height=10, fig.width=10}
-# new <- loadOutput('symphonia', '~/Documents/ECOFOG/Results/LL/symphonia500/')
-# new@name <- 'M11'
-# old <- loadOutput('Symphonia_sp.1', '~/Documents/ECOFOG/Results/LL/symphoniaOld/')
-# old@name <- 'Reich91'
-# a <- plot(new, what = 'agb', ggplot2 = T)
-# b <- plot(old, what = 'agb', ggplot2 = T)
-# c <- plot(stack(new, old), what = 'dbh', ggplot2 = T)
-# d <- plot(stack(new, old), what = 'age', ggplot2 = T)
-# plot_grid(a, b, c, d, labels = LETTERS[1:4])
+new <- loadOutput('symphonia', '~/Documents/ECOFOG/Results/LL/symphonia500/')
+new@name <- 'M11'
+old <- loadOutput('Symphonia_sp.1', '~/Documents/ECOFOG/Results/LL/symphoniaOld/')
+old@name <- 'Reich91'
+a <- plot(new, what = 'agb', ggplot2 = T)
+b <- plot(old, what = 'agb', ggplot2 = T)
+c <- plot(stack(new, old), what = 'dbh', ggplot2 = T)
+d <- plot(stack(new, old), what = 'age', ggplot2 = T)
+plot_grid(a, b, c, d, labels = LETTERS[1:4])
 ```
 
 Figure 8: TROLL simulations with allometry from Reich 1991 and new model **M11** for Symphonia sp 1 over 500 years. *Top graphics present aboveground biomass (AGB) for Symphonia simulations inside TROLL over 500 years with respectively Reich's 1991 allometry (A) and model M11 (B). Bottom graphics show respectively age (C) and diameter at breast heigh (D) histograms for Symphonia simulations inside TROLL over 500 years with both Reich's 1991 allometry and model M11.*
