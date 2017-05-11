@@ -264,7 +264,8 @@ pred$mean <- exp((beta[1]*(data$LMA/LMAmax) - beta[2]*(data$Nm/Nmax) + beta[3]*(
 pred$LMA <- data$LMA
 pred$Nm <- data$Nm
 pred$wsg <- data$wsg
-g <- ggplot(data, aes(x = LMA, y = LL)) +
+pred$obs <- data$LL
+lma <- ggplot(data, aes(x = LMA, y = LL)) +
   geom_ribbon(aes(x = pred$LMA, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
   geom_line(aes(x = pred$LMA, y = pred$`5%`, color = '5%'), linetype = 2) +
   geom_line(aes(x = pred$LMA, y = pred$`95%`, color = '95%'), linetype = 2) +
@@ -277,7 +278,7 @@ g <- ggplot(data, aes(x = LMA, y = LL)) +
                      values = c('5%' = 'black',
                                 '95%' = 'black',
                                 'mean' = 'red'))
-h <- ggplot(data, aes(x = Nm, y = LL)) +
+nm <- ggplot(data, aes(x = Nm, y = LL)) +
   geom_ribbon(aes(x = pred$Nm, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
   geom_line(aes(x = pred$Nm, y = pred$`5%`, color = '5%'), linetype = 2) +
   geom_line(aes(x = pred$Nm, y = pred$`95%`, color = '95%'), linetype = 2) +
@@ -290,7 +291,7 @@ h <- ggplot(data, aes(x = Nm, y = LL)) +
                      values = c('5%' = 'black',
                                 '95%' = 'black',
                                 'mean' = 'red'))
-f <- ggplot(data, aes(x = wsg, y = LL)) +
+wsg<- ggplot(data, aes(x = wsg, y = LL)) +
   geom_ribbon(aes(x = pred$wsg, ymin = pred$`5%`, ymax = pred$`95%`), color = 'grey', alpha = 0.2) +
   geom_line(aes(x = pred$wsg, y = pred$`5%`, color = '5%'), linetype = 2) +
   geom_line(aes(x = pred$wsg, y = pred$`95%`, color = '95%'), linetype = 2) +
@@ -303,10 +304,24 @@ f <- ggplot(data, aes(x = wsg, y = LL)) +
                      values = c('5%' = 'black',
                                 '95%' = 'black',
                                 'mean' = 'red'))
-plot_grid(g, h, f, labels = c('LMA', 'Nmass', 'wsg'))
+predvsobs<- ggplot(pred, aes(x = obs, y = mean)) +
+  geom_ribbon(aes(ymin =`5%`, ymax = `95%`), color = 'grey', alpha = 0.2) +
+  geom_line(aes(y = `5%`, color = '5%'), linetype = 2) +
+  geom_line(aes(y = `95%`, color = '95%'), linetype = 2) +
+  geom_line(aes(y = mean, color = 'mean'), linetype = 2) +
+  geom_point() +
+  theme_bw() +
+  xlab('Leaf nitrogen content (Nmass in %)') + 
+  ylab('Leaf lifespan (LL in months)') +
+  geom_abline(slope = 1) +
+  scale_color_manual(name = 'Model',
+                     values = c('5%' = 'black',
+                                '95%' = 'black',
+                                'mean' = 'red'))
+plot_grid(lma, nm, wsg, predvsobs, labels = c('LMA', 'Nmass', 'wsg', 'P v. O'))
 ```
 
-Figure 6: Leaflifespan predictions for model **M11** with leaf mass per area (LMA), leaf nitrogen content (Nmass), and wood specific gravity (wsg). *Leaf lifespan (LL in $months$) is predicted with model M10 fit. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %), and wood specific gravity (wsg in $mg.mm^{-3}$) are taken in a composite dataset of GLOPNET, TRY and DRYAD  datasets.* **Warning** *LMA (resp. Nmass and wsg) is not constant and depend on the closest point value for right (resp. center and left) graph.* 
+Figure 6: Leaflifespan predictions for model **M11** with leaf mass per area (LMA), leaf nitrogen content (Nmass), wood specific gravity (wsg) and predicted versus observed values. *Leaf lifespan (LL in $months$) is predicted with model M10 fit. Leaf mass per area (LMA in $g.m^{-2}$) and leaf nitrogen content (Nmass, in %), and wood specific gravity (wsg in $mg.mm^{-3}$) are taken in a composite dataset of GLOPNET, TRY and DRYAD  datasets.* **Warning** *LMA (resp. Nmass and wsg) is not constant and depend on the closest point value for right (resp. center and left) graph.* 
 
 $$M11:~~ LL = e^{`r round(beta[1]/LMAmax,3)`*LMA-`r round(beta[2]/Nmax,3)`*Nmass + `r round(beta[3]/wsgmax,3)`*wsg}$$
 
