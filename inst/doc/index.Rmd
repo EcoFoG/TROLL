@@ -42,15 +42,21 @@ The issue seemed link to leaf lifespan allometry. We searched for a new allometr
 
 Results are available on leaf lifespan [first](LL2.html) and [second](LL.html) model pages.
 
+Data origins are summarized in [data table](https://docs.google.com/spreadsheets/d/1WI7F2s-tnGG8r983lBEgnCiuvX61-g0y0xY7H_dr7dg/edit?usp=sharing).
+
 # Sylviculture
 
 We first needed to implement a realistic module to simulate sylviculture inside TROLL :
 
 Description of sylviculture module is made on [sylviculture](sylviculture.html) page.
 
-In order to realize the sylviculture modul we established different models linking probability for a tree to be probbed as rotten and final volume of wood to its diameter at breast height.
+In order to realize the sylviculture module we established different models linking probability for a tree to be probbed as rotten and final volume of wood to its diameter at breast height.
 
-Results are summarized on [rotten](rotten.html), [rotten2](rotten2.html) and [rotten3](rotten3.html) pages
+Results are summarized on [rotten](rotten.html), [rotten2](rotten2.html) and [rotten3](rotten3.html) pages.
+
+In order to realize the sylviculture module we established a model for increased mortality around gaps.
+
+Results are summarized on [hurt](hurt.html) page.
 
 # References
 

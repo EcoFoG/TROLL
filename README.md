@@ -21,6 +21,7 @@ Documentation
 -   Leaf lifespan:
     -   <https://sylvainschmitt.github.io/TROLL/LL>
     -   <https://sylvainschmitt.github.io/TROLL/LL2>
+    -   <https://docs.google.com/spreadsheets/d/1WI7F2s-tnGG8r983lBEgnCiuvX61-g0y0xY7H_dr7dg/edit?usp=sharing>
 -   Sylviculture:
     -   <https://sylvainschmitt.github.io/TROLL/sylviculture>
 -   Rotten :
