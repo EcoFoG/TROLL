@@ -311,8 +311,8 @@ predvsobs<- ggplot(pred, aes(x = obs, y = mean)) +
   geom_line(aes(y = mean, color = 'mean'), linetype = 2) +
   geom_point() +
   theme_bw() +
-  xlab('Leaf nitrogen content (Nmass in %)') + 
-  ylab('Leaf lifespan (LL in months)') +
+  xlab('Observed leaf lifespan (LL in months)') + 
+  ylab('Predicted leaf lifespan (LL in months)') +
   geom_abline(slope = 1) +
   scale_color_manual(name = 'Model',
                      values = c('5%' = 'black',
