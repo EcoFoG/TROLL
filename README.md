@@ -11,7 +11,7 @@ Documentation
 -------------
 
 -   Home:
-    -   <https://sylvainschmitt.github.io/TROLL/home>
+    -   <https://sylvainschmitt.github.io/TROLL/>
 -   Sensitivity:
     -   <https://sylvainschmitt.github.io/TROLL/sensitivity>
 -   Disturbance:

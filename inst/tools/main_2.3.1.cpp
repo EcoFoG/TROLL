@@ -496,7 +496,7 @@ void Species::Init(int nesp,fstream& is) {
     //s_leaflifespan=1.5+pow(10,(7.18+3.03*log10(s_LMA*0.0001)));           //this is the expression from Reich et al 1991 Oecologia (San Carlos Rio Negro).
     //s_leaflifespan=pow(10,(2.040816*(2.579713-log10(SLA))));    //this is the expression from Reich et al. 1997 PNAS (provides probably more realistic estimates for species with high LMA).
     //s_leaflifespan=0.5+pow(10,(-2.509+1.71*log10(s_LMA)));    //this is the expression from Wright et al 2004 Nature (leaf economics spectrum).
-    s_leaflifespan=exp(0.00843*s_LMA - 6.95*s_Nmass + 3.66*s_wsg); //this is the expression from model M11 in search for a new allometry https://sylvainschmitt.github.io/TROLL/LL
+    s_leaflifespan=exp(0.0165*s_LMA - 10.34*s_Nmass + 1.94*s_wsg); //this is the expression from model M11 in search for a new allometry https://sylvainschmitt.github.io/TROLL/LL
     s_time_young=1;
     s_time_mature=s_leaflifespan/3.0;
     s_time_old=s_leaflifespan-s_time_mature-s_time_young;

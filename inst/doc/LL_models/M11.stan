@@ -8,14 +8,14 @@ data {
   real wsg[N] ;
 }
 parameters {
-  real<lower=0,upper=5> sigma ;
   real<lower=0> beta_1 ;
   real<lower=0> beta_1s[S] ;
-  real<lower=0,upper=50> sigma_1 ;
   real<lower=0> beta_2 ;
   real<lower=0> beta_2s[S] ;
-  real<lower=0,upper=50> sigma_2 ;
   real<lower=0> beta_3 ;
+  real<lower=0,upper=5> sigma ;
+  real<lower=0,upper=50> sigma_1 ;
+  real<lower=0,upper=50> sigma_2 ;
 }
 model {
    real f[N] ;
