@@ -63,7 +63,7 @@ New code for this module is available [online](https://github.com/sylvainschmitt
 
 Before logging we first need to designate and select trees which will be harvested inside simulations.
 
-## *Harvestable areas*
+## Harvestable areas
 
 ### Reality
 
@@ -247,7 +247,7 @@ Main issue around the logging will be treefall direction. Due to crown aspects t
 Whereas interessant to test, due to the fact it is not much applied in french guiana, I think we should not model oriented logging for the moment. We should consider logging treefall as random like current treefall implementation inside TROLL (see code 5).
 
 ```{rcpp felling, eval=FALSE, echo=TRUE}
-/* LOGGING */
+/* FELLING */
 int individuals=0;
 volume=0.0;
 for(site=0;site<sites;site++){
@@ -255,7 +255,7 @@ for(site=0;site<sites;site++){
     row = floor(site/cols);
     col = site-(row*cols);
     output[36] << "L" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
-    T[site].t_hurt += 10*T[site].t_Tree_Height;
+    T[site].FellTree();
     individuals ++;
     volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
   }
@@ -265,6 +265,45 @@ cout << individuals << " trees have been logged representing " << volume << "m3.
 
 Code 5: Felling module.
 
+We added a specific felling function (in which we could implement in future versions oriented logging) to simulate fellinf in the module loop (see code 6).
+
+```{rcpp FellTree, eval=FALSE, echo=TRUE}
+void Tree::FellTree() {
+    int xx,yy;
+    float t_angle = float(twoPi*genrand2()); // random angle
+    int row0,col0,h_int, r_int;
+    float h_true = t_Tree_Height*LV;
+    if(t_dbh*LH>0.1) nbTreefall10++;
+    Thurt[0][t_site+sites] = int(t_Tree_Height);
+    Tfell[0][t_site] = 1;
+    row0=t_site/cols;       /* fallen stem destructs other trees */
+    col0=t_site%cols;
+    h_int = int(h_true*NH);
+    for(int h=1;h<h_int;h++) { // loop on the fallen stem (horizontally)
+        xx=int(flor(col0+h*cos(t_angle))); // get projection in col (= xx) direction
+        if(xx<cols){
+            yy=int(row0+h*sin(t_angle)); // get projection in row (= yy) direction
+            Thurt[0][xx+(yy+rows)*cols] = int(t_Tree_Height);
+            Tfell[0][xx+yy*cols] = 1;
+        }
+    }
+    xx=col0+int((h_true*NH-t_Crown_Radius)*cos(t_angle)); // where crown ends/starts fallen crown destructs other trees */
+    yy=row0+int((h_true*NH-t_Crown_Radius)*sin(t_angle));
+    r_int = int(t_Crown_Radius);
+    for(int col=max(0,xx-r_int);col<min(cols,xx+r_int+1);col++) { /* loop on the fallen crown (horizontally) */
+        for(int row=yy-r_int;row<yy+r_int+1;row++) {
+            if((col-xx)*(col-xx)+(row-yy)*(row-yy)<r_int*r_int) {
+            	Thurt[0][col+(row+rows)*cols] = int((t_Tree_Height-t_Crown_Radius*NV*LH)*0.5);
+            	Tfell[0][xx+yy*cols] = 1;
+            }
+        }
+    }
+    Death();
+}
+```
+
+Code 6: Felling module.
+
 ## Main track
 
 ### Reality
@@ -273,7 +312,7 @@ Roads are split in three classes: truck roads, main tractor track, and secondary
 
 ### Model
 
-One more time, one major assumption of TROLL is a flat environment. Consequently the main track can be considered as a way starting from the middle of one side of the simulated forest and reaching the center (see code 6).
+One more time, one major assumption of TROLL is a flat environment. Consequently the main track can be considered as a way starting from the middle of one side of the simulated forest and reaching the center (see code 7).
 
 ```{rcpp MT, eval=FALSE, echo=TRUE}
 /* MAIN TRACK */
@@ -295,7 +334,7 @@ for(row=0;row<(rows/2);row++){
 cout << MTindividuals << " trees have been killed for the main track." << endl;
 ```
 
-Code 6: Main track module.
+Code 7: Main track module.
 
 ## Secondary tracks (cloisonnement)
 
@@ -305,7 +344,7 @@ Secondary tracks are computed once trees have been designated and the geolocatio
 
 ### Model
 
-To not over-complicate the model we decided to simulate secondary tracks with few simple rules for a full automatic integration. It will not correspond to reality but because secondary tracks draw is a vast question (e.g. piste 2 and 3 softwares), it will answer or needs. The secondary tracks module compute the following algorithm (see code 7 and figure 2):
+To not over-complicate the model we decided to simulate secondary tracks with few simple rules for a full automatic integration. It will not correspond to reality but because secondary tracks draw is a vast question (e.g. piste 2 and 3 softwares), it will answer or needs. The secondary tracks module compute the following algorithm (see code 8 and figure 2):
 
 - Calculate a loads map measuring every trees at a distance of 30 meters for each pixel
 - Calculate a track proximity maps of the closest existing track
@@ -409,7 +448,7 @@ if(ST[site]==1 && T[site].t_age != 0){
 cout << STindividuals << " trees have been killed for secondary tracks." << endl;
 ```
 
-Code 7: Secondary tracks module.
+Code 8: Secondary tracks module.
 
 ```{r tracks}
 test <- loadOutput('test', '~/Documents/ECOFOG/TROLL/inst/tools/test/')
@@ -435,11 +474,50 @@ $Death$ of a tree $i$ follows a $\mathcal{Bernoulli}$ law of probability $P(Deat
 
 We need now to transfer this allometry into TROLL to simulate disturbed trees that will die because of the selective logging gaps. A tree will die and fall if he randomly get under the probability to die because of the logging gap:
 $$P(Death_i) < rand ~~with~~ rand \in [0,1]$$
-On the other in current implementation a tree die and fall because he has been injured. This process is simulated by the variable $hurt$. The probability to die follows formula:
+But the probabilty to be dead $P(Death_i)$ for a tree $i$ encompass both the probability to die due to the logging and the natural death rate. So we need to remove the natural death rate to this probability ($P(Death_i) - DeathRate_i$). On the other hand, in the current implementation of TROLL a tree dies and falls because he has been injured. This process is simulated by the variable $hurt$. The probability to die follows formula:
 $$Height < 2*hurt*rand ~~with~~ rand \in [0,1]$$
 So we can increase the variable $hurt$ to increase probability to die for trees close to logging gaps with:
-$$P(Death_i) = \frac{Height}{2*hurt} ~~ or ~~ hurt = \frac{Height}{2*P(Death_i)}=\frac{Height}{2*logit^{-1}(\theta + \beta*e^{\alpha*d_{gaps}})}$$
-$$hurt = \frac{Height}{2*logit^{-1}(-4.441 + 0.762*e^{0.064*d_{gaps}})}$$
+$$P(Death_i) - DeathRate_i = \frac{Height}{2*hurt}$$
+$$hurt = \frac{Height}{2*P(Death_i) - DeathRate_i}=\frac{Height}{2*(logit^{-1}(\theta + \beta*e^{\alpha*d_{gaps}}) - DeathRate_i)}$$
+$$hurt = \frac{Height}{2*[logit^{-1}(-4.441 + 0.762*e^{0.064*d_{gaps}}) - Species::DeathRate]}$$
+
+```{rcpp damages, eval=FALSE, echo=TRUE}
+/* GAP DAMAGES */
+float deathrate, gaps_deathrate, gaps_hurt, d, dgaps[sites];
+for(site=0;site<sites;site++)
+  dgaps[site] = rows*rows + cols*cols;
+int siteG, rowG, colG;
+for(siteG=0;siteG<sites;siteG++){
+  if(Tfell[0][siteG] == 1){
+    rowG = floor(siteG/cols);
+    colG = siteG-(rowG*cols);
+    for(site=0;site<sites;site++){
+      row = floor(site/cols);
+      col = site-(row*cols);
+      d = (row - rowG)*(row - rowG) + (col - colG)*(col - colG);
+      if(d < dgaps[site])
+        dgaps[site] = d;
+    }
+  }
+}
+for(site=0;site<sites;site++){
+  if(T[site].t_age != 0){
+    gaps_deathrate = -4.441 + 0.762*exp(0.064*sqrt(dgaps[site]));
+    gaps_deathrate = exp(gaps_deathrate) / (1 + exp(gaps_deathrate)); // Allometry representing gaps damages
+    if(_NDD)
+      deathrate = T[site].t_s->DeathRateNDD(T[site].t_PPFD, T[site].t_dbh, T[site].t_NDDfield[T[site].t_sp_lab]);
+    else
+      deathrate = T[site].t_s->DeathRate(T[site].t_PPFD, T[site].t_dbh, T[site].t_NPPneg);
+    if(gaps_deathrate > deathrate){
+      gaps_hurt = T[site].t_Tree_Height/(2*(gaps_deathrate - deathrate));
+      T[site].t_hurt += gaps_hurt;
+    }
+  }
+}        
+delete [] Tfell[0];
+```
+
+Code 9: Gap damages module.
 
 # Conclusion
 
@@ -448,15 +526,15 @@ $$hurt = \frac{Height}{2*logit^{-1}(-4.441 + 0.762*e^{0.064*d_{gaps}})}$$
 We can summarize modelling of selective logging in few steps :
 
 - Trees choice
-    - *Harvestable areas*: the whole simulated forest
+    - Harvestable areas: the whole simulated forest
     - Designation: all trees meeting species minimum and maximum harvestable diameters under or equal to a total volume of 30 $m^3.ha^{-1}$
     - Selection: first ranked trees according to harvesters reaching a total volume of 25 $m^3.ha^{-1}$
-    - Rotten: tree are considered as rotten depending on their diameter following our allometry
+    - Rotten: tree are considered as rotten depending on their diameter following our allometry (see [rotten models](rotten2.html))
 - Harvesting
     - Felling: all selected trees
     - Main track: from the middle of one side of the simulated forest to the center
     - Secondary track (cloisonnement): following our own simplified algorithm
-    - Other damages: tree are hurted depending on their distance to a logging gap following our allometry
+    - Other damages: tree are hurted depending on their distance to a logging gap following our allometry (see [hurt models](hurt.html))
     
 ## Perspectives
 
