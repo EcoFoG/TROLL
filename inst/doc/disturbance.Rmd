@@ -266,7 +266,6 @@ rm(data, mature, var)
 # Load stack 
 # mm <- loadStack('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/')
 # save(mm, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mm.Rdata')
-# load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mm.Rdata')
 
 # Data prep & check
 # datal <- extractData(mm)
@@ -297,11 +296,23 @@ g2 <- ggplot(data, aes(x = n10, y = n30, colour = sim, label = traits)) +
   geom_point() + guides(colour = F)
 g1
 g2
-# (p1 <- plotly_POST(ggplotly(g1), filename="p1"))
-# (p2 <- plotly_POST(ggplotly(g2), filename="p2"))
 
 rm(mm, data, g1, g2, p1, p2)
 ```
+
+## Still an issue ?
+
+```{r Issue}
+# load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mm.Rdata')
+# m <- mm@layers$Tachigali_bracteolata
+# save(m, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/mature/Tachigali.Rdata')
+load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/Tachigali.Rdata')
+summaryPlot(m)
+plot(m, what = 'age', ggplot = T)
+plot(m, what = 'dbh', ggplot = T)
+rm(mm)
+```
+
 
 ## Disturbance simulations
 
