@@ -364,7 +364,7 @@ for(site=0;site<sites;site++){
 while(individuals > 0){
   for(site0=0;site0<sites;site0++){ /*loadings and tracks distance*/
 load[site0]=0;
-    tracks[site0]=rows*cols*rows*cols;
+    tracks[site0]=rows*rows + cols*cols;
     row0 = floor(site0/cols);
     col0 = site0-(row0*cols);
     for(site=0;site<sites;site++){
@@ -372,7 +372,7 @@ load[site0]=0;
         row = floor(site/cols);
         col = site-(row*cols);
         d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
-        if(status[site]==1 && d <= 30*30)
+        if(status[site]==1 && d <= (30*30))
           load[site0]++;
         if(MT[site]==1 && d < tracks[site0])
           tracks[site0]=d;
@@ -388,7 +388,7 @@ if(load[site]==load[site0] && tracks[site]<tracks[site0])
   }	
   row0 = floor(site0/cols);
   col0 = site0-(row0*cols);
-  d0 = rows*cols*rows*cols; /* closest MT*/
+  d0 = rows*rows+cols*cols; /* closest MT*/
 for(site=0;site<sites;site++){
   if(MT[site]==1){
     rowMT = floor(site/cols);
@@ -418,7 +418,7 @@ if(status[site]==1){
   row = floor(site/cols);
   col = site-(row*cols);
   d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
-  if(d <= 33*33){
+  if(d <= (33*33)){
     status[site]=0;
     individuals--;
   }
@@ -481,40 +481,47 @@ $$P(Death_i) - DeathRate_i = \frac{Height}{2*hurt}$$
 $$hurt = \frac{Height}{2*P(Death_i) - DeathRate_i}=\frac{Height}{2*(logit^{-1}(\theta + \beta*e^{\alpha*d_{gaps}}) - DeathRate_i)}$$
 $$hurt = \frac{Height}{2*[logit^{-1}(-4.441 + 0.762*e^{0.064*d_{gaps}}) - Species::DeathRate]}$$
 
+Because the increased mortality due to gaps model was built on data for the 4 years after the logging, gaps damages are implemented in a submodule that get activated one year after the logging. It takes in account only trees that died hurted by tree felling (corrrection made following Isabelle mail).
+
 ```{rcpp damages, eval=FALSE, echo=TRUE}
 /* GAP DAMAGES */
-float deathrate, gaps_deathrate, gaps_hurt, d, dgaps[sites];
-for(site=0;site<sites;site++)
-  dgaps[site] = rows*rows + cols*cols;
-int siteG, rowG, colG;
-for(siteG=0;siteG<sites;siteG++){
-  if(Tfell[0][siteG] == 1){
-    rowG = floor(siteG/cols);
-    colG = siteG-(rowG*cols);
-    for(site=0;site<sites;site++){
-      row = floor(site/cols);
-      col = site-(row*cols);
-      d = (row - rowG)*(row - rowG) + (col - colG)*(col - colG);
-      if(d < dgaps[site])
-        dgaps[site] = d;
+if(iter == (disturb_iter+iterperyear)) {
+  cout << "###   Selective Logging Long Term Damages   ###" << endl;
+  int site, row, col, siteG, rowG, colG;
+  float deathrate, gaps_deathrate, gaps_hurt, d, dgaps[sites];
+  for(site=0;site<sites;site++)
+    dgaps[site] = rows*rows + cols*cols;
+  for(siteG=0;siteG<sites;siteG++){
+    if(Tfell[0][siteG] == 1){
+      if(T[siteG].t_age == 0){
+        rowG = floor(siteG/cols);
+        colG = siteG-(rowG*cols);
+        for(site=0;site<sites;site++){
+          row = floor(site/cols);
+          col = site-(row*cols);
+          d = (row - rowG)*(row - rowG) + (col - colG)*(col - colG);
+          if(d < dgaps[site])
+            dgaps[site] = d;
+        }
+      }
     }
   }
+  for(site=0;site<sites;site++){
+    if(T[site].t_age != 0){
+      gaps_deathrate = -4.441 + 0.762*exp(0.064*sqrt(dgaps[site]));
+      gaps_deathrate = exp(gaps_deathrate) / (1 + exp(gaps_deathrate)); // Allometry representing gaps damages
+      if(_NDD)
+        deathrate = T[site].t_s->DeathRateNDD(T[site].t_PPFD, T[site].t_dbh, T[site].t_NDDfield[T[site].t_sp_lab]);
+      else
+        deathrate = T[site].t_s->DeathRate(T[site].t_PPFD, T[site].t_dbh, T[site].t_NPPneg);
+      if(gaps_deathrate > deathrate){
+        gaps_hurt = T[site].t_Tree_Height/(2*(gaps_deathrate - deathrate));
+        T[site].t_hurt += gaps_hurt;
+      }
+    }
+  }        
+  delete [] Tfell[0];
 }
-for(site=0;site<sites;site++){
-  if(T[site].t_age != 0){
-    gaps_deathrate = -4.441 + 0.762*exp(0.064*sqrt(dgaps[site]));
-    gaps_deathrate = exp(gaps_deathrate) / (1 + exp(gaps_deathrate)); // Allometry representing gaps damages
-    if(_NDD)
-      deathrate = T[site].t_s->DeathRateNDD(T[site].t_PPFD, T[site].t_dbh, T[site].t_NDDfield[T[site].t_sp_lab]);
-    else
-      deathrate = T[site].t_s->DeathRate(T[site].t_PPFD, T[site].t_dbh, T[site].t_NPPneg);
-    if(gaps_deathrate > deathrate){
-      gaps_hurt = T[site].t_Tree_Height/(2*(gaps_deathrate - deathrate));
-      T[site].t_hurt += gaps_hurt;
-    }
-  }
-}        
-delete [] Tfell[0];
 ```
 
 Code 9: Gap damages module.

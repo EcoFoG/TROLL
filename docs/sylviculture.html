@@ -11,7 +11,7 @@
 
 <meta name="author" content="Sylvain Schmitt sylvain.schmitt@agroparistech.fr" />
 
-<meta name="date" content="2017-05-12" />
+<meta name="date" content="2017-05-18" />
 
 <title>Sylviculture modelling</title>
 
@@ -217,7 +217,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Sylviculture modelling</h1>
 <h4 class="author"><em>Sylvain Schmitt <a href="mailto:sylvain.schmitt@agroparistech.fr">sylvain.schmitt@agroparistech.fr</a></em></h4>
-<h4 class="date"><em>2017-05-12</em></h4>
+<h4 class="date"><em>2017-05-18</em></h4>
 
 </div>
 
@@ -533,7 +533,7 @@ for(site=0;site&lt;sites;site++){
 while(individuals &gt; 0){
   for(site0=0;site0&lt;sites;site0++){ /*loadings and tracks distance*/
 load[site0]=0;
-    tracks[site0]=rows*cols*rows*cols;
+    tracks[site0]=rows*rows + cols*cols;
     row0 = floor(site0/cols);
     col0 = site0-(row0*cols);
     for(site=0;site&lt;sites;site++){
@@ -541,7 +541,7 @@ load[site0]=0;
         row = floor(site/cols);
         col = site-(row*cols);
         d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
-        if(status[site]==1 &amp;&amp; d &lt;= 30*30)
+        if(status[site]==1 &amp;&amp; d &lt;= (30*30))
           load[site0]++;
         if(MT[site]==1 &amp;&amp; d &lt; tracks[site0])
           tracks[site0]=d;
@@ -557,7 +557,7 @@ if(load[site]==load[site0] &amp;&amp; tracks[site]&lt;tracks[site0])
   } 
   row0 = floor(site0/cols);
   col0 = site0-(row0*cols);
-  d0 = rows*cols*rows*cols; /* closest MT*/
+  d0 = rows*rows+cols*cols; /* closest MT*/
 for(site=0;site&lt;sites;site++){
   if(MT[site]==1){
     rowMT = floor(site/cols);
@@ -587,7 +587,7 @@ if(status[site]==1){
   row = floor(site/cols);
   col = site-(row*cols);
   d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
-  if(d &lt;= 33*33){
+  if(d &lt;= (33*33)){
     status[site]=0;
     individuals--;
   }
@@ -630,39 +630,45 @@ cout &lt;&lt; STindividuals &lt;&lt; &quot; trees have been killed for secondary
 <h3>Modelling</h3>
 <p>We gathered data from Paracou dataset in cenususes between 1988 and 1992 on Paracou harvested plots. Individuals were categorized between alive, dead, or recruited during the period. Individuals categorized as damaged tree (17), poisoned tree alive (19), death during logging standing (1), logged tree (4), poisoned tree (9), recruited alive or recruited and dead were removed from the dataset. Dead trees still in the dataset were then categorized in natural death standing (0), primary windfall (6), and secondary windfall (7). We adapted the model from <strong>Cite Herault</strong> based on a disturbance index into: <span class="math display">\[Death_i \sim \mathcal{B}(P(Death_i))\]</span> <span class="math display">\[with ~~ P(Death_i) = logit^{-1}(\theta + \beta*e^{\alpha*d_{gaps}}) = \frac{e^{\theta + \beta*e^{\alpha*d_{gaps}}}}{1 + e^{\theta + \beta*e^{\alpha*d_{gaps}}}}\]</span> <span class="math inline">\(Death\)</span> of a tree <span class="math inline">\(i\)</span> follows a <span class="math inline">\(\mathcal{Bernoulli}\)</span> law of probability <span class="math inline">\(P(Death_i)\)</span>. The odds for a tree <span class="math inline">\(i\)</span> to die <span class="math inline">\(O(Death_i)\)</span> is calculated by the sum of the natural tree death odd <span class="math inline">\(\theta\)</span> and a perturbation index <span class="math inline">\(\beta*e^{\alpha*d_{gaps}}\)</span>. The perturbation index depend on the distance <span class="math inline">\(d_{gaps}\)</span> of the tree <span class="math inline">\(i\)</span> to the closest logging gap. The probability for a tree <span class="math inline">\(i\)</span> to die <span class="math inline">\(P(Death_i)\)</span> is finally calculated by taking the inverse logit of the odd <span class="math inline">\(logit^{-1}[O(Death_i)]\)</span> (see <a href="hurt.html">hurt models</a> document).</p>
 <p>We need now to transfer this allometry into TROLL to simulate disturbed trees that will die because of the selective logging gaps. A tree will die and fall if he randomly get under the probability to die because of the logging gap: <span class="math display">\[P(Death_i) &lt; rand ~~with~~ rand \in [0,1]\]</span> But the probabilty to be dead <span class="math inline">\(P(Death_i)\)</span> for a tree <span class="math inline">\(i\)</span> encompass both the probability to die due to the logging and the natural death rate. So we need to remove the natural death rate to this probability (<span class="math inline">\(P(Death_i) - DeathRate_i\)</span>). On the other hand, in the current implementation of TROLL a tree dies and falls because he has been injured. This process is simulated by the variable <span class="math inline">\(hurt\)</span>. The probability to die follows formula: <span class="math display">\[Height &lt; 2*hurt*rand ~~with~~ rand \in [0,1]\]</span> So we can increase the variable <span class="math inline">\(hurt\)</span> to increase probability to die for trees close to logging gaps with: <span class="math display">\[P(Death_i) - DeathRate_i = \frac{Height}{2*hurt}\]</span> <span class="math display">\[hurt = \frac{Height}{2*P(Death_i) - DeathRate_i}=\frac{Height}{2*(logit^{-1}(\theta + \beta*e^{\alpha*d_{gaps}}) - DeathRate_i)}\]</span> <span class="math display">\[hurt = \frac{Height}{2*[logit^{-1}(-4.441 + 0.762*e^{0.064*d_{gaps}}) - Species::DeathRate]}\]</span></p>
+<p>Because the increased mortality due to gaps model was built on data for the 4 years after the logging, gaps damages are implemented in a submodule that get activated one year after the logging. It takes in account only trees that died hurted by tree felling (corrrection made following Isabelle mail).</p>
 <pre class="rcpp"><code>/* GAP DAMAGES */
-float deathrate, gaps_deathrate, gaps_hurt, d, dgaps[sites];
-for(site=0;site&lt;sites;site++)
-  dgaps[site] = rows*rows + cols*cols;
-int siteG, rowG, colG;
-for(siteG=0;siteG&lt;sites;siteG++){
-  if(Tfell[0][siteG] == 1){
-    rowG = floor(siteG/cols);
-    colG = siteG-(rowG*cols);
-    for(site=0;site&lt;sites;site++){
-      row = floor(site/cols);
-      col = site-(row*cols);
-      d = (row - rowG)*(row - rowG) + (col - colG)*(col - colG);
-      if(d &lt; dgaps[site])
-        dgaps[site] = d;
+if(iter == (disturb_iter+iterperyear)) {
+  cout &lt;&lt; &quot;###   Selective Logging Long Term Damages   ###&quot; &lt;&lt; endl;
+  int site, row, col, siteG, rowG, colG;
+  float deathrate, gaps_deathrate, gaps_hurt, d, dgaps[sites];
+  for(site=0;site&lt;sites;site++)
+    dgaps[site] = rows*rows + cols*cols;
+  for(siteG=0;siteG&lt;sites;siteG++){
+    if(Tfell[0][siteG] == 1){
+      if(T[siteG].t_age == 0){
+        rowG = floor(siteG/cols);
+        colG = siteG-(rowG*cols);
+        for(site=0;site&lt;sites;site++){
+          row = floor(site/cols);
+          col = site-(row*cols);
+          d = (row - rowG)*(row - rowG) + (col - colG)*(col - colG);
+          if(d &lt; dgaps[site])
+            dgaps[site] = d;
+        }
+      }
     }
   }
-}
-for(site=0;site&lt;sites;site++){
-  if(T[site].t_age != 0){
-    gaps_deathrate = -4.441 + 0.762*exp(0.064*sqrt(dgaps[site]));
-    gaps_deathrate = exp(gaps_deathrate) / (1 + exp(gaps_deathrate)); // Allometry representing gaps damages
-    if(_NDD)
-      deathrate = T[site].t_s-&gt;DeathRateNDD(T[site].t_PPFD, T[site].t_dbh, T[site].t_NDDfield[T[site].t_sp_lab]);
-    else
-      deathrate = T[site].t_s-&gt;DeathRate(T[site].t_PPFD, T[site].t_dbh, T[site].t_NPPneg);
-    if(gaps_deathrate &gt; deathrate){
-      gaps_hurt = T[site].t_Tree_Height/(2*(gaps_deathrate - deathrate));
-      T[site].t_hurt += gaps_hurt;
+  for(site=0;site&lt;sites;site++){
+    if(T[site].t_age != 0){
+      gaps_deathrate = -4.441 + 0.762*exp(0.064*sqrt(dgaps[site]));
+      gaps_deathrate = exp(gaps_deathrate) / (1 + exp(gaps_deathrate)); // Allometry representing gaps damages
+      if(_NDD)
+        deathrate = T[site].t_s-&gt;DeathRateNDD(T[site].t_PPFD, T[site].t_dbh, T[site].t_NDDfield[T[site].t_sp_lab]);
+      else
+        deathrate = T[site].t_s-&gt;DeathRate(T[site].t_PPFD, T[site].t_dbh, T[site].t_NPPneg);
+      if(gaps_deathrate &gt; deathrate){
+        gaps_hurt = T[site].t_Tree_Height/(2*(gaps_deathrate - deathrate));
+        T[site].t_hurt += gaps_hurt;
+      }
     }
-  }
-}        
-delete [] Tfell[0];</code></pre>
+  }        
+  delete [] Tfell[0];
+}</code></pre>
 <p>Code 9: Gap damages module.</p>
 </div>
 </div>
