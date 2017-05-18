@@ -1,0 +1,74 @@
+---
+output: 
+  pdf_document:
+    citation_package: natbib
+    fig_caption: true
+    latex_engine: pdflatex
+    template: template.tex
+title: "Effet de la biodiversité sur la dynamique de l'écosystème forestier en réponse à la sylviculture (à changer)"
+author: Sylvain SCHMITT
+date: 12 Juin 2017
+place: Kourou
+jury:
+  - name: "Dr Bruno HERAULT"
+    role: "Tuteur de stage"
+  - name: "Titre Prénom NOM"
+    role: "Examinateur"
+  - name: "Titre Prénom NOM"
+    role: "Examinateur"
+  - name: "Dr Stéphane TRAISSAC"
+    role: "Enseignant-référent"
+abstract: "Write your abstract here..."
+resume: "Écrivez votre résumé ici..."
+keywords: "Biodiversity, Disturbance, Selective logging, Modelling, Tropical evergreen forest"
+motscles: "Biodiversité, Perturbation, Coupe sélective, Modélisation, Forêt tropicales humides"
+acknowlegments: "I am grateful to ..."
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 12pt
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r config, message=FALSE, warning=FALSE, include=FALSE}
+rm(list = ls()) ; invisible(gc()) ; set.seed(42)
+library(knitr)
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 6, fig.width = 8,
+  cache = T, cache.lazy = F)
+```
+
+# Introduction
+
+* Introduce why tropical rainforest are such a good study case
+* Define biodiversity 
+* Define ecosystem functionning
+* Define ecosystem services
+* Introduce tropical sylviculture
+* Define selective logging
+* Introduce biodiversity erosion in tropical rainforests ant its impact
+* Introduce Loreau partitionning
+* Introduce the interest of modelling
+* Introduce the idea to look at biodiversity as both a parameter and an output
+
+Tropical rainforests have fascinated ecologists due to their outstanding diversity [@connell_diversity_1978].
+
+Tropical forests are primary ecosystems in terms of biodiversit and carbon storage [@Lewis2004].
+
+High biodiversity from tropical rainforests is the source of many ecosystem functions, which support ecosystem services.
+
+Biodiversity and ecosystem functionning field is emmering [@Loreau2000].
+
+Selective logging is increasing in tropical forests.
+
+Tropical logging accounts for one eight of global timber production [@Blaser2011].
+
+Selective logging represents a major threat to biodiversity [@Gibson2013].
+
+# Material and methods
+
+# Results
+
+# Discussion
+
+# References
