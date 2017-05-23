@@ -105,7 +105,7 @@ _OUTPUT_reduced=0,      /* reduced set of ouput files */
 _OUTPUT_last100=0,      /* output that tracks the last 100 years of the simulation for the whole grid (2D) */
 _OUTPUT_fullLAI=0,      /* output of full final voxel field */
 _OUTPUT_fullFinal=1,	/* output of full final pattern with all tree attributes */
-_FromData=0,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
+_FromData=1,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
 _DISTURBANCE=0,			/* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
 _LOGGING=0;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
 
@@ -2335,26 +2335,36 @@ void InitialiseLogging(fstream& is){
 
 
 void InitialiseFromData(){
-    // prepare data set beforehand: col/x_dim, row/y_dim, dbh_measured, species_label,
+    // prepare data set beforehand: col/x_dim, row/y_dim, dbh_measured, species_label from inventories
+    // or use fullfinal.txt output to load TROLL simulation in its full state
     
     fstream In(inputfile_data, ios::in);                                                // input stream
     float col_data, row_data, dbh_measured, sp_lab_data;                            // values needed for tree initialisation
-    
-    int col_int, row_int, data_read=0, data_initialised=0;                          // diagnostics
+    float dbh_thresh, hmax, dbhmature, height, Crown_Depth, Crown_Radius, ddbh;		// extra values in case of full final use
+    float age, youngLA, matureLA, oldLA, leafarea, dens, litter, hurt;
+    int NPPneg;
+
+    int col_int, row_int, data_read=0, data_initialised=0, fullfinal=0;             // diagnostics
     float height_max=0;                                                             // diagnostics
     
     nblivetrees=0;
     
-    //for (int line=0;line<30;line++) In.getline(buffer,128,'\n');
-    
     cout << "Reading from file " << inputfile_data << "\n";
     
-    In.getline(buffer,256,'\n');                                                    // skip header lines
+    //In.getline(buffer,256,'\n');                                                    // skip header lines
+    string header;
+    getline(In, header);
+    if(header.size() > 100){ // ! DIRTY HACK NEED TO BE IMPROVED ! //
+    	cout << "Full final will be used to load entirely the previous TROLL model." << endl;
+    	fullfinal=1;
+    }
     
     cout << "Header line skipped \n";
     
     while ((In >> col_data >> row_data >> dbh_measured  >> sp_lab_data) && data_read < sites)       // restricting to data sets with a maximum number of values corresponding to no. of sites
     {
+    	if(fullfinal==1)
+    		In >> NPPneg >> dbh_thresh >> hmax >> height >> Crown_Depth >> Crown_Radius >> ddbh >> age >> youngLA >> matureLA >> oldLA >> leafarea >> dens >> litter >> hurt;
         In.getline(buffer, 256, '\n'); // reads additional information into buffer
         
         if((sp_lab_data > 0) && (sp_lab_data <= numesp) && (col_data >= 0) && (col_data < cols) && (row_data >= 0) && (row_data < rows)){
@@ -2363,19 +2373,38 @@ void InitialiseFromData(){
             // cout << "col: " << round(col_data) << " row: " << round(row_data) << " species: " << sp_lab_data << " dbh: " << dbh_measured << " data measured \n";
             
             dbh_measured = 0.001*dbh_measured;          //here given in mm, converting to m
+            
             /*cout << dbh_measured << "\n";*/
             col_int = (int) (col_data+0.5f);            //rounding, works since negatives have been eliminated before
             row_int = (int) (row_data+0.5f);
             
             // immediate tree birth
             
-            if(T[col_int+row_int*cols].t_age==0) T[col_int+row_int*cols].BirthFromData(S,sp_lab_data,col_int+row_int*cols,dbh_measured);
-            
+            if(T[col_int+row_int*cols].t_age==0){
+            	T[col_int+row_int*cols].BirthFromData(S,sp_lab_data,col_int+row_int*cols,dbh_measured);
+            	if(fullfinal==1){ // adding full final extra information about trees
+            		T[col_int+row_int*cols].t_NPPneg = NPPneg;
+            		T[col_int+row_int*cols].t_dbh_thresh = dbh_thresh;
+            		T[col_int+row_int*cols].t_hmax = hmax;
+            		T[col_int+row_int*cols].t_Tree_Height = height;
+            		T[col_int+row_int*cols].t_Crown_Depth = Crown_Depth;
+            		T[col_int+row_int*cols].t_Crown_Radius = Crown_Radius;
+            		T[col_int+row_int*cols].t_ddbh = ddbh;
+            		// We keeping a reset age to track tree initialised from data for now
+            		// T[col_int+row_int*cols].t_age = age;
+            		// T[col_int+row_int*cols].t_from_Data = 0; // now the age is correct
+            		T[col_int+row_int*cols].t_youngLA = youngLA;
+            		T[col_int+row_int*cols].t_matureLA = matureLA;
+            		T[col_int+row_int*cols].t_oldLA = oldLA;
+            		T[col_int+row_int*cols].t_leafarea = leafarea;
+            		T[col_int+row_int*cols].t_dens = dens;
+            		T[col_int+row_int*cols].t_litter = litter;
+            		T[col_int+row_int*cols].t_hurt = hurt;
+            	}
+            }
             if(height_max<T[col_int+row_int*cols].t_Tree_Height) height_max = T[col_int+row_int*cols].t_Tree_Height;
-            
             // first attempt: simple, only trees with coordinates, only known species
             // other possibilities: not spatially explicit and/or assign species randomnly to trees whose species are not known
-            
             data_initialised++;
         }
         data_read++;
@@ -3428,7 +3457,7 @@ void OutputSnapshotDetail(fstream& output){
 void OutputSnapshotFullFinal(fstream& output){
 	for(int row=0;row<rows;row++)
         for(int col=0;col<cols;col++)
-        	output << col << "\t" << row << "\t" << T[col + cols*row].t_dbh*1000 << "\t" << T[col + cols*row].t_sp_lab <<  "\t" << T[col + cols*row].t_NPPneg << "\t" << "\t" << T[col + cols*row].t_dbh_thresh << "\t" << T[col + cols*row].t_hmax << "\t" << T[col + cols*row].t_Tree_Height << "\t" << T[col + cols*row].t_Crown_Depth << "\t" << T[col + cols*row].t_Crown_Radius << "\t" << T[col + cols*row].t_ddbh << "\t" << T[col + cols*row].t_age << "\t" << T[col + cols*row].t_youngLA << "\t" << T[col + cols*row].t_matureLA << "\t" << T[col + cols*row].t_oldLA << "\t" << T[col + cols*row].t_leafarea << "\t" << T[col + cols*row].t_dens << "\t" << T[col + cols*row].t_litter << "\t" << T[col + cols*row].t_hurt << endl;
+        	output << col << "\t" << row << "\t" << T[col + cols*row].t_dbh << "\t" << T[col + cols*row].t_sp_lab <<  "\t" << T[col + cols*row].t_NPPneg << "\t" << "\t" << T[col + cols*row].t_dbh_thresh << "\t" << T[col + cols*row].t_hmax << "\t" << T[col + cols*row].t_Tree_Height << "\t" << T[col + cols*row].t_Crown_Depth << "\t" << T[col + cols*row].t_Crown_Radius << "\t" << T[col + cols*row].t_ddbh << "\t" << T[col + cols*row].t_age << "\t" << T[col + cols*row].t_youngLA << "\t" << T[col + cols*row].t_matureLA << "\t" << T[col + cols*row].t_oldLA << "\t" << T[col + cols*row].t_leafarea << "\t" << T[col + cols*row].t_dens << "\t" << T[col + cols*row].t_litter << "\t" << T[col + cols*row].t_hurt << endl;
 }
 /* Basic BirthFromData: col, row, dbh_measured (in mm), species_label
 /* Tree attributes added: NPPneg, dbh_thresh, hmax, dbhmature, Tree_Height, Crown_Depth, Crown_Radius, ddbh, age, youngLA, matureLA, oldLA, leafarea, dens, litter, hurt
