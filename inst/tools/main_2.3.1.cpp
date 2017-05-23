@@ -107,7 +107,7 @@ _OUTPUT_fullLAI=0,      /* output of full final voxel field */
 _OUTPUT_fullFinal=1,	/* output of full final pattern with all tree attributes */
 _FromData=1,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
 _DISTURBANCE=0,			/* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
-_LOGGING=0;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
+_LOGGING=1;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
 
 
 /********************************/
@@ -251,7 +251,7 @@ m1;                 /* deathrate-wsg slope -- new v.2.2 */
 
 float **LAI3D(0);   /* leaf density (per volume unit) */
 unsigned short *Thurt[3];            /* Treefall field */
-unsigned short *Tfell[1];            /* Felling tree field */
+unsigned short *Tlogging[3];            /* Logging tree field (0 for logged, 1 for tracks, 2 for gap damages)*/
 
 int    *SPECIES_GERM (0);
 float  *PROB_S (0); /* _SEEDTRADEOFF */
@@ -314,6 +314,19 @@ OutputField(void),
 FreeMem(void),
 Disturbance(void),					// _DISTURBANCE
 SelectiveLogging(void);				// _LOGGING
+
+/******************************************/
+/* Selective logging routines (_LOGGING) */
+/****************************************/
+
+void
+Designate(),
+Select(void),
+Rot(void),
+Fell(void),
+MainTracks(void),
+SecondaryTracks(void),
+GapDamages(void);
 
 /**********************/
 /** Output routines ***/
@@ -419,8 +432,8 @@ public:
    	/* species logging parameters */
 	bool s_harvestable;		/*is the species in the list of harvestable species*/
 	float s_dbhmin,			/*minimum harvestable diameter*/
-	s_dbhmax,				/*maximum harvestable diameter*/
-	s_interest;				/*species interest to filter harvested trees in designated trees*/
+	s_dbhmax;				/*maximum harvestable diameter*/
+	int s_interest;				/*species interest to filter harvested trees in designated trees*/
     
     Species() {
         s_nbind=0;
@@ -1543,22 +1556,22 @@ int Tree::Couple() {
 
 
 void Tree::FellTree() {
-    int xx,yy;
-    float t_angle = float(twoPi*genrand2()); // random angle
-    int row0,col0,h_int, r_int;
-    float h_true = t_Tree_Height*LV;
+
+	float t_angle = float(twoPi*genrand2()); // random angle
+	float h_true = t_Tree_Height*LV;
+    int xx, yy, row0, col0, r_int, h_int=int(h_true*NH);    
+
     if(t_dbh*LH>0.1) nbTreefall10++;
     Thurt[0][t_site+sites] = int(t_Tree_Height); // Thurt[0] saves the integer tree height, here exactly at the place where the tree fell...
-    Tfell[0][t_site] = 1;
+    Tlogging[2][t_site] = 1;
     row0=t_site/cols;       /* fallen stem destructs other trees */
     col0=t_site%cols;
-    h_int = int(h_true*NH);
     for(int h=1;h<h_int;h++) { // loop on the fallen stem (horizontally)
         xx=int(flor(col0+h*cos(t_angle))); // get projection in col (= xx) direction, where xx is absolute location
         if(xx<cols){
             yy=int(row0+h*sin(t_angle)); // get projection in row (= yy) direction, where yy is absolute location
             Thurt[0][xx+(yy+rows)*cols] = int(t_Tree_Height); // Thurt[0] where the stem fell, calculation: xx+(yy+rows)*cols= xx + yy*cols + rows*cols = xx + yy*cols + sites
-            Tfell[0][xx+yy*cols] = 1; // Tfell[0] is used to represent gaps for gaps damages modelling
+            if(xx<cols && yy<rows) Tlogging[2][xx+yy*cols] = 1; // Tfell[0] is used to represent gaps for gaps damages modelling
         }
     }
     xx=col0+int((h_true*NH-t_Crown_Radius)*cos(t_angle)); // where crown ends/starts fallen crown destructs other trees */
@@ -1568,7 +1581,7 @@ void Tree::FellTree() {
         for(int row=yy-r_int;row<yy+r_int+1;row++) {
             if((col-xx)*(col-xx)+(row-yy)*(row-yy)<r_int*r_int) {
             	Thurt[0][col+(row+rows)*cols] = int((t_Tree_Height-t_Crown_Radius*NV*LH)*0.5);
-            	Tfell[0][xx+yy*cols] = 1;
+            	if(xx<cols && yy<rows) Tlogging[2][xx+yy*cols] = 1;
             }
         }
     }
@@ -2315,8 +2328,8 @@ void Initialise() {
 void InitialiseLogging(fstream& is){
 
 	char name[256];
-	int sp;
-	float dbhmin, dbhmax, interest;
+	int sp, interest;
+	float dbhmin, dbhmax;
 	
     /*** Read parameters ***/
     is  >> name >> sp >> dbhmin >> dbhmax >> interest;
@@ -2494,8 +2507,12 @@ void AllocMem() {
     for(i=1;i<3;i++)
         if (NULL==(Thurt[i]=new unsigned short[sites]))
             cerr<<"!!! Mem_Alloc\n";
-    if(_LOGGING)
-		if (NULL==(Tfell[0]=new unsigned short[sites]))									/* Field for felled tree */
+    if(_LOGGING)													/* global variable for logging module erased after use */
+    	if (NULL==(Tlogging[0]=new unsigned short[sites]))			/* Field for tree felling */
+            cerr<<"!!! Mem_Alloc\n";
+        if (NULL==(Tlogging[1]=new unsigned short[sites]))			/* Field for loging tracks */
+            cerr<<"!!! Mem_Alloc\n";
+		if (NULL==(Tlogging[2]=new unsigned short[sites]))			/* Field for gap damages */
             cerr<<"!!! Mem_Alloc\n";
     
 #ifdef DCELL
@@ -2612,248 +2629,334 @@ void SelectiveLogging() {
 
     if(iter == disturb_iter) {
 
-    	cout << "###   Selective Logging   ###" << endl;
-        int site, col, row, sp, designated;
-        int status[sites];
-        float volume=designated_volume*2;
-
-        /* DESIGNATION */
-        while(volume > designated_volume*1.05){
-        	volume=0.0;
-        	designated=0;
-        	for(site=0;site<sites;site++){
-        		if(T[site].t_age > 0										/*alive tree*/
-        			&& S[T[site].t_sp_lab].s_harvestable 					/*harvestable species*/
-        			&& T[site].t_dbh >= S[T[site].t_sp_lab].s_dbhmin		/*reached minimum dbh*/
-        			&& T[site].t_dbh <= S[T[site].t_sp_lab].s_dbhmax){		/*under maximum dbh*/
-        			status[site]=1;
-        			volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
-        			designated++;
-        		} else {
-        			status[site]=0;
-        		}
-        	}	
-        	if(volume > designated_volume){
-        		for(sp=1;sp<=numesp;sp++) {
-        			if(S[sp].s_harvestable){
-        				S[sp].s_dbhmin += 0.01;
-        			}
-    			}
-        	}
-        }
-        cout << designated << " trees have been designated, representing " << volume << " m3." << endl;
-        sp=1;
-        while(!S[sp].s_harvestable)
-        	sp++;
-        cout << "dbh min is now " << S[sp].s_dbhmin << endl;
-
-        /* SELECTION */
-        int rank=0, individuals=0;
-        if(volume <= harvested_volume)
-        	cout << "All designated trees will be harvested." << endl;
-        if(volume >= harvested_volume){
-        	for(site=0;site<sites;site++)
-        		if(status[site]==1 && S[T[site].t_sp_lab].s_interest > rank)
-        			rank = S[T[site].t_sp_lab].s_interest;
-        	while(volume >= harvested_volume){
-        		site=floor(genrand2()*sites);
-        		if(status[site]==1 && S[T[site].t_sp_lab].s_interest==rank){
-        			status[site]=0;
-        			individuals++;
-        			volume -= -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
-        		}
-        	}
-        	cout << individuals << " trees have been unselected, volume is now of " << volume << " m3." << endl;
-        }
-
-        /* ROTTEN */
-        float protten;
-        volume=0.0;
-        individuals=0;
-        for(site=0;site<sites;site++){
-        	if(status[site]==1){
-        		protten = 1 / (1 + exp(-(-5.151 + 0.042*T[site].t_dbh*100))); /*Probability to be rotten*/
-        		if(genrand2() < protten){
-        			status[site]=0;
-        			individuals++;
-            		volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
-        		}
-        	}
-        } 
-        cout << individuals << " trees are rotten, representing " << volume << " m3." << endl;
-
-        /* FELLING */
-        for(site=0;site<sites;site++)
-          	Tfell[0][site] = 0;
-        individuals=0;
-        volume=0.0;
-        for(site=0;site<sites;site++){
-        	if(status[site]==1){
-        		row = floor(site/cols);
-        		col = site-(row*cols);
-        		output[36] << "L" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
-            	T[site].FellTree();
-            	individuals ++;
-            	volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
-        	}
-        } // !! ISSUE WITH THE VOLUME !!
-        cout << individuals << " trees have been logged representing " << volume << " m3." << endl;
-
-        /* MAIN TRACK */
-        int MTindividuals=0;
-        int MT[sites];
-        for(site=0;site<sites;site++)
-        	MT[site] = 0;
-        for(row=0;row<(rows/2);row++){
-        	for(col=((cols/2)-3);col<((cols/2)+3);col++){
-        		site = col+row*cols;
-        		MT[site] = 1;
-        		if(T[site].t_age != 0) {
-        			output[36] << "MT" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
-            		T[site].Death();
-            		MTindividuals++;
-        		}
-        	}
+    	int site;
+    	for(site=0;site<sites;site++){
+    		Tlogging[0][site]=0;		// tree felling
+    		Tlogging[1][site]=0;		// tracks
+    		Tlogging[2][site] = 0;			// gaps
     	}
-        cout << MTindividuals << " trees have been killed for the main track." << endl;
 
-        /* SECONDARY TRACK */
-        int load[sites], tracks[sites], ST[sites], STindividuals=0;
-        int site0, row0, col0, siteMT, rowMT, colMT;
-        float d, d0;
-        for(site=0;site<sites;site++){
-        	ST[site] = 0;
+    	cout << "###   Selective Logging   ###" << endl;
+    	Designate();
+    	Select();
+    	Rot();
+    	Fell();
+    	MainTracks();
+    	//SecondaryTracks();
+        cout << "### Selective Logging done ###" << endl;
+    }
+
+    if(iter == (disturb_iter+iterperyear)) {
+    	GapDamages();  
+    	int i;
+    	for (i=0; i<3; i++) delete [] Tlogging[i];	 // free memory
+    }
+}
+
+/********************************/
+/* SelectiveLogging submodules */
+/******************************/
+
+
+void Designate() {
+
+	int site, col, row, sp, sph=0, designated;
+	float volume, dbh_min[numespharvestable], min_dbh_min, max_dbh_max=0.0;
+
+	/* getting species vector of minimum harvestable diameter */
+	for(sp=1;sp<=numesp;sp++)
+		if(S[sp].s_harvestable){
+			dbh_min[sph]=S[sp].s_dbhmin; 
+			sph++;
+			if(S[sp].s_dbhmax > max_dbh_max)
+				max_dbh_max = S[sp].s_dbhmax;
+		}
+
+	/* getting minimum value of minimum harvestable diameter among species*/
+	min_dbh_min = dbh_min[0];
+	for(sph=1;sph<numespharvestable;sph++)
+		if(dbh_min[sph] < min_dbh_min)
+			min_dbh_min = dbh_min[sph];
+
+	/* designating tree, increasing minimum harvestable dbh if needed to br under the objective */
+	for(min_dbh_min; min_dbh_min < max_dbh_max; min_dbh_min += 0.1){
+		volume=0.0;
+		designated=0;
+		for(site=0;site<sites;site++){
+        	if(T[site].t_age > 0										/*alive tree*/
+        		&& S[T[site].t_sp_lab].s_harvestable 					/*harvestable species*/
+        		&& T[site].t_dbh >= S[T[site].t_sp_lab].s_dbhmin		/*reached minimum dbh*/
+        		&& T[site].t_dbh <= S[T[site].t_sp_lab].s_dbhmax){		/*under maximum dbh*/
+        		Tlogging[0][site] = 1;
+        		volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+        		designated++;
+        	}
         }
-        while(individuals > 0){
-        	for(site0=0;site0<sites;site0++){ /*loadings and tracks distance*/
+        if(volume < designated_volume)
+        	break;														/*if the volume is under the objective we can stop */
+        else
+        	for(sp=1;sp<=numesp;sp++)
+        		if(S[sp].s_harvestable)
+        			S[sp].s_dbhmin += 0.01;								/*if the volume is greater than the objective we need to derease minimum harvestable diameter for all species */
+	}
+
+	cout << designated << " trees have been designated, representing " << volume << " m3." << endl;
+    cout << "dbh min is now " << min_dbh_min << endl;
+}        
+        
+
+void Select() {
+	
+	int site, sp, i, rank, rankmax=0, unselected=0;
+	float volume=0.0;
+
+	/* Calculating designated volume */
+	for(site=0;site<sites;site++) 
+		if(Tlogging[0][site] == 1)
+			volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+    
+	if(volume <= harvested_volume)
+        cout << "All designated trees will be harvested." << endl;
+
+	if(volume > harvested_volume){
+
+		/* determining maximal interest rank (leat valuable species) */
+		for(sp=1;sp<=numesp;sp++)
+        	if(S[sp].s_interest > rankmax)
+        		rankmax = S[sp].s_interest;	
+
+        /* determining determining headcount for each rank */
+        int rank_nb[rankmax];
+        for(rank=0;rank<rankmax;rank++) rank_nb[rank]=0;
+        for(site=0;site<sites;site++)
+        	if(S[sp].s_harvestable)
+        		rank_nb[S[T[site].t_sp_lab].s_interest]++;
+
+        /* removing tree untill wanted volume is reached starting by highest rank */
+        for(rank=rankmax-1;rank>=0;rank--){
+        	while(rank_nb[rank]>0){
+        		site=floor(genrand2()*sites);
+        		if(Tlogging[0][site]==1 && S[T[site].t_sp_lab].s_interest==rank){
+        			Tlogging[0][site]=0;
+        			rank_nb[rank]--;
+        			unselected++;
+        			volume -= -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+        			if(volume <= harvested_volume) break;
+        		}
+        	}
+        	if(volume <= harvested_volume) break;
+        }
+
+        cout << unselected << " trees have been unselected, volume is now of " << volume << " m3." << endl;
+	}
+}
+
+
+void Rot() {
+
+	int site, rotten=0;
+	float protten, volume=0.0;
+
+	/* Calculating selected volume */
+	for(site=0;site<sites;site++) 
+		if(Tlogging[0][site] == 1)
+			volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+
+	/* evaluates each tree probability to be rotten, and remove it if randomly in the risk to be rotten*/
+    for(site=0;site<sites;site++){
+       	if(Tlogging[0][site]==1){
+       		protten = 1 / (1 + exp(-(-5.151 + 0.042*T[site].t_dbh*100))); /*Probability to be rotten*/
+       		if(genrand2() < protten){
+       			Tlogging[0][site]=0;
+       			rotten++;
+           		volume -= -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+       		}
+       	}
+       } 
+    cout << rotten << " trees are rotten, volume is now of " << volume << " m3." << endl;
+}
+
+
+void Fell() {
+
+	int site, row, col, felled=0;
+	float volume=0.0;
+
+	/* fell the selected tree not rotten */
+    for(site=0;site<sites;site++){
+        if(Tlogging[0][site]==1){
+        	row = floor(site/cols);
+        	col = site-(row*cols);
+        	volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+        	output[36] << "L" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+           	T[site].FellTree();
+           	felled ++;
+        }
+    } 
+    cout << felled << " trees have been felled representing " << volume << " m3." << endl;
+}
+
+
+void MainTracks() {
+
+    int site, row, col, individuals=0;
+    float volume=0.0;
+           
+    for(row=0;row<(rows/2);row++){
+        for(col=((cols/2)-3);col<((cols/2)+3);col++){
+        	site = col+row*cols;
+        	Tlogging[1][site] = 1;
+        	if(T[site].t_age != 0) {
+        		volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
+        		output[36] << "MT" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
+            	T[site].Death();
+            	individuals++;
+        	}
+       	}
+    }    
+    cout << individuals << " trees have been killed for the main track representing " << volume << " m3." << endl;
+}
+
+
+void SecondaryTracks() {
+
+	    int load[sites], tracks[sites], individuals=0, felt=0;
+        int site, col, row, site0, row0, col0, siteT, rowT, colT;
+        float d, d0, volume=0.0;
+
+        /* Counting number of felt trees to skid */
+        for(site=0;site<sites;site++) felt += Tlogging[0][site];
+        
+        while(felt > 0){
+
+        	/*Computing loadings and tracks distance for each tree*/
+        	for(site0=0;site0<sites;site0++){ 
         		load[site0]=0;
         		tracks[site0]=rows*rows + cols*cols;
         		row0 = floor(site0/cols);
         		col0 = site0-(row0*cols);
         		for(site=0;site<sites;site++){
-        			if(status[site]==1 || MT[site]==1){
+        			if(Tlogging[0][site]==1 || Tlogging[1][site]==1){ // compute distance if the site is a felt tree or a track
         				row = floor(site/cols);
         				col = site-(row*cols);
         				d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
-        				if(status[site]==1 && d <= (30*30))
+        				if(Tlogging[0][site]==1 && d <= (30*30)) // site can evacuate the tree if is at a distance smaller than 30 meters
         					load[site0]++;
-        				if(MT[site]==1 && d < tracks[site0])
+        				if(Tlogging[1][site]==1 && d < tracks[site0]) // save the track distance if it's closest than the previously saved one
         					tracks[site0]=d;
         			}
         		}
         	}
+
+        	/*Seeking the best place to start the secondary track*/
         	site0=0;
-        	for(site=0;site<sites;site++){ /*best candidate*/
-        		if(load[site]>load[site0])
+        	for(site=0;site<sites;site++){
+        		if(load[site]>load[site0]) // best candidate is the one which can evacuate maximum number of trees
         			site0=site;
-        		if(load[site]==load[site0] && tracks[site]<tracks[site0])
+        		if(load[site]==load[site0] && tracks[site]<tracks[site0]) // for equal loadings, best candidate is the one with a minimum distance to join an existing track
         			site0=site;
         	}	
+
+        	/*Seeking for the closest track*/
         	row0 = floor(site0/cols);
         	col0 = site0-(row0*cols);
-        	d0 = rows*rows+cols*cols; /* closest MT*/
+        	d0 = rows*rows+cols*cols;
         	for(site=0;site<sites;site++){
-        		if(MT[site]==1){
-        			rowMT = floor(site/cols);
-        			colMT = site-(rowMT*cols);
-        			d = (row0 - rowMT)*(row0 - rowMT) + (col0 - colMT)*(col0 - colMT);
-        			if(d<d0){
-        				siteMT=site;
+        		if(Tlogging[1][site]==1){ // if it's a track compute distance to the track
+        			rowT = floor(site/cols);
+        			colT = site-(rowT*cols);
+        			d = (row0 - rowT)*(row0 - rowT) + (col0 - colT)*(col0 - colT);
+        			if(d<d0){ // if the track is closer than the previously saved one, keep the location
+        				siteT=site;
         				d0=d;
         			}
         		}
         	}
-        	rowMT = floor(siteMT/cols);
-        	colMT = siteMT-(rowMT*cols);
-        	do{ /*trace ST*/
+
+        	/*Trace the secondary track*/
+        	rowT = floor(siteT/cols);
+        	colT = siteT-(rowT*cols);
+        	do{
         		do {
-            		for(int i=-2;i<=2;i++){ /*flag ST*/
+            		for(int i=-2;i<=2;i++){ 
         				for(int j=-2;j<=2;j++){
         					site = (col0+i)+(row0+j)*cols;
-        					if(site>=0 && site<sites){
-        						ST[site]=1; 
-        						MT[site]=1;
-        					}
+        					if(site>=0 && site<sites) Tlogging[1][site]=1; //flag the track with a size of 4 meters
         				}
         			}
-        			for(site=0;site<sites;site++){ /*unflag served trees*/
-        				if(status[site]==1){
+        			for(site=0;site<sites;site++){ 
+        				if(Tlogging[0][site]==1){
         					row = floor(site/cols);
         					col = site-(row*cols);
         					d = (row - row0)*(row - row0) + (col - col0)*(col - col0);
-        					if(d <= (33*33)){
-        						status[site]=0;
-        						individuals--;
+        					if(d <= (33*33)){ //unflag served trees in a radius of 30 meters
+        						Tlogging[0][site]=0;
+        						felt--;
         					}
         				}
         			}
-        			if(col0 > colMT)
-        				col0--;
-        			if(col0 < colMT)
-        				col0++;
-        			if(row0 > rowMT)
-        				row0--;
-        			if(row0 < rowMT)
-        				row0++;
-        		} while(row0 != rowMT);
-        	} while(col0 != colMT);
-        	cout << "A secondary track have been traced." << endl;
+        			if(col0 > colT) col0--; //move in direction of the closest existing track
+        			if(col0 < colT) col0++;
+        			if(row0 > rowT) row0--;
+        			if(row0 < rowT) row0++;
+        		} while(row0 != rowT); //stop when we reach the closest existing track
+        	} while(col0 != colT);
+        	cout << "A secondary track have been traced, " << felt << " trees still need to be evacuated." << endl; //!LONG! computation, console output to follow advancement
 		}
-        for(site=0;site<sites;site++){ /*removing trees*/
-        	if(ST[site]==1 && T[site].t_age != 0){
+
+		/* Removing trees on secondary tracks */
+        for(site=0;site<sites;site++){ 
+        	if(Tlogging[1][site] == 1 && T[site].t_age != 0){
         		row = (site/cols);
         		col = site-(row*cols);
+        		volume += -0.0358 + 8.7634*T[site].t_dbh*T[site].t_dbh; /*volume by ONF-2011 in French Guiana - Center (Kourou)*/
         		output[36] << "ST" << "\t" << col << "\t" << row << "\t" << T[site].t_age << "\t" << T[site].t_dbh << "\t" << T[site].t_Tree_Height << "\t" << T[site].t_Crown_Radius << "\t" << T[site].t_Crown_Depth << "\t" << T[site].t_sp_lab << endl;
             	T[site].Death();
-            	STindividuals ++;
+            	individuals ++;
         	}
         }
-        cout << STindividuals << " trees have been killed for secondary tracks." << endl;
-
-
-        cout << "### Selective Logging done ###" << endl;
-    }
-
-    /* GAP DAMAGES */
-    if(iter == (disturb_iter+iterperyear)) {
-    	cout << "###   Selective Logging Long Term Damages   ###" << endl;
-        int site, row, col, siteG, rowG, colG;
-        float deathrate, gaps_deathrate, gaps_hurt, d, dgaps[sites];
-        for(site=0;site<sites;site++)
-          	dgaps[site] = rows*rows + cols*cols;
-        for(siteG=0;siteG<sites;siteG++){
-        	if(Tfell[0][siteG] == 1){
-        		if(T[siteG].t_age > 1){ // New trees could have been recruited over a year
-        			rowG = floor(siteG/cols);
-					colG = siteG-(rowG*cols);
-					for(site=0;site<sites;site++){
-						row = floor(site/cols);
-        				col = site-(row*cols);
-         				d = (row - rowG)*(row - rowG) + (col - colG)*(col - colG);
-         				if(d < dgaps[site])
-         					dgaps[site] = d;
-         			}
-				}
-			}
-        }
-        for(site=0;site<sites;site++){
-        	if(T[site].t_age != 0){
-        		gaps_deathrate = -4.441 + 0.762*exp(0.064*sqrt(dgaps[site]));
-        		gaps_deathrate = exp(gaps_deathrate) / (1 + exp(gaps_deathrate)); // Allometry representing gaps damages
-        		if(_NDD)
-            		deathrate = T[site].t_s->DeathRateNDD(T[site].t_PPFD, T[site].t_dbh, T[site].t_NDDfield[T[site].t_sp_lab]);
-        		else
-            		deathrate = T[site].t_s->DeathRate(T[site].t_PPFD, T[site].t_dbh, T[site].t_NPPneg);
-        		if(gaps_deathrate > deathrate){
-        			gaps_hurt = T[site].t_Tree_Height/(2*(gaps_deathrate - deathrate));
-        			T[site].t_hurt += gaps_hurt;
-        		}
-          	}
-        }        
-        delete [] Tfell[0];
-    }
+    cout << individuals << " trees have been killed for secondary tracks representing " << volume << " m3." << endl;
 }
 
+
+void GapDamages() {
+
+	cout << "###   Selective Logging Long Term Damages   ###" << endl;
+	int site, row, col, siteG, rowG, colG;
+    float deathrate, gaps_deathrate, gaps_hurt, d, dgaps[sites];
+
+    /*Initialise dgaps to maximum distance to a gaps (null effect)*/
+    for(site=0;site<sites;site++) dgaps[site] = rows*rows + cols*cols;
+
+    /*Compute for each tree the distance to the closest gap*/
+    for(siteG=0;siteG<sites;siteG++){
+        if(Tlogging[2][siteG] == 1){
+        	if(T[siteG].t_age > 1){ // New trees could have been recruited over a year
+        		rowG = floor(siteG/cols);
+				colG = siteG-(rowG*cols);
+				for(site=0;site<sites;site++){
+					row = floor(site/cols);
+        			col = site-(row*cols);
+         			d = (row - rowG)*(row - rowG) + (col - colG)*(col - colG);
+         			if(d < dgaps[site])	dgaps[site] = d;
+         		}
+			}
+		}
+    }
+
+    /*Hurt trees depending on their distance to a gaps following an allometry fitted with Paracou data*/
+    for(site=0;site<sites;site++){
+       	if(T[site].t_age != 0){
+       		gaps_deathrate = -4.441 + 0.762*exp(0.064*sqrt(dgaps[site]));
+       		gaps_deathrate = exp(gaps_deathrate) / (1 + exp(gaps_deathrate)); // Allometry representing gaps damages
+       		deathrate = T[site].t_s->DeathRate(T[site].t_PPFD, T[site].t_dbh, T[site].t_NPPneg);
+       		if(gaps_deathrate > deathrate){
+       			gaps_hurt = T[site].t_Tree_Height/(2*(gaps_deathrate - deathrate));
+       			T[site].t_hurt += gaps_hurt;
+       		}
+       	}
+    }        
+}
 
 /*##################################
  ####    Compute field LAI 3D    ###
