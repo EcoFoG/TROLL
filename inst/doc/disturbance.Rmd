@@ -10,6 +10,8 @@ output:
     toc_float: yes
   pdf_document: default
   word_document: default
+# csl: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/csl/mee.csl
+# bibliography: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/library.bib
 csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
 bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
@@ -24,21 +26,20 @@ library(ggplot2)
 library(cowplot)
 library(entropart)
 library(plotly)
+library(readr)
 cores <- 16
 opts_chunk$set(
   echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
     cache = T, cache.lazy = F)
+path <- '~/Documents/ECOFOG/Results/disturbance/'
 ```
 
 Built with `RconTroll` package version `r packageVersion('RconTroll')` available at https://gitlab.com/sylvain.schmitt/RconTroll and `TROLL` package version `r packageVersion('TROLL')` available at https://gitlab.com/sylvain.schmitt/TROLL with `r R.Version()$version.string` environment.
 
 # Design of experiment
 
-## Space of experiments
-
 ```{r Sample, include=FALSE}
 # Init
-path <- '~/Documents/ECOFOG/Results/disturbance/'
 set.seed(42)
 n <- 20
 rep <- 10^3
@@ -115,7 +116,91 @@ ggplot(DOE, aes(x = Convexhull, y = Distance, label = Sim)) +
   ylab('Euclidean distance to\nmetacommunity centroïd') ; rm(DOE)
 ```
 
-## Pre-disturbance simulations
+# Mature forest
+
+## Monocultures
+
+```{r mm Sim}
+# # Init
+# seedrain <- 50 # Seedtrain constant to fix
+# dir.create(file.path(path, 'monoculture'))
+# dir.create(file.path(path, 'monoculture/mature'))
+# sim <- sort(unique(unlist(Sel)))
+# invisible(sapply(sim, function(s) dir.create(file.path(path, 'monoculture/mature', s))))
+# species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=TRUE, dec=".", sep="")
+# Sel <- lapply(sim, function(sp){
+#   com <- species[which(species$Name == sp),]
+#   com$Freg <- 1
+#   return(com)
+# })
+# names(Sel) <- sim
+# invisible(sapply(sim, function(s){
+#   init(path = file.path(path, 'monoculture/mature'),
+#        input = paste0(s, '.txt'),
+#        species = Sel[[s]],
+#        numesp = 1,
+#        nbiter = 12*600,
+#        seedrain = seedrain)
+# }))
+# # Bash
+# if('mature.sh' %in% list.files(file.path(path, 'monoculture/mature')))
+#    unlink(file.path(path, 'monoculture/mature', 'mature.sh'))
+# bash <- file(file.path(path, 'monoculture/mature', 'mature.sh'), open = 'a')
+# cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
+# cat(' echo "mature monoculture forest parrallel modelling in TROLL" \n\n',
+#     file = bash, append = TRUE)
+# for(i in seq_len(length(sim))){
+#   command <- paste0('./troll',
+#                     ' -i"', sim[i], '.txt"',
+#                     ' -o./', sim[i], '/', sim[i], ' &\n')
+#   cat(command, file = bash, append = TRUE)
+#   cat(paste0(' echo "', sim[i], ' Done" \n'), file = bash, append = TRUE)
+#   if(i %/% (cores/2) == i/(cores/2))
+#   cat('wait\n', file = bash, append = TRUE)
+# }
+# cat('wait\n', file = bash, append = TRUE)
+# cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
+# close(bash)
+```
+
+```{r mm Results, fig.height=12, fig.width=12}
+# Load stack 
+# mm <- loadStack('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/models/')
+# save(mm, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mm.Rdata')
+
+# Data prep & check
+# datal <- extractData(mm)
+# save(datal, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mmData.Rdata')
+load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mmData.Rdata')
+data <- datal$time
+data <- data[data$time %in% round(data$time),]
+ggplot(data, aes(x = time, y = agb, colour = sim)) +
+    geom_point() + guides(colour = F)
+
+# Functional diversity
+data <- datal$time
+data <- data[data$time > 450,]
+data <- data.frame(apply(data[c('agb','ba','n10','n30')],
+                         2, function(x) tapply(x, data$sim, mean)))
+data <- cbind(data.frame(sim = row.names(data)), data)
+species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt',
+                      header=T, dec=".", sep="",
+                      row.names = 1)[c('LMA', 'wsg', 'dmax', 'hmax')]
+species <- species[row.names(datal$species),]
+data$traits <- apply(species, 1, paste, collapse = ' ')
+data <- cbind(data, species) # ; rm(species, datal)
+
+# Plotly
+g1 <- ggplot(data, aes(x = ba, y = agb, colour = sim, label = traits)) +
+  geom_point() + guides(colour = F)
+g2 <- ggplot(data, aes(x = n10, y = n30, colour = sim, label = traits)) +
+  geom_point() + guides(colour = F)
+g1 ; g2
+
+rm(data, g1, g2)
+```
+
+## Communities
 
 ```{r pd Sim, include=FALSE}
 # # Init
@@ -154,14 +239,14 @@ ggplot(DOE, aes(x = Convexhull, y = Distance, label = Sim)) +
 # cat('wait\n', file = bash, append = TRUE)
 # cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
 # close(bash)
-rm(bash, Sel, seedrain, i, command, species)
+# rm(bash, seedrain, i, command, species)
+rm(Sel)
 ```
 
 ```{r pd Results, fig.height=12, fig.width=12}
 # Load stack
 # mature <- loadStack('~/Documents/ECOFOG/Results/disturbance/maturity/models/')
 # save(mature, file = '~/Documents/ECOFOG/Results/disturbance/maturity/mature.Rdata')
-# load('~/Documents/ECOFOG/Results/disturbance/maturity/mature.Rdata')
 
 # Data prep & check
 # datal <- extractData(mature)
@@ -214,106 +299,110 @@ sapply(c('LMA', 'wsg', 'dmax', 'hmax'), function(trait){
   plot_grid(plotlist = var, labels = c('AGB', 'BA', 'N10', 'N30'))
 }, simplify = F)
 
-rm(data, mature, var)
+rm(data, var)
 ```
 
-## Monoculture simulations
+# Disturbance
 
-```{r mm Sim}
-# # Init
-# seedrain <- 50 # Seedtrain constant to fix
-# dir.create(file.path(path, 'monoculture'))
-# dir.create(file.path(path, 'monoculture/mature'))
-# sim <- sort(unique(unlist(Sel)))
-# invisible(sapply(sim, function(s) dir.create(file.path(path, 'monoculture/mature', s))))
-# species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt', header=TRUE, dec=".", sep="")
-# Sel <- lapply(sim, function(sp){
-#   com <- species[which(species$Name == sp),]
-#   com$Freg <- 1
-#   return(com)
-# })
-# names(Sel) <- sim
+## Monoculture
+
+```{r md Sim, include=FALSE}
+# # Simulations
+# sim <- list.dirs('~/Documents/ECOFOG/Results/disturbance/monoculture/mature//models/', full.names = F)[-1]
+# sim <- c(sapply(dist, function(d) sapply(sim, function(s) paste0(s, '.', d*100))))
+# # Outputs
+# dir.create(file.path(path, 'monoculture', 'disturbance'))
+# invisible(sapply(sim, function(s) dir.create(file.path(path, 'monoculture', 'disturbance', s))))
+# # Inits
 # invisible(sapply(sim, function(s){
-#   init(path = file.path(path, 'monoculture/mature'),
-#        input = paste0(s, '.txt'),
-#        species = Sel[[s]],
-#        numesp = 1,
-#        nbiter = 12*600,
-#        seedrain = seedrain)
+#   doe <- unlist(strsplit(s, '.', fixed = T))
+#   init <- paste0(doe[1],'.txt')
+#   file.copy(from = file.path(path, 'monoculture', 'mature', 'parameters', init),
+#             to  = file.path(path, 'monoculture', 'disturbance', paste0('init_', init)))
+#   }))
+# # Forests
+# load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mm.Rdata')
+# invisible(lapply(mm@layers, function(l){
+#   cat(l@name, '\n')
+#   inventoryFromOutput(l, paste0('forest_', l@name, '.txt'), file.path(path, 'monoculture', 'disturbance'))
 # }))
 # # Bash
-# if('mature.sh' %in% list.files(file.path(path, 'monoculture/mature')))
-#    unlink(file.path(path, 'monoculture/mature', 'mature.sh'))
-# bash <- file(file.path(path, 'monoculture/mature', 'mature.sh'), open = 'a')
+# if('disturbance.sh' %in% list.files(file.path(path, 'monoculture', 'disturbance')))
+#    unlink(file.path(path, 'monoculture', 'disturbance', 'disturbance.sh'))
+# bash <- file(file.path(path, 'monoculture', 'disturbance', 'disturbance.sh'), open = 'a')
 # cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
-# cat(' echo "mature monoculture forest parrallel modelling in TROLL" \n\n',
-#     file = bash, append = TRUE)
+# cat(' echo "disturbance forest parrallel modelling in TROLL" \n\n', file = bash, append = TRUE)
 # for(i in seq_len(length(sim))){
+#   doe <- unlist(strsplit(sim[i], '.', fixed = T))
+#   init <- paste0('init_', doe[1], '.', doe[2])
+#   forest <- paste0('forest_', doe[1], '.', doe[2])
+#   sylviculture <- paste0('sylviculture_', doe[3])
 #   command <- paste0('./troll',
-#                     ' -i"', sim[i], '.txt"',
+#                     ' -i"', init, '.txt"',
+#                     ' -f"', forest, '.txt"',
+#                     ' -s"', sylviculture, '.txt"',
 #                     ' -o./', sim[i], '/', sim[i], ' &\n')
 #   cat(command, file = bash, append = TRUE)
-#   cat(paste0(' echo "', sim[i], ' Done" \n'), file = bash, append = TRUE)
-#   if(i %/% (cores/2) == i/(cores/2))
+#   if(i %/% cores == i/cores)
 #   cat('wait\n', file = bash, append = TRUE)
 # }
 # cat('wait\n', file = bash, append = TRUE)
 # cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
 # close(bash)
+# rm(bash, i, command)
 ```
 
-```{r mm Results, fig.height=12, fig.width=12}
-# Load stack 
-# mm <- loadStack('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/')
-# save(mm, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mm.Rdata')
+## Communities
 
-# Data prep & check
-# datal <- extractData(mm)
-# save(datal, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mmData.Rdata')
-load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mmData.Rdata')
-data <- datal$time
-data <- data[data$time %in% round(data$time),]
-ggplot(data, aes(x = time, y = agb, colour = sim)) +
-    geom_point() + guides(colour = F)
-
-# Functional diversity
-data <- datal$time
-data <- data[data$time > 450,]
-data <- data.frame(apply(data[c('agb','ba','n10','n30')],
-                         2, function(x) tapply(x, data$sim, mean)))
-data <- cbind(data.frame(sim = row.names(data)), data)
-species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt',
-                      header=T, dec=".", sep="",
-                      row.names = 1)[c('LMA', 'wsg', 'dmax', 'hmax')]
-species <- species[row.names(datal$species),]
-data$traits <- apply(species, 1, paste, collapse = ' ')
-data <- cbind(data, species) # ; rm(species, datal)
-
-# Plotly
-g1 <- ggplot(data, aes(x = ba, y = agb, colour = sim, label = traits)) +
-  geom_point() + guides(colour = F)
-g2 <- ggplot(data, aes(x = n10, y = n30, colour = sim, label = traits)) +
-  geom_point() + guides(colour = F)
-g1
-g2
-
-rm(mm, data, g1, g2, p1, p2)
+```{r d Sim, include=FALSE}
+# # Simulations
+# sim <- list.dirs('~/Documents/ECOFOG/Results/disturbance/maturity/models/', full.names = F)[-1]
+# sim <- c(sapply(dist, function(d) sapply(sim, function(s) paste0(s, '.', d*100))))
+# # Outputs
+# dir.create(file.path(path, 'disturbance'))
+# invisible(sapply(sim, function(s) dir.create(file.path(path, 'disturbance', s))))
+# # Inits
+# invisible(sapply(sim, function(s){
+#   doe <- unlist(strsplit(s, '.', fixed = T))
+#   init <- paste0(doe[1], '.', doe[2], '.txt')
+#   file.copy(from = file.path(path, 'maturity', 'parameters', init),
+#             to  = file.path(path, 'disturbance', paste0('init_', init)))}))
+# # Forests
+# load('~/Documents/ECOFOG/Results/disturbance/maturity/mature.Rdata')
+# invisible(lapply(mature@layers, function(l){
+#   cat(l@name, '\n')
+#   try(inventoryFromOutput(l, paste0('forest_', l@name, '.txt'), file.path(path, 'disturbance')))
+# }))
+# Bash
+# if('disturbance.sh' %in% list.files(file.path(path, 'disturbance')))
+#    unlink(file.path(path, 'disturbance', 'disturbance.sh'))
+# bash <- file(file.path(path, 'disturbance', 'disturbance.sh'), open = 'a')
+# cat(' #!/bin/bash  \n\n', file = bash, append = TRUE)
+# cat(' echo "disturbance forest parrallel modelling in TROLL" \n\n', file = bash, append = TRUE)
+# for(i in seq_len(length(sim))){
+#   doe <- unlist(strsplit(sim[i], '.', fixed = T))
+#   init <- paste0('init_', doe[1], '.', doe[2])
+#   forest <- paste0('forest_', doe[1], '.', doe[2])
+#   sylviculture <- paste0('sylviculture_', doe[3])
+#   command <- paste0('./troll',
+#                     ' -i"', init, '.txt"',
+#                     ' -f"', forest, '.txt"',
+#                     ' -s"', sylviculture, '.txt"',
+#                     ' -o./', sim[i], '/', sim[i], ' &\n')
+#   cat(command, file = bash, append = TRUE)
+#   if(i %/% cores == i/cores)
+#   cat('wait\n', file = bash, append = TRUE)
+# }
+# cat('wait\n', file = bash, append = TRUE)
+# cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
+# close(bash)
+# rm(bash, i, command)
 ```
 
-## Still an issue ?
+# Selective logging
 
-```{r Issue}
-# load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/mm.Rdata')
-# m <- mm@layers$Tachigali_bracteolata
-# save(m, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/mature/Tachigali.Rdata')
-load('~/Documents/ECOFOG/Results/disturbance/monoculture/mature/Tachigali.Rdata')
-summaryPlot(m)
-plot(m, what = 'age', ggplot = T)
-plot(m, what = 'dbh', ggplot = T)
-rm(mm)
-```
+## Monoculture
 
-
-## Disturbance simulations
+## Communities
 
 # References

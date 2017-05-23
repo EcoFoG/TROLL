@@ -95,7 +95,7 @@ fstream output[38];
 /* currenly, options are set below, but inclusion in parameter sheet needed (for control from R) */
 
 bool
-_FASTGPP=1,             /* This defines an option to compute only GPP from the topmost value of PPFD and GPP, instead of looping within the crown. Much faster and more accurate */
+_FASTGPP=0,             /* This defines an option to compute only GPP from the topmost value of PPFD and GPP, instead of looping within the crown. Much faster and more accurate */
 _BASICTREEFALL=1,       /* if defined: treefall is a source of tree death (and if TREEFALL not defined, this is modeled through simple comparison between tree height and a threshold t_Ct, if not defined, treefall is not represented as a separated and independent source of death, but instead, all tree death are due to the deathrate value) */
 _TREEFALL=1,            /* computation of the force field if TREEFALL is defined, neighboring trees contribute to fell each tree */
 _DAILYLIGHT=1,          /* if defined: the rate of carbon assimilation integrates an average daily fluctuation of light (thanks to GPPDaily). Should be defined to ensure an appropriate use of Farquhar model */
@@ -103,10 +103,11 @@ _SEEDTRADEOFF=0,        /* if defined: the number of seeds produced by each tree
 _NDD=0,                 /* if defined, negative density dependant processes affect both the probability of seedling recruitment and the local tree death rate. The term of density-dependance is computed as the sum of conspecific tree basal area divided by their distance to the focal tree within a neighbourhood (circle of radius 15m) */
 _OUTPUT_reduced=0,      /* reduced set of ouput files */
 _OUTPUT_last100=0,      /* output that tracks the last 100 years of the simulation for the whole grid (2D) */
-_OUTPUT_fullLAI=0,       /* output of full final voxel field */
-_FromData=1,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
+_OUTPUT_fullLAI=0,      /* output of full final voxel field */
+_OUTPUT_fullFinal=1,	/* output of full final pattern with all tree attributes */
+_FromData=0,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
 _DISTURBANCE=0,			/* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
-_LOGGING=1;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
+_LOGGING=0;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
 
 
 /********************************/
@@ -322,7 +323,8 @@ void
 OutputSnapshot(fstream& output),
 OutputSnapshotDetail(fstream& output),
 OutputSpeciesParameters(fstream& output),
-OutputFullLAI(fstream& output_CHM, fstream& output_LAD);
+OutputFullLAI(fstream& output_CHM, fstream& output_LAD),
+OutputSnapshotFullFinal(fstream& output);
 
 /****************************/
 /* Various inline functions */
@@ -1021,12 +1023,12 @@ void Tree::BirthFromData(Species *S, int nume, int site0, float dbh_measured) {
     }
     
     t_ddbh=0.0;
-    t_dbh_thresh = (t_s->s_dmax);
+    t_dbh_thresh = ((t_s->s_dmax)-t_dbh)*flor(1.0+log(genrand2())*0.01)+t_dbh;
     t_hmax = (t_s->s_hmax);
     
     t_Tree_Height = t_hmax * t_dbh/(t_dbh + (t_s->s_ah));
-    t_Crown_Radius  = 0.80+10.47*t_dbh-3.33*t_dbh*t_dbh;;
-    if (t_Tree_Height<5.0) t_Crown_Depth = 0.133+0.168*t_Tree_Height;
+    t_Crown_Radius  = 0.80+10.47*t_dbh-3.33*t_dbh*t_dbh;
+    if (t_Tree_Height<5.0) t_Crown_Depth = 0.17 + 0.13*t_Tree_Height; 
     else t_Crown_Depth = -0.48+0.26*t_Tree_Height;
     t_dens=dens;
     t_leafarea=t_dens*PI*t_Crown_Radius*LH*t_Crown_Radius*LH*t_Crown_Depth;
@@ -1759,6 +1761,8 @@ int main(int argc,char *argv[]) {
             if(_OUTPUT_fullLAI){
                 OutputFullLAI(output[36],output[37]);               // CHM and LAD patterns
             }
+            if(_OUTPUT_fullFinal)
+            	OutputSnapshotFullFinal(output[37]);				// Full Final Pattern (TROLL save)
         }
     }
     
@@ -2293,6 +2297,11 @@ void Initialise() {
             sprintf(nnn,"%s_%i_LAI3D_avg.txt",buf, easympi_rank);
             output[37].open(nnn, ios::out);
         }
+        if(_OUTPUT_fullFinal){
+        	sprintf(nnn, "%s_%i_fullfinal.txt", buf, easympi_rank);
+        	output[37].open(nnn, ios::out);
+        }
+
     }
     
 
@@ -2667,7 +2676,7 @@ void SelectiveLogging() {
         for(site=0;site<sites;site++)
         	MT[site] = 0;
         for(row=0;row<(rows/2);row++){
-        	for(col=((cols/2)-7);col<((cols/2)+8);col++){
+        	for(col=((cols/2)-3);col<((cols/2)+3);col++){
         		site = col+row*cols;
         		MT[site] = 1;
         		if(T[site].t_age != 0) {
@@ -2785,7 +2794,7 @@ void SelectiveLogging() {
           	dgaps[site] = rows*rows + cols*cols;
         for(siteG=0;siteG<sites;siteG++){
         	if(Tfell[0][siteG] == 1){
-        		if(T[siteG].t_age == 0){
+        		if(T[siteG].t_age > 1){ // New trees could have been recruited over a year
         			rowG = floor(siteG/cols);
 					colG = siteG-(rowG*cols);
 					for(site=0;site<sites;site++){
@@ -3413,6 +3422,16 @@ void OutputSnapshotDetail(fstream& output){
             output << iter << "\t" << col+cols*row << "\t" << col << "\t" << row << "\t" << T[col + cols*row].t_age << "\t" << T[col + cols*row].t_sp_lab << "\t" << T[col + cols*row].t_dbh << "\t" << T[col + cols*row].t_Tree_Height << "\t" << T[col + cols*row].t_Crown_Radius << "\t" << T[col + cols*row].t_Crown_Depth << "\t" << T[col + cols*row].t_leafarea << "\t" << T[col + cols*row].t_dens << "\t" << T[col + cols*row].t_GPP << "\t" << T[col + cols*row].t_hurt << endl;
         }
 }
+
+/* This can be used to take snapshots of the forest with all attributes from each tree, it can be used to save TROLL in its current state to reload it again */
+
+void OutputSnapshotFullFinal(fstream& output){
+	for(int row=0;row<rows;row++)
+        for(int col=0;col<cols;col++)
+        	output << col << "\t" << row << "\t" << T[col + cols*row].t_dbh*1000 << "\t" << T[col + cols*row].t_sp_lab <<  "\t" << T[col + cols*row].t_NPPneg << "\t" << "\t" << T[col + cols*row].t_dbh_thresh << "\t" << T[col + cols*row].t_hmax << "\t" << T[col + cols*row].t_Tree_Height << "\t" << T[col + cols*row].t_Crown_Depth << "\t" << T[col + cols*row].t_Crown_Radius << "\t" << T[col + cols*row].t_ddbh << "\t" << T[col + cols*row].t_age << "\t" << T[col + cols*row].t_youngLA << "\t" << T[col + cols*row].t_matureLA << "\t" << T[col + cols*row].t_oldLA << "\t" << T[col + cols*row].t_leafarea << "\t" << T[col + cols*row].t_dens << "\t" << T[col + cols*row].t_litter << "\t" << T[col + cols*row].t_hurt << endl;
+}
+/* Basic BirthFromData: col, row, dbh_measured (in mm), species_label
+/* Tree attributes added: NPPneg, dbh_thresh, hmax, dbhmature, Tree_Height, Crown_Depth, Crown_Radius, ddbh, age, youngLA, matureLA, oldLA, leafarea, dens, litter, hurt
 
 /* This provides relevant species parameters whenever called */
 
