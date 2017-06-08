@@ -1,32 +1,35 @@
 #' @export
-extractData <- function(stack){
+extractData <- function(stack,
+                        sp = 'Total',
+                        vars = c('agb', 'ba', 'n', 'n10', 'n30',
+                                 'gpp', 'npp', 'Rday', 'Rnight'),
+                        reduce = TRUE){
   
   time <- seq(1,stack@nbiter,1)/stack@iter
-  data <- data.frame(
-    time = rep(time, length(names(stack@layers))),
-    sim = rep(names(stack@layers), each = length(time))
-  )
-  data$agb <- unlist(lapply(stack@layers, function(layer) layer@agb$Total))
-  data$ba <- unlist(lapply(stack@layers, function(layer) layer@ba$ba$Total))
-  data$n10 <- unlist(lapply(stack@layers, function(layer) layer@abundances$abu10$Total))
-  data$n30 <- unlist(lapply(stack@layers, function(layer) layer@abundances$abu30$Total))
+  data <- data.frame(time = rep(time, length(names(stack@layers))),
+                     sim = rep(names(stack@layers), each = length(time)))
   
-  species <- lapply(stack@layers, function(layer){
-    abd <- table(row.names(layer@sp_par)[layer@final_pattern$sp_lab])
-    abd <- abd / sum(abd)
-    abd <- data.frame(row.names = names(abd), abd = as.vector(abd))
-  })
-  spdata <- data.frame(row.names = unique(unlist(lapply(species, row.names))))
-  species <- lapply(species, function(abd){
-    spdata$abd <- 0
-    spdata[row.names(abd),] <- abd$abd
-    return(spdata)
-  })
-  species <- do.call('cbind', species)
-  names(species) <- names(stack@layers)
+  if('agb' %in% vars)
+    data$agb <- unlist(lapply(stack@layers, function(layer) layer@agb[[sp]]))
+  if('ba' %in% vars)
+    data$ba <- unlist(lapply(stack@layers, function(layer) layer@ba$ba[[sp]]))
+  if('n' %in% vars)
+    data$n <- unlist(lapply(stack@layers, function(layer) layer@abundances$abund[[sp]]))
+  if('n10' %in% vars)
+    data$n10 <- unlist(lapply(stack@layers, function(layer) layer@abundances$abu10[[sp]]))
+  if('n30' %in% vars)
+    data$n30 <- unlist(lapply(stack@layers, function(layer) layer@abundances$abu30[[sp]]))
+  if('gpp' %in% vars)
+    data$gpp <- unlist(lapply(stack@layers, function(layer) layer@gpp[[sp]]))
+  if('npp' %in% vars)
+    data$npp <- unlist(lapply(stack@layers, function(layer) layer@npp[[sp]]))
+  if('Rday' %in% vars)
+    data$Rday <- unlist(lapply(stack@layers, function(layer) layer@R$Rday[[sp]]))
+  if('Rnight' %in% vars)
+    data$Rnight <- unlist(lapply(stack@layers, function(layer) layer@R$Rnight[[sp]]))
   
-  return(list(
-    time = data,
-    species = species
-  ))
+  if(reduce)
+    data <- data[data$time %in% round(data$time),]
+  
+  return(data)
 }

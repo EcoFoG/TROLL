@@ -2642,7 +2642,7 @@ void SelectiveLogging() {
     	Rot();
     	Fell();
     	MainTracks();
-    	//SecondaryTracks();
+    	SecondaryTracks();
         cout << "### Selective Logging done ###" << endl;
     }
 
@@ -2946,7 +2946,7 @@ void GapDamages() {
 
     /*Hurt trees depending on their distance to a gaps following an allometry fitted with Paracou data*/
     for(site=0;site<sites;site++){
-       	if(T[site].t_age != 0){
+       	if(T[site].t_age != 0 && T[site].t_dbh > 0.1){ //tree with dbh<10 have not an increased mortality closed to gaps, on the contrary they'll have a tendency 
        		gaps_deathrate = -4.441 + 0.762*exp(0.064*sqrt(dgaps[site]));
        		gaps_deathrate = exp(gaps_deathrate) / (1 + exp(gaps_deathrate)); // Allometry representing gaps damages
        		deathrate = T[site].t_s->DeathRate(T[site].t_PPFD, T[site].t_dbh, T[site].t_NPPneg);

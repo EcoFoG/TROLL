@@ -1,0 +1,244 @@
+---
+title: "Disturbance"
+author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
+date: '`r Sys.Date()`'
+output:
+  html_document: 
+    theme: journal
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+  pdf_document: default
+  word_document: default
+# csl: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/csl/mee.csl
+# bibliography: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/library.bib
+csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+bibliography: /home/sylvain/Documents/Bibliography/library.bib
+---
+
+```{r config, message=FALSE, warning=FALSE, include=FALSE}
+rm(list = ls()) ; invisible(gc())
+library(knitr)
+library(parallel)
+library(TROLL)
+library(RconTroll)
+library(ggplot2)
+library(cowplot)
+library(entropart)
+library(plotly)
+library(readr)
+library(dplyr)
+library(reshape2)
+opts_chunk$set(
+  echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
+    cache = T, cache.lazy = F)
+path <- '~/Documents/ECOFOG/Results/disturbance/disturbance/data'
+```
+
+```{r functions}
+cbind.all <- function(x, y) {
+    x.diff <- setdiff(row.names(x), row.names(y))
+    y.diff <- setdiff(row.names(y), row.names(x))
+    x[c(as.character(y.diff)),] <- 0
+    y[c(as.character(x.diff)),] <- 0
+    rownames <- row.names(x)
+    x <- x[order(row.names(x)),]
+    y <- y[order(row.names(y)),]
+    data <- data.frame(cbind(x, y))
+    row.names(data) <- rownames
+    return(data)
+}
+```
+
+# Data preparation
+
+```{r DOE}
+rich <- c(5,25,125)
+cvh <- 1:20
+dist <- c(0,25,50,75)
+# doe <- data.frame(
+#   sim = c(sapply(c(sapply(rich,
+#                            function(x) paste0(x, '.', cvh))),
+#                   function(y) paste0(y, '.', dist))))
+# doe <- cbind(doe, do.call('rbind', sapply(doe$sim, function(x)
+#   strsplit(as.character(x), '.', fixed = T))))
+# names(doe)[2:4] <- c('richness', 'cvh', 'disturbance')
+# mature <- loadStack('~/Documents/ECOFOG/Results/disturbance/maturity/models/')
+# save(mature, file = '~/Documents/ECOFOG/Results/disturbance/maturity/mature.Rdata')
+# load('~/Documents/ECOFOG/Results/disturbance/maturity/mature.Rdata')
+# species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt',
+#                       header=T, dec=".", sep="",
+#                       row.names = 1)[c('LMA', 'wsg', 'dmax', 'hmax')]
+# abund <- lapply(mature@layers, function(layer) tail(layer@abundances$abund, 1))
+# abund <- lapply(abund, function(layer)
+#   do.call('rbind', apply(layer, 2, function(x) x/ layer['Total'])))
+# abund <- lapply(abund, function(layer) data.frame(t(layer)))
+# names <- names(abund)
+# abund <- data.frame(plyr::rbind.fill(abund))
+# abund <- abund[-which(colnames(abund) == 'Total')]
+# row.names(abund) <- names ; rm(names)
+# species <- species[colnames(abund),]
+# fd <- FD::dbFD(species, abund)
+# fd <- cbind(fd$FRic, fd$FEve, fd$FDiv, fd$FDis, fd$RaoQ, fd$CWM)
+# names(fd) <- c('FRic', 'FEve', 'FDiv', 'FDis', 'RaoQ',
+#                paste0('CWM.', c('LMA', 'wsg', 'dmax', 'hmax')))
+# fd <- fd[apply(doe[c('richness', 'cvh')], 1, function(x) paste0(x[1], '.', x[2])),]
+# doe <- cbind(doe, fd) ; rm(fd)
+# row.names(doe) <- doe$sim
+# save(doe, file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceDOE.Rdata')
+load(file.path(path, 'disturbanceDOE.Rdata'))
+rm(cbind.all)
+```
+
+
+```{r Communities}
+# disturbance <- loadStack('~/Documents/ECOFOG/Results/disturbance/disturbance/models/')
+# save(disturbance, 
+     # file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbance.Rdata')
+# ecosystem <- extractData(disturbance)
+# save(ecosystem, file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceData.Rdata')
+load(file.path(path, 'disturbanceData.Rdata'))
+# data <- ecosystem
+# sim <- c(sapply(rich, function(r) paste0(r, '.', cvh)))
+# time <- unique(data$time)
+# resilience <- sapply(sim, function(s){
+#   data_s <- data[which(data$sim %in% paste0(s, '.', dist)),]
+#   data_s <- sapply(time, function(t){
+#     data_t <- subset(data_s, time == t)
+#     T0 <- which(data_t$sim == paste0(s, '.0'))
+#     data_t[-c(1:2)] <- apply(data_t[-c(1:2)], 2, function(x) x/x[T0])
+#     return(data_t[-T0,])
+#   }, simplify = F)
+#   data_s <- do.call('rbind', data_s)
+# }, simplify = F) ; rm(sim, time)
+# resilience <- do.call('rbind', resilience)
+# save(resilience, file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceResilience.Rdata')
+load(file.path(path, 'disturbanceResilience.Rdata'))
+```
+
+```{r Deq}
+deq <- data.frame(
+  time = resilience$time,
+  sim = resilience$sim,
+  structure = apply(resilience[c('agb', 'ba', 'n', 'n10', 'n30')], 1, 
+                  function(x) sqrt(sum((rep(1, length(x)) - x)^2))),
+  production = apply(resilience[c('gpp', 'npp', 'Rday', 'Rnight')], 1, 
+                  function(x) sqrt(sum((rep(1, length(x)) - x)^2)))
+)
+# g1 <- ggplot(subset(deq, sim %in% paste0('25.5', c('.0', '.25', '.50', '.75'))), 
+#        aes(x = time, y = structure, color = sim)) + 
+#   geom_point() + geom_line() + ylab('distance to structure equilibrium') 
+# g2 <- ggplot(subset(deq, sim %in% paste0('25.5', c('.0', '.25', '.50', '.75'))), 
+#        aes(x = time, y = production, color = sim)) + 
+#   geom_point() + geom_line() + ylab('distance to production equilibrium') 
+# cowplot::plot_grid(g1, g2)
+```
+
+```{r Ieq}
+sim <- c(sapply(c(sapply(rich, function(r) paste0(r, '.', cvh))), function(x) paste0(x, '.', dist[-1])))
+Ieq <- sapply(sim, function(s){
+  data_s <- subset(deq, sim ==s)
+  return(cbind(data_s[c(1,2)], cumsum(data_s[-c(1,2)])))
+}, simplify = F) ; rm(sim)
+Ieq <- data.frame(do.call('rbind', Ieq))
+names(Ieq)[3:4] <- paste0('Ieq.', names(Ieq)[3:4])
+
+# Graphical analysis
+data <- Ieq %>% 
+  left_join(., doe, by = 'sim') %>% 
+  filter(time == 600) 
+# vars <- c('richness', 'FRic', 'FEve', 'FDiv', 'CWM.LMA', 'CWM.wsg')
+# g1 <- sapply(vars, function(var)
+#   ggplot(data, aes_string(x = var, y = 'Ieq.structure')) + 
+#   geom_point() +
+#   facet_wrap(~disturbance, scales = "free"), simplify = F)
+# g2 <- sapply(vars, function(var)
+#   ggplot(data, aes_string(x = var, y = 'Ieq.production')) + 
+#   geom_point() +
+#   facet_wrap(~disturbance, scales = "free"), simplify = F)
+# g.prod <- ggplot(data, aes(x = FDiv, y = Ieq.production, label = sim,
+#                        shape = richness, color = FEve)) +
+# geom_point() +
+# facet_wrap(~disturbance, scales = "free")
+g <- ggplot(data, aes(x = FDiv, y = Ieq.structure, label = sim)) + 
+  geom_smooth(method = 'lm', alpha = 0.3, colour= 'grey') +
+  geom_point(aes(shape = richness, color = FEve)) +
+  facet_wrap(~disturbance, scales = "free", labeller = 'label_both') + 
+  xlab('Functional diversity (FDiv)') +
+  ylab('Cummulative integral from ecosystem 
+       distance to equilibrium after 600 years') +
+  scale_shape_discrete('Species\nrichness\n(SR)') +
+  scale_color_continuous('Functional\neveness\n(FEve)')
+
+```
+
+
+
+```{r BE}
+## Biodiversity Net Effect ##
+# mature <- loadStack('~/Documents/ECOFOG/Results/disturbance/maturity/models/')
+# save(mature, file = '~/Documents/ECOFOG/Results/disturbance/maturity/mature.Rdata')
+# load(file = '~/Documents/ECOFOG/Results/disturbance/maturity/mature.Rdata')
+# disturbance <- loadStack('~/Documents/ECOFOG/Results/disturbance/disturbance/models/')
+# save(disturbance, 
+# file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbance.Rdata')
+# load('~/Documents/ECOFOG/Results/disturbance/disturbance/disturbance.Rdata')
+# md <- loadStack('~/Documents/ECOFOG/Results/disturbance/monoculture/disturbance/models/')
+# save(md, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/disturbance/md.Rdata')
+# load('~/Documents/ECOFOG/Results/disturbance/monoculture/disturbance/md.Rdata')
+# BE <- lapply(disturbance@layers, function(layer) 
+#   {cat(layer@name, '\n') ; return(getBE(layer, mature, md))})
+# BE <- do.call('rbind', BE)
+# save(BE,
+# file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceBE.Rdata')
+load(file.path(path, 'disturbanceBE.Rdata'))
+
+# g <- BE %>%
+#   left_join(., doe, by = 'sim') %>%
+#   filter(richness == 25) %>%
+#   filter(cvh == 10) %>%
+#   ggplot(aes(x = time, y = gpp, color = BE)) +
+#   facet_wrap(~ disturbance) +
+#   geom_hline(yintercept = 0, col = 'red') +
+#   geom_point()
+```
+
+```{r BEresilience}
+# sim <- c(sapply(rich, function(r) paste0(r, '.', cvh)))
+# time <- unique(BE$time)
+# be <- c('NE', 'CE', 'SE')
+# BEresilience <- sapply(sim, function(s){
+#   cat(s, '\n')
+#   data_s <- BE[which(BE$sim %in% paste0(s, '.', dist)),]
+#   data_s <- sapply(time, function(t){
+#     data_t <- subset(data_s, time == t)
+#     T0 <- which(data_t$sim == paste0(s, '.0'))
+#     T0_NE <- which(data_t[T0,]$BE == "NE")
+#     data_t[-c(1:3)] <- apply(data_t[-c(1:3)], 2, function(x) x/x[T0_NE])
+#     return(data_t[-T0,])
+#   }, simplify = F)
+#   data_s <- do.call('rbind', data_s)
+# }, simplify = F) ; rm(sim, time, BE)
+# BEresilience <- do.call('rbind', BEresilience)
+# save(BEresilience,
+# file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceBErecovery.Rdata')
+load(file.path(path, 'disturbanceBErecovery.Rdata'))
+
+g <- BEresilience %>% 
+  left_join(., doe, by = 'sim') %>%
+  filter(richness == 125) %>% 
+  filter(BE %in% c('SE', 'CE')) %>% 
+  group_by(time, BE, disturbance, richness) %>%
+  summarise(qt1 =quantile(agb, probs=0.05),
+            qt2 =quantile(agb, probs=0.75),
+            mean=mean(agb),
+            n=n()) %>% 
+  ggplot(aes(x = time)) +
+  geom_hline(yintercept = 1, color = 'red') +
+  geom_ribbon(aes(ymin = qt1, ymax = qt2, fill = BE), alpha = 0.3) +
+  geom_line(aes(y = mean, color = BE)) +
+  facet_grid(richness ~ disturbance, labeller = 'label_both')
+```
+
+
+# References

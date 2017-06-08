@@ -1,5 +1,5 @@
 ---
-title: "Disturbance"
+title: "Disturbance simulations"
 author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
 date: '`r Sys.Date()`'
 output:
@@ -10,10 +10,10 @@ output:
     toc_float: yes
   pdf_document: default
   word_document: default
-# csl: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/csl/mee.csl
-# bibliography: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/library.bib
-csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
-bibliography: /home/sylvain/Documents/Bibliography/library.bib
+csl: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/csl/mee.csl
+bibliography: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/library.bib
+# csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
+# bibliography: /home/sylvain/Documents/Bibliography/library.bib
 ---
 
 ```{r config, message=FALSE, warning=FALSE, include=FALSE}
@@ -49,6 +49,7 @@ rich <- 5^(1:3)
 # species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt',
 #                       header=TRUE, dec=".", sep="",
 #                       row.names = 1)[c('LMA', 'wsg', 'hmax', 'dmax')]
+# species <- species[-which(row.names(species) == "Tachigali_bracteolata"),]
 # proba <- ks::kde(scale(species), eval.points = scale(species))$estimate
 # proba <- 1/proba
 # coms <- lapply(as.list(rich), function(r)
@@ -89,8 +90,8 @@ rich <- 5^(1:3)
 sim <- as.vector(sapply(rich, function(r) paste(r, 1:n, sep = '.')))
 # Sel <- unlist(Sel, recursive = F)
 # names(Sel) <- sim ; rm(Scale, CH, Dist, coms)
-# save(Sel, Sample, file = file.path(path, 'SpeciesSel2.Rdata'))
-load(file.path(path, 'SpeciesSel2.Rdata'))
+# save(Sel, Sample, file = file.path(path, 'SpeciesSel3.Rdata'))
+load(file.path(path, 'SpeciesSel3.Rdata'))
 ```
 
 The space of experiments encompass following axes (with their abbreviations and values) :
@@ -209,6 +210,7 @@ rm(data, g1, g2)
 # invisible(sapply(sim, function(s) dir.create(file.path(path, 'maturity', s))))
 # species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt',
 #                       header=TRUE, dec=".", sep="")
+# names(species)[1] <- 'Name'
 # Sel <- lapply(Sel, function(com){
 #   com <- species[which(species$Name %in% com),]
 #   com$Freg <- 1/dim(com)[1]
@@ -299,7 +301,16 @@ sapply(c('LMA', 'wsg', 'dmax', 'hmax'), function(trait){
   plot_grid(plotlist = var, labels = c('AGB', 'BA', 'N10', 'N30'))
 }, simplify = F)
 
-rm(data, var)
+# DOE
+g <- ggplot(data, aes(x = FDis, y = richness, 
+                      label = sim, color = agb/1000)) + 
+  geom_point(size = 3) + 
+  geom_text_repel() +
+  scale_color_continuous("Aboveground\nBiomass\n(AGB, ton C/ha)") +
+  xlab("Functional dispersion (FDis)") +
+  ylab("Species richness (SR)")
+
+g ; rm(data, var)
 ```
 
 # Disturbance
@@ -334,9 +345,9 @@ rm(data, var)
 # cat(' echo "disturbance forest parrallel modelling in TROLL" \n\n', file = bash, append = TRUE)
 # for(i in seq_len(length(sim))){
 #   doe <- unlist(strsplit(sim[i], '.', fixed = T))
-#   init <- paste0('init_', doe[1], '.', doe[2])
-#   forest <- paste0('forest_', doe[1], '.', doe[2])
-#   sylviculture <- paste0('sylviculture_', doe[3])
+#   init <- paste0('init_', doe[1])
+#   forest <- paste0('forest_', doe[1])
+#   sylviculture <- paste0('sylviculture_', doe[2])
 #   command <- paste0('./troll',
 #                     ' -i"', init, '.txt"',
 #                     ' -f"', forest, '.txt"',
@@ -350,6 +361,58 @@ rm(data, var)
 # cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
 # close(bash)
 # rm(bash, i, command)
+```
+
+```{r md Results, fig.height=12, fig.width=12}
+# Load stack
+# md <- loadStack('~/Documents/ECOFOG/Results/disturbance/monoculture/disturbance/models/')
+# save(md, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/disturbance/md.Rdata')
+
+# Data prep & check
+# datal <- extractData(md)
+# save(datal, file = '~/Documents/ECOFOG/Results/disturbance/monoculture/disturbance/mdData.Rdata')
+load('~/Documents/ECOFOG/Results/disturbance/monoculture/disturbance/mdData.Rdata')
+data <- datal$time
+data <- data[data$time %in% round(data$time),]
+data <- data[data$time > 550,]
+orig <- data.frame(apply(data[c('agb','ba','n10','n30')],
+                         2, function(x) tapply(x, data$sim, mean)))
+load('~/Documents/ECOFOG/Results/disturbance/monoculture/disturbance/mdData.Rdata')
+data <- datal$time
+data <- data[data$time %in% round(data$time),]
+species <- 'Dicorynia_guianensis'
+data <- data[grep(species, data$sim),]
+orig <- orig[grep(species, row.names(orig)),]
+data[which(names(data)%in%names(orig))] <- sapply(
+  names(orig), function(var){
+     x <- data[,which(names(data)==var)]/orig[,which(names(orig)==var)]
+  })
+thresh <- 0.01
+data$stability <- as.numeric(unlist(apply(data[c('agb', 'n10')], 1, function(x) x[1] > (1-thresh) & x[2] > (1-thresh))))
+data$stability.first <- 0
+data[
+  sapply(unique(data$sim), function(s) 
+  row.names(data[which(data$sim == s & data$stability == 1),])[
+    which.min(data[which(data$sim == s & data$stability == 1),'time'])]),
+  'stability.first'] <- 1
+data$disturbance <- unlist(lapply(sapply(as.character(data$sim), strsplit, split = '.', fixed = T), '[[', 2))
+g <- ggplot(data, aes(x = n10, y = agb, group = sim,
+                 shape = disturbance, color = time, 
+                 label = paste('Resilience of', 
+                               disturbance, '% loss\nof BA in', 
+                               time, 'years'))) + 
+  geom_point() +
+  geom_hline(yintercept = 1, col = 'red') +
+  geom_vline(xintercept = 1, col = 'red') +
+  xlab('Resilience of number of stems above 10 cm dbh') +
+  ylab('Resilience of number of aboveground biomass') +
+  scale_color_continuous('Time (years)') +
+  scale_shape_discrete('Disturbance intensity\n(% of basal area loss)') +
+  geom_point(data=data[data$stability.first == 1,],color="red",size=3) +
+  geom_label_repel(data=data[data$stability.first == 1,],
+                   nudge_x = data$n10)
+
+rm(data, g)
 ```
 
 ## Communities
@@ -371,9 +434,9 @@ rm(data, var)
 # load('~/Documents/ECOFOG/Results/disturbance/maturity/mature.Rdata')
 # invisible(lapply(mature@layers, function(l){
 #   cat(l@name, '\n')
-#   try(inventoryFromOutput(l, paste0('forest_', l@name, '.txt'), file.path(path, 'disturbance')))
+#   inventoryFromOutput(l, paste0('forest_', l@name, '.txt'), file.path(path, 'disturbance'))
 # }))
-# Bash
+# # Bash
 # if('disturbance.sh' %in% list.files(file.path(path, 'disturbance')))
 #    unlink(file.path(path, 'disturbance', 'disturbance.sh'))
 # bash <- file(file.path(path, 'disturbance', 'disturbance.sh'), open = 'a')
@@ -397,6 +460,62 @@ rm(data, var)
 # cat(' echo "TROLL all jobs done"  \n\n', file = bash, append = TRUE)
 # close(bash)
 # rm(bash, i, command)
+```
+
+```{r d Results, fig.height=12, fig.width=12}
+# Load stack
+# disturbance <- loadStack('~/Documents/ECOFOG/Results/disturbance/disturbance/models/')
+# save(disturbance, file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbance.Rdata')
+
+# Data prep & check
+# datal <- extractData(disturbance)
+# save(datal, file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceData.Rdata')
+load('~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceData.Rdata')
+data <- datal$time
+data <- data[data$time %in% round(data$time),]
+data <- data[which(data$sim %in% 
+                     paste0('125.5', c('.0', '.25', '.50', '.75'))),]
+g0 <- ggplot(data, aes(x = time, y = agb, color = sim)) +
+  geom_point() + geom_line()
+time <- unique(data$time)
+data <- sapply(time, function(t){
+  data_t <- subset(data, time == t)
+  T0 <- which(data_t$sim == '125.5.0')
+  data_t[c('agb', 'ba', 'n10', 'n30')] <- apply(data_t[c('agb', 'ba', 'n10', 'n30')], 2, function(x) x/x[T0])
+  return(data_t[-T0,])
+}, simplify = F)
+data <- do.call('rbind', data)
+g1 <- ggplot(data, aes(x = time, y = agb, color = sim)) +
+  geom_point() + geom_line()
+doe <- strsplit(as.character(data$sim), '.', fixed = T)
+data$richness <- as.factor(unlist(lapply(doe, '[[', 1)))
+data$disturbance <- as.factor(unlist(lapply(doe, '[[', 3)))
+rm(doe)
+thresh <- 0.05
+data$stability <- as.numeric(unlist(apply(data[c('agb', 'n10')], 1, function(x) x[1] > (1-thresh) & x[2] > (1-thresh))))
+data$stability.first <- 0
+data[
+  sapply(unique(data$sim), function(s) 
+  row.names(data[which(data$sim == s & data$stability == 1),])[
+    which.min(data[which(data$sim == s & data$stability == 1),'time'])]),
+  'stability.first'] <- 1
+g2 <- ggplot(data, aes(x = n10, y = agb, group = sim,
+                 shape = disturbance, color = time, 
+                 label = paste('Resilience of', 
+                               disturbance, '% loss\nof BA in', 
+                               time, 'years'))) + 
+  geom_point() +
+  geom_hline(yintercept = 1, col = 'red') +
+  geom_vline(xintercept = 1, col = 'red') +
+  xlab('Resilience of stems above 10 cm dbh') +
+  ylab('Resilience of number of aboveground biomass') +
+  scale_color_continuous('Time (years)') +
+  scale_shape_discrete('Disturbance intensity\n(% of basal area loss)') +
+  geom_point(data=data[data$stability.first == 1,],color="red",size=3) +
+  geom_label_repel(data=data[data$stability.first == 1,],
+                   nudge_x = data$n10)
+cowplot::plot_grid(g0,g1,g2)
+rm(data, var)
 ```
 
 # Selective logging
