@@ -344,9 +344,13 @@ BE %>%
   summarise(mean = mean(value, na.rm = T), 
             'standard deviation' = sd(value, na.rm = T)) %>% 
   filter(variable != 'n30') %>% 
-  bind_cols(., data.frame(unit = 
-                            c('$tonC.ha^{-1}$', '$m^2.ha^{-1}$', '$n.ha^{-1}$', '$n.ha^{-1}$', 
-                              '$MgC.ha^{-1}$', '$MgC.ha^{-1}$', '$MgC.ha^{-1}$', '$MgC.ha^{-1}$'))) %>% 
+  bind_cols(., data.frame(
+    name = c('aboveground biomass', 'basal area', 'number of stems', 
+             'number of stems above 10cm dbh', 'growth primary production', 
+             'net primary production', 'autotrophic respiration during day',
+             'autotrophic respiration during night'),
+    unit = c('$tonC.ha^{-1}$', '$m^2.ha^{-1}$', '$n.ha^{-1}$', '$n.ha^{-1}$', 
+             '$MgC.ha^{-1}$', '$MgC.ha^{-1}$', '$MgC.ha^{-1}$', '$MgC.ha^{-1}$'))) %>% 
   kable(caption = 'Table 1: Biodiversity net effect mean value and standard deviation for different ecosystem variable.', digits = 3)
 ```
 
