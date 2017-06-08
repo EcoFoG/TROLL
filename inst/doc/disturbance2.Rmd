@@ -1,5 +1,5 @@
 ---
-title: "Disturbance"
+title: "Tropical forest ecosystem answer to disturbance"
 author: "Sylvain Schmitt sylvain.schmitt@agroparistech.fr"
 date: '`r Sys.Date()`'
 output:
@@ -10,19 +10,19 @@ output:
     toc_float: yes
   pdf_document: default
   word_document: default
-# csl: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/csl/mee.csl
-# bibliography: /home/ECOFOG/sylvain.schmitt/Documents/Bibliography/library.bib
 csl: /home/sylvain/Documents/Bibliography/csl/mee.csl
 bibliography: /home/sylvain/Documents/Bibliography/library.bib
+link-citations: yes
+colorlinks: yes
 ---
 
 ```{r config, message=FALSE, warning=FALSE, include=FALSE}
 rm(list = ls()) ; invisible(gc())
 library(knitr)
-library(parallel)
 library(TROLL)
 library(RconTroll)
 library(ggplot2)
+library(ggrepel)
 library(cowplot)
 library(entropart)
 library(plotly)
@@ -30,7 +30,7 @@ library(readr)
 library(dplyr)
 library(reshape2)
 opts_chunk$set(
-  echo = F, message = F, warning = F, fig.height = 8, fig.width = 8,
+  echo = F, message = F, warning = F, fig.height = 8, fig.width = 12,
     cache = T, cache.lazy = F)
 path <- '~/Documents/ECOFOG/Results/disturbance/disturbance/data'
 ```
@@ -50,9 +50,50 @@ cbind.all <- function(x, y) {
 }
 ```
 
-# Data preparation
+This document presents the results from the disturbance simulations within TROLL model [@Chave1999]. We realized 240 simulations of 4 levels of disturbance with 60 different species assemblages encompassing varying level of both taxonomic and functional diversity. We adapted @Henry2012 framework to measure resilience of ecosystem outputs agregated in ecosystem functions (forest dynmaic, forest production, and forest diversity). We used the cummulative integral of the distance from the ecosystem to equilibrium over 600 years after the disturbance events as a measure of forest ecosystem resilience efficiency. In addition, we used @Loreau2001 biodiversity partioning to study importance of selection and complementarity effects in forest ecosystem answer to disturbance. We found that increased functional diversity was inmproving ecosystem answer to disturbance with a better resilience. In addition, increased taxonomix diversity was increasing chance to have resilient forest exosystems. Finally, we found that the complementarity effects was responsible for early answer of ecosystem to disturbance whereas the selection effects has a long term importance into ecosytem resilience. **Discussion**.
 
-```{r DOE}
+# Introduction
+
+See [master thesis introduction](https://sylvainschmitt.github.io/master-thesis/introduction.html) (**Warning, work in progress**).
+
+# Material and methods
+
+## Design of experiment
+
+In order to assess the role of biodiversity in ecosystem answer to both disturbance, we needed to create a space of experiments encompassing both variation of disturbance, biodiversity and time. Disturbance was represented by percentage of basal area loss (0%, 25%, 50% and 75%), or as a selective logging simulation. Biodiversity was integrated with two components of its components: taxonomic and functional diversities. We used species richness $SR$ to represents taxonomic diversity (5, 25, and 125 species). Functional diversity can be related to numerous components, and @Borgy2017 argued for 5: richness, divergence, regularity, overlap and mean. Because mature forest were created from a bare soil with TROLL simulations, we could not control a priori divergence, regularity and overlap but only assess theim before diturbance. Consequently, we focused on functional richness with convex hull volume $CHV$ and functional mean with community weighted mean $CWM$. For each level of species richness $SR$, we selected 20 communities with growing convex hull volume $CHV$ but with a community weighted means close to the regional species pool community weighted means. Effectivelly, we did not wanted drastic change in community means that could have more effect than functional richness itself. This design of experiments resulted in 60 communities ($5~SR*20~CHV$) and 240 simulations ($60 ~communities*4~levels~of~disturbance$) over 600 years (maturity being assumed after 500 years of regeneration [@Li]). Figure 1 presents the design of experiment for communities biodiversity after the mature forest were simulated, and thus before disturbance. We obtained a broad range of both functionl dispersion $FDis$ and aboveground biomass $AGB$ for simulated forest ecosystems before disturbance.
+
+```{r DOE, echo=FALSE, fig.cap='Figure 1: Experimental design before disturbance. Communities are implemented along a gradient of species richness (SR) and functional dispersion (FDis) resulting in a broad range of aboveground biomass (AGB). FDis was caluclated based on 4 functional traits (leaf mass per area, wood specific gravity, maximum diameter, and maximum height).', cache=TRUE}
+# Data prep
+load('~/Documents/ECOFOG/Results/disturbance/maturity/matureData.Rdata')
+data <- datal$time
+data <- data[data$time > 450,]
+data <- data.frame(apply(data[c('agb','ba','n10','n30')],
+                         2, function(x) tapply(x, data$sim, mean)))
+data <- cbind(data.frame(sim = row.names(data)), data)
+data$richness <- as.factor(floor(as.numeric(as.character(data$sim))))
+species <- read.table('~/Documents/ECOFOG/TROLL/inst/extdata/species.txt',
+                      header=T, dec=".", sep="",
+                      row.names = 1)[c('LMA', 'wsg', 'dmax', 'hmax')]
+species <- species[row.names(datal$species),]
+fd <- suppressWarnings(FD::dbFD(species, t(datal$species), messages = F))
+data <- cbind(data, do.call('cbind',
+                            fd[c('FRic', 'FEve', 'FDiv', 'FDis', 'RaoQ')]))
+data <- cbind(data, fd$CWM)
+rm(fd, species, datal)
+
+# Graph
+g <- ggplot(data, aes(x = FDis, y = richness, 
+                      label = sim, color = agb/1000)) + 
+  geom_point(size = 3) + 
+  geom_text_repel() +
+  scale_color_continuous("Aboveground\nBiomass\n(AGB, ton C/ha)") +
+  xlab("Functional dispersion (FDis)") +
+  ylab("Species richness (SR)")
+
+g ; rm(data, g)
+```
+
+```{r DOE data}
 rich <- c(5,25,125)
 cvh <- 1:20
 dist <- c(0,25,50,75)
@@ -90,15 +131,62 @@ load(file.path(path, 'disturbanceDOE.Rdata'))
 rm(cbind.all)
 ```
 
+## Ecosystem answer analysis
 
-```{r Communities}
+### Ecosystem functions
+
+Tropical forest ecosystems provides numerous ecosystem services linked to several ecosystem functions. We decided to describe simiulated tropical forests in three major functions: forest dynamic, forest production, and forest diversity. Forest dynamic was represented by aboveground biomass ($AGB$ in $ton~C.ha^{-1}$), basal area ($BA$ in $m^2.ha^{-1}$), total number of stem ($N$), number of stem above $10~cm$ diameter ($N10$), and number of stem above $30~cm$ diameter ($N30$). Forest production was represented by growth pimary productivity ($GPP$ in $MgC.ha^{-1}$), net pimary productivity ($NPP$ in $MgC.ha^{-1}$), tree autotrophic respiration in day ($Rday$ in $MgC.ha^{-1}$) and tree autotrophic respiration in night ($Rnight$ in $MgC.ha^{-1}$). Finally, forest diversity was represented by **??**.
+
+The resilience of metrics values post disturbance were assessed through @Henry2012 formula:
+
+\begin{equation}
+  R\left(t\right)=\frac{Recovery\left(t\right)}{Loss\left(t_d\right)} \approx \frac{X_T(t)}{X_C(t)}
+\end{equation}
+
+The resilience of the system $R(t)$ at the time $t$ is described by the ratio of recovery $Recovery(t)$ at time $t$ to loss suffered $Loss(t_d)$ at disturbance time $t_d$. But in our peculiar case of tropical forest ecosystems, the equilibrium used to calculate $Loss(t_d)$ can not be reduced to a specific time if the equilibrium is dynamic. Consequently, to encompass undisturbed ecosystem variations throught time, we simulated an undisturbed control ecosystem $C$. And the resilience of the system $R(t)$ at the time $t$ was defined as the ratio of the ecosystem metric values in the disturbed simulation $X_T(t)$ over the the ecosystem metric values from the control $X_C(t)$ . Thus, the value of resilience $R(t)$ is normalized for all simulations and metrics. $R(t)$  will be equal to $R_{eq} = 1$ when reaching the equilibrium value. Consequently we can calculate an euclidean distance to equilibrium $d_{eq}(t)$ as $d_{eq}(t) = \sqrt{(R_{eq} - R(t))^2}$. Ecosystem euclidean distance to equilibrium was calculated in a multi-dimensional space for all three functions described above: forest dynamic (AGB, BA, N, N10, and N30), forest production (GPP, NPP, Rday, and Rnight) and forest diversity (**?**). We then used cummulative integral over time of eulcidean distance to equilibrium to assess simulations resilience.
+
+### Biodiversity effect
+
+Biodiversity is not only a facet of the experimental design and an ecosystem output through forest diversity, but also interact on ecosystem functioning and consequently on its answer to disturbance. Biodiversity ecosystem functioning relation can be split in complementarity and selection effect with @Loreau2001 partitioning:
+
+\begin{equation}
+  \begin{array}{c}
+    NE = X_O - X_E = CE + SE \\
+    CE = N* \overline{\Delta RX} \overline{M}\\
+    SE = N*cov(\Delta RX,M)
+  \end{array}
+\end{equation}
+
+Biodiversity net effect $NE$ is based on the difference between ecosystem variable $X$ observed value $X_O$ within the community mixture of species and its expected value $X_E$ if species performance were equal to their performance in monocultures. This effect can be partitioned between complementarity effect $CE$, representing niche partitionning, positive interactions, and resource supply, and selectvie effect $SE$ due to dominant species pool driving the ecosystem. Both metrics depend on the variation of relative ecosystem variable $\Delta RX$:
+
+\begin{equation}
+  \Delta RX_{sp} = \frac{X_{sp}(mixture)}{X_{sp}(monoculture)} - P_{sp}
+\end{equation}
+
+$X_{sp}$ is the ecosystem variable value for one species either in mixture $X_{sp}(mixture)$ or in monoculture $X_{sp}(monoculture)$. $P_{sp}$ is the proportion of the species in the mixture represented by species relative abundance. Consequently, $CE$ averages diversity effects of all species presents in the mixture (both negatives and positives). Whereas $SE$ become positive when dominant species outperform theimselves in mixture than in monoculture, and negative when less dominant species outperform theimselves in mixture than in monoculture [@Tobner2016]. But similarly to resilience measurement, biodiversity net effect $NE$ can be in a dynamic equilibrium and vary over time without disturbance. So in order to correctly assess selection and complementarity effect in answer to disturbance, we normalized it by undisturbed control ecosystem net effect $NE_C$ to measure treatments net effect resilience $R(NE_T)$:
+
+\begin{equation}
+  \Delta R(NE_T) = \frac{NE_T}{NE_C} = \frac{SE_T}{NE_C} + \frac{CE_T}{NE_C}
+\end{equation}
+
+
+Resilience trajectories of ecosystem variable after disturbance were partitioned between complementarity effect $CE$ and selection effect $SE$. In order to do that, the design of experiment was repeated for each species indivdually representing 652 simulations of monoculture.
+
+# Results
+
+## Ecosystem functions
+
+```{r ecosystem}
 # disturbance <- loadStack('~/Documents/ECOFOG/Results/disturbance/disturbance/models/')
 # save(disturbance, 
      # file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbance.Rdata')
 # ecosystem <- extractData(disturbance)
 # save(ecosystem, file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceData.Rdata')
-load(file.path(path, 'disturbanceData.Rdata'))
 # data <- ecosystem
+load(file.path(path, 'disturbanceData.Rdata'))
+```
+
+```{r resilience}
 # sim <- c(sapply(rich, function(r) paste0(r, '.', cvh)))
 # time <- unique(data$time)
 # resilience <- sapply(sim, function(s){
@@ -125,13 +213,6 @@ deq <- data.frame(
   production = apply(resilience[c('gpp', 'npp', 'Rday', 'Rnight')], 1, 
                   function(x) sqrt(sum((rep(1, length(x)) - x)^2)))
 )
-# g1 <- ggplot(subset(deq, sim %in% paste0('25.5', c('.0', '.25', '.50', '.75'))), 
-#        aes(x = time, y = structure, color = sim)) + 
-#   geom_point() + geom_line() + ylab('distance to structure equilibrium') 
-# g2 <- ggplot(subset(deq, sim %in% paste0('25.5', c('.0', '.25', '.50', '.75'))), 
-#        aes(x = time, y = production, color = sim)) + 
-#   geom_point() + geom_line() + ylab('distance to production equilibrium') 
-# cowplot::plot_grid(g1, g2)
 ```
 
 ```{r Ieq}
@@ -142,37 +223,70 @@ Ieq <- sapply(sim, function(s){
 }, simplify = F) ; rm(sim)
 Ieq <- data.frame(do.call('rbind', Ieq))
 names(Ieq)[3:4] <- paste0('Ieq.', names(Ieq)[3:4])
+```
 
-# Graphical analysis
-data <- Ieq %>% 
+We transformed all ecosystem outputs from the 240 simulations in resilience metrics normalizing the treatment values by their corresponding control (Figure 2.A et 2.B). We then gathered ecosystem outputs by main ecosystem functions (forest dynamic, forest production and forest diversity) to compute ecosystem distance to equilibrium (Figure 2.C). Finally, we integrated dsitance to equilibrium in a cummulative sum over time (Figure 2.D). 
+
+```{r data process, echo=FALSE, fig.cap='Figure 2: Ecosystem outputs data transformation. Ecosystem outputs (**A**) are normalized by the control value over time to calculate resilience (**B**); resilience of different ecosystem outputs is then used in a multidimensional space to caluclate ecosystem distance to equilibrium (**C**); finally distance ot equilibirum is integrated over time in a cummulative sum (**D**). ', cache=TRUE}
+g_agb <- ecosystem %>% 
+  left_join(., doe, by = 'sim') %>%
+  filter(richness == 125) %>% 
+  filter(cvh == 1) %>% 
+  ggplot(aes(x = time, y = agb/1000, color = disturbance)) +
+  geom_point() +
+  xlab('Time (years)') +
+  ylab('Aboveground biomass (tonC/ha)') +
+  scale_color_discrete('Disturbance\nintensity\n(% of BA)')
+g_resilience <- resilience %>% 
+  left_join(., doe, by = 'sim') %>%
+  filter(richness == 125) %>% 
+  filter(cvh == 1) %>% 
+  ggplot(aes(x = time, y = agb, color = disturbance)) +
+  geom_hline(yintercept = 1, col = 'red') +
+  geom_point() +
+  xlab('Time (years)') +
+  ylab('Resilience of aboveground biomass') +
+  scale_color_discrete('Disturbance\nintensity\n(% of BA)')
+g_deq <- deq %>% 
+  left_join(., doe, by = 'sim') %>%
+  filter(richness == 125) %>% 
+  filter(cvh == 1) %>% 
+  ggplot(aes(x = time, y = structure, color = disturbance)) +
+  geom_hline(yintercept = 0, col = 'red') +
+  geom_point() +
+  xlab('Time (years)') +
+  ylab('Distance to forest dynamic equilibrium\n(AGB, BA, N, N10 and N30)') +
+  scale_color_discrete('Disturbance\nintensity\n(% of BA)')
+g_Ieq <- Ieq %>% 
+  left_join(., doe, by = 'sim') %>%
+  filter(richness == 125) %>% 
+  filter(cvh == 1) %>% 
+  ggplot(aes(x = time, y = Ieq.structure, color = disturbance)) +
+  geom_point() +
+  xlab('Time (years)') +
+  ylab('Cummulative integral of\ndistance to forest dynamic equilibrium\n(AGB, BA, N, N10 and N30)') +
+  scale_color_discrete('Disturbance\nintensity\n(% of BA)')
+cowplot::plot_grid(g_agb, g_resilience, g_deq, g_Ieq, labels = LETTERS[1:4])
+```
+
+The ranking was stable over time for the 240 simulations. So we used the cummulative integral after 600 years $Ieq_{600}$ as a measurement of ecosystem resilience. We compared cummulative integral after 600 years to communities taxonomic and functional diversity for each leavel of disturbance (see Figure 3). We found that increased functional diversity [FDiv, @villeger_new_2008] was reducing cummulative integral from ecosystem distance to forest dynamic equilibrium after 600 years ($Ieq_{600}$). In addition, functional eveness was complementary reducing $Ieq_{600}$. Finally species richness was not directly link to $Ieq_{600}$. Effectivelly, low species richness could result in variant $Ieq_{600}$, but increased species richness resulted in increased functional diversity and consequently lower $Ieq_{600}$. We found similar results for all disturbance levels and other ecosystem functions (forest production and forest diversity).
+
+```{r gIeq, echo=FALSE, fig.cap='Figure 3: Ecosystem resilience after 600 years with taxonomic and functional diversity for different levels of disturbance. Cummulative integral from ecosystem distance to forest dynamic equilibrium after 600 years was represented against functional diversity [FDiv, @villeger_new_2008] for different level of disturbance (25, 50 and 75% of total basal area); dot shapes represents the species richness whereas dot color represents functional eveness [FEve, @villeger_new_2008].', cache=TRUE}
+Ieq %>% 
   left_join(., doe, by = 'sim') %>% 
-  filter(time == 600) 
-# vars <- c('richness', 'FRic', 'FEve', 'FDiv', 'CWM.LMA', 'CWM.wsg')
-# g1 <- sapply(vars, function(var)
-#   ggplot(data, aes_string(x = var, y = 'Ieq.structure')) + 
-#   geom_point() +
-#   facet_wrap(~disturbance, scales = "free"), simplify = F)
-# g2 <- sapply(vars, function(var)
-#   ggplot(data, aes_string(x = var, y = 'Ieq.production')) + 
-#   geom_point() +
-#   facet_wrap(~disturbance, scales = "free"), simplify = F)
-# g.prod <- ggplot(data, aes(x = FDiv, y = Ieq.production, label = sim,
-#                        shape = richness, color = FEve)) +
-# geom_point() +
-# facet_wrap(~disturbance, scales = "free")
-g <- ggplot(data, aes(x = FDiv, y = Ieq.structure, label = sim)) + 
+  filter(time == 600) %>% 
+  ggplot(aes(x = FDiv, y = Ieq.structure, label = sim)) + 
   geom_smooth(method = 'lm', alpha = 0.3, colour= 'grey') +
   geom_point(aes(shape = richness, color = FEve)) +
   facet_wrap(~disturbance, scales = "free", labeller = 'label_both') + 
   xlab('Functional diversity (FDiv)') +
   ylab('Cummulative integral from ecosystem 
-       distance to equilibrium after 600 years') +
+       distance to forest dynamic equilibrium after 600 years') +
   scale_shape_discrete('Species\nrichness\n(SR)') +
   scale_color_continuous('Functional\neveness\n(FEve)')
-
 ```
 
-
+## Biodiversity effect
 
 ```{r BE}
 ## Biodiversity Net Effect ##
@@ -192,15 +306,6 @@ g <- ggplot(data, aes(x = FDiv, y = Ieq.structure, label = sim)) +
 # save(BE,
 # file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceBE.Rdata')
 load(file.path(path, 'disturbanceBE.Rdata'))
-
-# g <- BE %>%
-#   left_join(., doe, by = 'sim') %>%
-#   filter(richness == 25) %>%
-#   filter(cvh == 10) %>%
-#   ggplot(aes(x = time, y = gpp, color = BE)) +
-#   facet_wrap(~ disturbance) +
-#   geom_hline(yintercept = 0, col = 'red') +
-#   geom_point()
 ```
 
 ```{r BEresilience}
@@ -223,8 +328,12 @@ load(file.path(path, 'disturbanceBE.Rdata'))
 # save(BEresilience,
 # file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceBErecovery.Rdata')
 load(file.path(path, 'disturbanceBErecovery.Rdata'))
+```
 
-g <- BEresilience %>% 
+We measured all ecosystem outputs biodiversity net effect by comparing theim to their species corresponding monoculture simulations. The net effect was then partition between slection and complementarity effect. We normalized treatments effect by control net effect to measure their aboveground biomass resilience to disturbance (see Figure 4). We found that complementarity effect was recovering net effect in the first decades untill it disappeared after a century. On the contrary selection effect was reduced or even removed by the disturbance. It increased during the whole simulation and was greater than complementarity effect only after decades. The time lag for which complementarity effect was non null and greater than selection effect was increasing with disturbance intensity. Finally 600 years after the disturbance event biodiversity net effect was still not recovered for a disturbance intensity greater than 25% of basal area.
+
+```{r gBE, echo=FALSE, fig.cap='Figure 4: Resilience of complementarity and selection effects. Complementarity effect (CE) and selection effect (SE) where normalized by control net effect (NEc), thus measuring their resilience over time.', cache=TRUE}
+BEresilience %>% 
   left_join(., doe, by = 'sim') %>%
   filter(richness == 125) %>% 
   filter(BE %in% c('SE', 'CE')) %>% 
@@ -235,10 +344,14 @@ g <- BEresilience %>%
             n=n()) %>% 
   ggplot(aes(x = time)) +
   geom_hline(yintercept = 1, color = 'red') +
+  geom_hline(yintercept = 0, color = 'blue') +
   geom_ribbon(aes(ymin = qt1, ymax = qt2, fill = BE), alpha = 0.3) +
   geom_line(aes(y = mean, color = BE)) +
-  facet_grid(richness ~ disturbance, labeller = 'label_both')
+  facet_grid(richness ~ disturbance, labeller = 'label_both') +
+  xlab('Time (years)') +
+  ylab('Recovery of aboveground biomass net effect')
 ```
 
+# Discussion
 
 # References
