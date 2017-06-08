@@ -332,7 +332,7 @@ load(file.path(path, 'disturbanceBErecovery.Rdata'))
 
 We measured all ecosystem outputs biodiversity net effect by comparing theim to their species corresponding monoculture simulations. The net effect was then partition between selection and complementarity effect. We normalized treatments effect by control net effect (see Table 1) to measure their aboveground biomass resilience to disturbance (see Figure 4). We found that complementarity effect was recovering net effect in the first decades untill it disappeared after a century. On the contrary selection effect was reduced or even removed by the disturbance. It increased during the whole simulation and was greater than complementarity effect only after decades. The time lag for which complementarity effect was non null and greater than selection effect was increasing with disturbance intensity. Finally 600 years after the disturbance event biodiversity net effect was still not recovered for a disturbance intensity greater than 25% of basal area. We obtained those results for aboveground biomass. We found similar results but with an amlified signal for basal area ($BA$) and stem abundance ($N$ but with an inverted signal because of the forest self thinning) (see Supplementary materials S2). Finally, forest growth primary productivity ($GPP$) recovered in few years (proportionnaly to disturbance), and its net effect was maintained by complementarity effect (see Supplementary materials S2).
 
-```{r NE control}
+```{r NE table}
 BE %>%
   mutate(agb = agb/1000) %>% 
   filter(BE == 'NE') %>%
@@ -380,7 +380,7 @@ BEresilience %>%
 
 ## S1: Ecosystem functions
 
-Supplementary materials S1 presents ecosystem resilience after 600 years with taxonomic and functional diversity for different levels of disturbance. It encompass all functionnal diversity components [FRIC, FEve, FDiv, and FDis, @villeger_new_2008]. And it presents results for both forest dynamic (Figure S1.1) and forest production (Figure S1.2)0
+Supplementary materials S1 presents ecosystem resilience after 600 years with taxonomic and functional diversity for different levels of disturbance. It encompass all functionnal diversity components [FRIC, FEve, FDiv, and FDis, @villeger_new_2008]. And it presents results for both forest dynamic (Figure S1.1) and forest production (Figure S1.2).
 
 ```{r Ieq.structure all var, echo=FALSE, fig.cap='Figure S1.1: Ecosystem resilience after 600 years with taxonomic and functional diversity for different levels of disturbance. Cummulative integral from ecosystem distance to forest dynamic equilibrium after 600 years was represented against functional diversity [FRIC, FEve, FDiv, and FDis, @villeger_new_2008] for different level of disturbance (25, 50 and 75% of total basal area); dot shapes represents the species richness.', cache=TRUE}
 Ieq %>% 
@@ -392,8 +392,8 @@ Ieq %>%
   geom_smooth(method = 'lm', alpha = 0.3, colour= 'grey') +
   geom_point(aes(shape = richness)) +
   facet_grid(variable~disturbance, scales = "free", labeller = 'label_both') + 
-  xlab('Functional diversity') +
-  ylab('Cummulative integral from ecosystem 
+  ylab('Functional diversity') +
+  xlab('Cummulative integral from ecosystem 
        distance to forest dynamic equilibrium after 600 years') +
   scale_shape_discrete('Species\nrichness\n(SR)')
 ```
@@ -408,8 +408,8 @@ Ieq %>%
   geom_smooth(method = 'lm', alpha = 0.3, colour= 'grey') +
   geom_point(aes(shape = richness)) +
   facet_grid(variable~disturbance, scales = "free", labeller = 'label_both') + 
-  xlab('Functional diversity') +
-  ylab('Cummulative integral from ecosystem 
+  ylab('Functional diversity') +
+  xlab('Cummulative integral from ecosystem 
        distance to forest production equilibrium after 600 years') +
   scale_shape_discrete('Species\nrichness\n(SR)')
 ```
