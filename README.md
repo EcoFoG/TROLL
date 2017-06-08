@@ -16,6 +16,7 @@ Documentation
     -   <https://sylvainschmitt.github.io/TROLL/sensitivity>
 -   Disturbance:
     -   <https://sylvainschmitt.github.io/TROLL/disturbance>
+    -   <https://sylvainschmitt.github.io/TROLL/disturbance2>
 -   Minimum LMA:
     -   <https://sylvainschmitt.github.io/TROLL/LMAmin>
 -   Leaf lifespan:
