@@ -186,6 +186,26 @@ Resilience trajectories of ecosystem variable after disturbance were partitioned
 load(file.path(path, 'disturbanceData.Rdata'))
 ```
 
+```{r forest diversity}
+# load(file.path(path, 'disturbanceData.Rdata'))
+# diversity <- lapply(disturbance@layers, function(layer){
+#   cat(layer@name, '\n')
+#   apply(layer@abundances$relabund, 1, entropart::Diversity, q = 1)})
+# diversity <- do.call('cbind', diversity)
+# diversity <- diversity[seq(0,7200,12),]
+# diversity <- melt(diversity)
+# names(diversity) <- c('time', 'sim', 'div1')
+# save(diversity, 
+#      file = '~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceDiv.Rdata')
+load('~/Documents/ECOFOG/Results/disturbance/disturbance/disturbanceDiv.Rdata')
+diversity %>% 
+  left_join(., doe, by = 'sim') %>%
+  ggplot(aes(x = time, y = div1, color = FDiv)) +
+  facet_grid(richness ~ disturbance, scale = 'free') +
+  geom_point()
+```
+
+
 ```{r resilience}
 # sim <- c(sapply(rich, function(r) paste0(r, '.', cvh)))
 # time <- unique(data$time)
@@ -439,6 +459,5 @@ BEresilience %>%
   ylab('Recovery of variable net effect') + 
   ylim(-2.5,2.5)
 ```
-
 
 # References

@@ -15,6 +15,8 @@ getBE <- function(sim,
   
   # Species DeltaRY
   d <- strsplit(sim@name, '.', fixed = T)[[1]][3]
+  if(is.na(d))
+    d <- 0
   DeltaRY <- array(dim = c(600,length(vars),length(species))) # time*DelatRvars*sp
   M <- array(dim = c(600,length(vars),length(species))) # time*DelatRvars*sp
   for(i in seq_len(length(species))){

@@ -518,10 +518,4 @@ cowplot::plot_grid(g0,g1,g2)
 rm(data, var)
 ```
 
-# Selective logging
-
-## Monoculture
-
-## Communities
-
 # References

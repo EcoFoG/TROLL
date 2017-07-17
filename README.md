@@ -25,6 +25,7 @@ Documentation
     -   <https://docs.google.com/spreadsheets/d/1WI7F2s-tnGG8r983lBEgnCiuvX61-g0y0xY7H_dr7dg/edit?usp=sharing>
 -   Sylviculture:
     -   <https://sylvainschmitt.github.io/TROLL/sylviculture>
+    -   <https://sylvainschmitt.github.io/TROLL/sylviculture2>
 -   Rotten :
     -   <https://sylvainschmitt.github.io/TROLL/rotten>
     -   <https://sylvainschmitt.github.io/TROLL/rotten2>
