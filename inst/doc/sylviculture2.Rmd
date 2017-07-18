@@ -215,18 +215,18 @@ Ieq <- data.frame(do.call('rbind', Ieq))
 names(Ieq)[3:4] <- paste0('Ieq.', names(Ieq)[3:4])
 ```
 
-```{r gIeq, echo=FALSE, fig.cap='Figure 1: Ecosystem resilience after 600 years with taxonomic and functional diversity. Cummulative integral from ecosystem distance to forest dynamic equilibrium after 600 years was represented against functional richness [FRic, @villeger_new_2008] ; dot shapes represents the species richness whereas dot color represents the disturbed basal area (m2/ha).', cache=TRUE}
+```{r gIeq, echo=FALSE, fig.cap='Figure 1: Ecosystem resilience after 600 years with taxonomic and functional diversity. Cummulative integral from ecosystem distance to forest structure equilibrium after 600 years normalized by disturbed basal area was represented against functional richness [FRic, @villeger_new_2008]. Dot color represents the species richness (nb) whereas dot size represents the disturbed basal area (m2/ha). Grey line represents the linear regression and grey area the confidence interval.', cache=TRUE}
 Ieq %>% 
   left_join(., doe, by = 'sim') %>% 
   filter(time == 600) %>% 
   ggplot(aes(x = FRic, y = Ieq.structure/ba, label = sim)) + 
   geom_smooth(method = 'lm', alpha = 0.3, colour= 'grey') +
-  geom_point(aes(shape = richness, color = ba/16)) +
+  geom_point(aes(color = richness, size = ba/16)) +
   xlab('Functional richness (FRic)') +
   ylab('Cummulative integral from ecosystem 
        distance to forest dynamic equilibrium after 600 years') +
-  scale_shape_discrete('Species\nrichness\n(SR)') +
-  scale_color_continuous('Basla\narea\ndisturbed\n(m2/ha)')
+  scale_color_discrete('Species\nrichness\n(SR)') +
+  scale_size_continuous('Basla\narea\ndisturbed\n(m2/ha)')
 ```
 
 ```{r lmIeq, results='asis'}
@@ -306,7 +306,7 @@ BEresilience %>%
 
 Supplementary materials S1 presents ecosystem resilience after 600 years with taxonomic and functional diversity for different levels of disturbance. It encompass all functionnal diversity components [FRIC, FEve, FDiv, and FDis, @villeger_new_2008]. And it presents results for both forest dynamic (Figure S1.1) and forest production (Figure S1.2).
 
-```{r Ieq.structure all var, echo=FALSE, fig.cap='Figure S1.1: Ecosystem resilience after 600 years with taxonomic and functional diversity. Cummulative integral from ecosystem distance to forest dynamic equilibrium after 600 years was represented against functional diversity [FRIC, FEve, FDiv, and FDis, @villeger_new_2008] and level of disturbed basal area (ba in m2/ha); dot shapes represents the species richness.', cache=TRUE}
+```{r Ieq.structure all var, echo=FALSE, fig.cap='Figure S1.1: Ecosystem resilience after 600 years with taxonomic and functional diversity. Cummulative integral from ecosystem distance to forest structure equilibrium after 600 years normalized by disturbed basal area was represented against functional functional diversity [FRIC, FEve, FDiv, and FDis, @villeger_new_2008]. Dot color represents the species richness (nb) whereas dot size represents the disturbed basal area (m2/ha). Grey line represents the linear regression and grey area the confidence interval.', cache=TRUE}
 Ieq %>% 
   left_join(., doe, by = 'sim') %>% 
   filter(time == 600) %>%
@@ -314,15 +314,16 @@ Ieq %>%
   melt(id.vars = c('Ieq.structure', 'ba', 'richness')) %>% 
   ggplot(aes(x = Ieq.structure/ba, y = value)) + 
   geom_smooth(method = 'lm', alpha = 0.3, colour= 'grey') +
-  geom_point(aes(shape = richness)) +
+  geom_point(aes(color = richness, size = ba/16)) +
   facet_wrap(~variable, scales = "free", labeller = 'label_both') + 
   ylab('Functional diversity') +
   xlab('Cummulative integral from ecosystem 
        distance to forest dynamic equilibrium after 600 years') +
-  scale_shape_discrete('Species\nrichness\n(SR)')
+  scale_color_discrete('Species\nrichness\n(SR)') +
+  scale_size_continuous('Basla\narea\ndisturbed\n(m2/ha)')
 ```
 
-```{r Ieq.production all var, echo=FALSE, fig.cap='Figure S1.1: Ecosystem resilience after 600 years with taxonomic and functional diversity. Cummulative integral from ecosystem distance to forest production equilibrium after 600 years was represented against functional diversity [FRIC, FEve, FDiv, and FDis, @villeger_new_2008] and level of disturbed basal area (ba in m2/ha); dot shapes represents the species richness.', cache=TRUE}
+```{r Ieq.production all var, echo=FALSE, fig.cap='Figure S1.2: Ecosystem resilience after 600 years with taxonomic and functional diversity. Cummulative integral from ecosystem distance to forest functionning equilibrium after 600 years normalized by disturbed basal area was represented against functional functional diversity [FRIC, FEve, FDiv, and FDis, @villeger_new_2008]. Dot color represents the species richness (nb) whereas dot size represents the disturbed basal area (m2/ha). Grey line represents the linear regression and grey area the confidence interval.', cache=TRUE}
 Ieq %>% 
   left_join(., doe, by = 'sim') %>% 
   filter(time == 600) %>%
@@ -330,12 +331,13 @@ Ieq %>%
   melt(id.vars = c('Ieq.production', 'ba', 'richness')) %>% 
   ggplot(aes(x = Ieq.production/ba, y = value)) + 
   geom_smooth(method = 'lm', alpha = 0.3, colour= 'grey') +
-  geom_point(aes(shape = richness)) +
+  geom_point(aes(color = richness, size = ba/16)) +
   facet_wrap(~variable, scales = "free", labeller = 'label_both') + 
   ylab('Functional diversity') +
   xlab('Cummulative integral from ecosystem 
        distance to forest dynamic equilibrium after 600 years') +
-  scale_shape_discrete('Species\nrichness\n(SR)')
+  scale_color_discrete('Species\nrichness\n(SR)') +
+  scale_size_continuous('Basla\narea\ndisturbed\n(m2/ha)')
 ```
 
 ## S2: Biodiversity effect
