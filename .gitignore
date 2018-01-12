@@ -1,23 +1,14 @@
+# R
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
 .Rbuildignore
-inst/extdata/
-inst/doc/*_cache
-inst/doc/*_files
-inst/doc/*.pdf
-inst/doc/*.docx
-inst/doc/*.html
-inst/doc/vert.txt
 *.rds
 *.Rdata
-inst/tools/*.txt
-inst/tools/troll*
-inst/tools/OUTPUT
-inst/tools/test
-inst/tools/mature*
-*.png
-inst/thesis/*.log
-inst/thesis/*.pdf
-inst/thesis/*.tex
+# Data
+Data/
+# TROLL
+TROLL/*.txt
+TROLL/troll*
+TROLL/test

@@ -1,34 +1,9 @@
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
 TROLL
 =====
 
-*Personnal package to use TROLL model*
+*Repository for TROLL sylviculture model development and use*
 
-Function and code to manage and use forest model indivdual-based and spatially-explicit TROLL.
+Function and code to develop and use sylviculture module of forest model indivdual-based and spatially-explicit TROLL.
 
-Documentation
--------------
-
--   Home:
-    -   <https://sylvainschmitt.github.io/TROLL/>
--   Sensitivity:
-    -   <https://sylvainschmitt.github.io/TROLL/sensitivity>
--   Disturbance:
-    -   <https://sylvainschmitt.github.io/TROLL/disturbance>
-    -   <https://sylvainschmitt.github.io/TROLL/disturbance2>
--   Minimum LMA:
-    -   <https://sylvainschmitt.github.io/TROLL/LMAmin>
--   Leaf lifespan:
-    -   <https://sylvainschmitt.github.io/TROLL/LL>
-    -   <https://sylvainschmitt.github.io/TROLL/LL2>
-    -   <https://docs.google.com/spreadsheets/d/1WI7F2s-tnGG8r983lBEgnCiuvX61-g0y0xY7H_dr7dg/edit?usp=sharing>
--   Sylviculture:
-    -   <https://sylvainschmitt.github.io/TROLL/sylviculture>
-    -   <https://sylvainschmitt.github.io/TROLL/sylviculture2>
--   Rotten :
-    -   <https://sylvainschmitt.github.io/TROLL/rotten>
-    -   <https://sylvainschmitt.github.io/TROLL/rotten2>
-    -   <https://sylvainschmitt.github.io/TROLL/rotten3>
--   Hurt :
-    -   <https://sylvainschmitt.github.io/TROLL/hurt>
+Some functions need the *species.txt* files included in the Data folder not present in the online repository.

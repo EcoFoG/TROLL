@@ -5,6 +5,12 @@
 
 # TROLL 0.1.9029
 
+* Branch opening
+* Repository cleaning
+* EcoFoG transfer (Nino onternship)
+
+# TROLL 0.1.9029
+
 * Pre EcoFoG transfer (Nino onternship)
 
 # TROLL 0.1.9028
