@@ -105,9 +105,9 @@ _OUTPUT_reduced=0,      /* reduced set of ouput files */
 _OUTPUT_last100=0,      /* output that tracks the last 100 years of the simulation for the whole grid (2D) */
 _OUTPUT_fullLAI=0,      /* output of full final voxel field */
 _OUTPUT_fullFinal=1,	/* output of full final pattern with all tree attributes */
-_FromData=1,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
+_FromData=0,            /* if defined, an additional input file can be provided to start simulations from an existing data set or a simulated data set (5 parameters are needed: x and y coordinates, dbh, species_label, species */
 _DISTURBANCE=0,			/* if defined: implementation of a basic perturbance module at a given iteration step in waiting for a more sofisticated sylviculture module */
-_LOGGING=1;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
+_LOGGING=0;			/* if defined: implementation of a selective logging module imulating sylviculture as it is happening in french guiana */
 
 
 /********************************/

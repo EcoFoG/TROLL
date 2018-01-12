@@ -3,6 +3,10 @@
 * automatic integration of Paracou and Guyafor data into virtual forest for simulations
 * sylviculture module in main.cpp
 
+# TROLL 0.1.9029
+
+* Pre EcoFoG transfer (Nino onternship)
+
 # TROLL 0.1.9028
 
 * LL with more traits
